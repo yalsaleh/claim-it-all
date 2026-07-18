@@ -1,0 +1,18 @@
+{
+  "name": "contractradar",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ContractRadar monorepo — GCC construction entitlement and notice-detection platform",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "data-plane:up": "bash scripts/dev-data-plane.sh up",
+    "data-plane:down": "bash scripts/dev-data-plane.sh down",
+    "data-plane:ps": "bash scripts/dev-data-plane.sh ps",
+    "lint": "echo \"Apps not scaffolded yet — see docs/backlog/phase-1.md (A1/A2)\"",
+    "test": "echo \"Apps not scaffolded yet — see docs/backlog/phase-1.md (A1/A2)\"",
+    "typecheck": "echo \"Apps not scaffolded yet — see docs/backlog/phase-1.md (A1/A2)\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

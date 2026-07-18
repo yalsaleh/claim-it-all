@@ -1,0 +1,189 @@
+# ContractRadar — Security
+
+Enterprise construction portfolios contain contracts, pricing, delay narratives, and dispute strategy. A breach is not only a privacy incident — it can compromise live commercial positions. This document defines the security baseline for ContractRadar.
+
+---
+
+## 1. Threat context
+
+**Assets**
+
+- Contract documents and amendments
+- Correspondence and engineer instructions
+- Payment and cost evidence
+- Entitlement event analyses and notice drafts
+- Audit trails and user identity data
+
+**Primary threats**
+
+- Cross-tenant data exposure
+- Unauthorized project access within a tenant
+- Exfiltration via AI provider prompts/logs
+- Tampering with evidence or audit history
+- Credential stuffing / session hijacking
+- Malicious file upload (malware, zip bombs)
+- Prompt injection via document content influencing trusted outputs
+- Insider misuse (over-privileged staff)
+
+---
+
+## 2. Security principles
+
+1. **Least privilege** — default deny; grant by role and project membership.
+2. **Tenant isolation** — every data path is tenant-scoped.
+3. **Evidence integrity** — originals immutable; mutations produce new versions + audit.
+4. **Human control** — no autonomous legal outward actions.
+5. **Defense in depth** — app checks + storage IAM + network controls (+ optional DB RLS).
+6. **Secure defaults** — encryption on, public buckets off, verbose doc logging off.
+7. **Assume document content is hostile** — treat uploads as untrusted input to AI and parsers.
+
+---
+
+## 3. Authentication
+
+- Strong password policy or magic-link with rate limiting (Phase 1).
+- HTTP-only, Secure, SameSite session cookies.
+- Server-side session revocation.
+- Lockout / throttling on auth endpoints.
+- MFA and SSO (SAML/OIDC) for enterprise tenants (later phases).
+- Separate credentials for internal service-to-service calls.
+
+---
+
+## 4. Authorization
+
+- RBAC with tenant and project scopes (see ARCHITECTURE.md).
+- Authorization enforced on the server for every mutation and sensitive read.
+- UI hiding is not a security control.
+- `auditor_readonly` cannot mutate events or notices.
+- Elevation (e.g., tenant admin accessing a project) is audited.
+
+---
+
+## 5. Multi-tenant isolation
+
+| Control | Requirement |
+|---------|-------------|
+| Data model | Mandatory `tenant_id` on tenant-owned tables |
+| Queries | Central helpers that require tenant context |
+| Jobs | Jobs carry tenant/project ids; workers re-check access |
+| Object storage | Keys prefixed `tenants/{tenant_id}/...`; no listing across prefixes for users |
+| Caching | Cache keys include tenant id |
+| Testing | Automated cross-tenant negative tests in CI |
+
+Optional later: PostgreSQL Row Level Security as defense-in-depth; dedicated DB/schema for regulated clients.
+
+---
+
+## 6. Data protection
+
+### In transit
+
+- TLS for all external traffic.
+- Internal service traffic on private networks; authenticate callers.
+
+### At rest
+
+- Database encryption at rest (cloud default or volume encryption).
+- Object storage SSE (SSE-S3 or customer-managed KMS where required).
+- Secrets in env / secret manager — never in git.
+
+### Field precision & integrity
+
+- Checksums on stored objects.
+- Write-once original versions.
+- Audit log append-only via API policy.
+
+---
+
+## 7. Document upload safety
+
+- Validate content types and size limits.
+- Compute hashes; store separately from filename (filenames are display metadata only).
+- Malware scanning interface; required in hardened deployments.
+- Isolate parsing/OCR in workers with resource limits.
+- Do not execute embedded macros or external links during processing.
+
+---
+
+## 8. AI and prompt security
+
+- Document text may contain prompt-injection attempts (“ignore instructions…”).
+- System prompts and tool policies must instruct models to extract/classify only; never to invent contractual deadlines.
+- Structured output validation before execute/persist.
+- Strip or avoid sending unnecessary sensitive fields to providers.
+- Contractual + technical controls: no provider training on customer data where the vendor API allows.
+- Store model run metadata; avoid logging full prompt bodies with sensitive clauses at info level in production.
+- Tenant allowlists for which providers/models may be used.
+
+---
+
+## 9. Logging and monitoring
+
+**Do log:** request ids, tenant ids, user ids, job ids, error codes, auth failures (without passwords).
+
+**Do not log:** raw document contents, notice draft bodies, access tokens, pre-signed URL query signatures, payment primary account numbers (if ever processed).
+
+Alert on: repeated auth failures, cross-tenant denial spikes, malware detections, privilege changes, mass downloads.
+
+---
+
+## 10. Auditability
+
+- Immutable audit records for security-relevant actions (see ARCHITECTURE.md §13).
+- Retention policies configurable per tenant (enterprise).
+- Export for customer security reviews without exposing other tenants.
+
+---
+
+## 11. Secure development
+
+- Dependency scanning in CI.
+- Lint + typecheck + tests required for merge when app code exists.
+- No secrets in fixtures; sample docs only in `data/samples` / `tests/fixtures`.
+- Code review for tenancy, authz, and deadline/legal labeling changes.
+- Environment variable validation at process start.
+
+---
+
+## 12. Deployment & operations
+
+- Separate environments: local / staging / production.
+- Distinct credentials per environment.
+- Least-privilege cloud IAM for compute accessing S3/DB.
+- Backups encrypted; restore tested.
+- Client-hosted mode: customer manages network boundaries; product provides hardening guide.
+- Feature flag `FEATURE_AUTO_SEND_NOTICES` remains forced off; no production path enables autonomous send.
+
+---
+
+## 13. Privacy & regional considerations
+
+- GCC customers may require data residency — support region selection / client-hosted deployment.
+- Minimize PII in extractions; personnel names in correspondence are business data but still sensitive.
+- Provide tenant-level data export and deletion workflows (enterprise phase) consistent with contractual commitments.
+
+---
+
+## 14. Incident response (baseline)
+
+1. Contain (revoke sessions, rotate keys, isolate tenant if needed).
+2. Assess blast radius using audit logs and access logs.
+3. Preserve forensic evidence.
+4. Notify affected customers per contractual/legal duties.
+5. Remediate and add regression tests.
+
+---
+
+## 15. Phase 1 security checklist
+
+- [ ] `.env.example` without real secrets; `.env` gitignored
+- [ ] Session cookies secured
+- [ ] Tenant scoping middleware / query helpers
+- [ ] Cross-tenant integration tests
+- [ ] Pre-signed downloads only
+- [ ] Internal token between web and document-intelligence
+- [ ] Redacted structured logging
+- [ ] Upload size/type limits
+- [ ] Legal disclaimer copy: AI outputs are not final legal advice
+- [ ] No notice auto-send code paths

@@ -1,0 +1,79 @@
+# ContractRadar local data plane
+# Usage from repo root:
+#   docker compose -f infrastructure/docker/docker-compose.yml up -d
+#
+# Application containers will be added when apps/web and
+# services/document-intelligence are scaffolded in Phase 1.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: contractradar-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: contractradar
+      POSTGRES_PASSWORD: contractradar
+      POSTGRES_DB: contractradar
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U contractradar -d contractradar"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: contractradar-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: contractradar-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Creates the default bucket used by .env.example
+  minio-init:
+    image: minio/mc:latest
+    container_name: contractradar-minio-init
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing local/contractradar-documents;
+      mc anonymous set none local/contractradar-documents;
+      exit 0;
+      "
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

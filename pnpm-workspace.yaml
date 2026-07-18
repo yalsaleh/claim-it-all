@@ -1,0 +1,4 @@
+# Activated when Phase 1 scaffolds application packages.
+packages:
+  - "apps/*"
+  - "packages/*"

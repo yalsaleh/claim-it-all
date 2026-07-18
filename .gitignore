@@ -1,0 +1,83 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.turbo/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+secrets/
+credentials/
+
+# Next.js / frontend
+apps/web/.next/
+apps/web/out/
+apps/web/coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Prisma
+apps/web/prisma/*.db
+apps/web/prisma/*.db-journal
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+
+# Logs and runtime
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test / coverage
+coverage/
+htmlcov/
+.coverage
+.nyc_output/
+
+# Local object storage / data dumps
+.minio/
+tmp/
+.tmp/
+*.tmp
+data/local/
+uploads/
+
+# Terraform
+infrastructure/terraform/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Docker volumes
+infrastructure/docker/volumes/
+
+# Generated
+*.generated.*
+.cache/

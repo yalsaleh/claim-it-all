@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  foundation:
+    name: Foundation checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose file
+        run: docker compose -f infrastructure/docker/docker-compose.yml config --quiet
+
+      - name: Verify required documentation exists
+        run: |
+          set -e
+          for f in \
+            README.md \
+            ARCHITECTURE.md \
+            DOMAIN_MODEL.md \
+            ROADMAP.md \
+            DECISIONS.md \
+            SECURITY.md \
+            docs/backlog/phase-1.md
+          do
+            test -f "$f" || (echo "Missing $f" && exit 1)
+          done
+          echo "Documentation set present."
