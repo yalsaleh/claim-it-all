@@ -24,23 +24,87 @@ PY_OUT="artifacts/live-python.log"
 : >"${WEB_OUT}"
 : >"${PY_OUT}"
 
+sanitize_log() {
+  # Strip signed URL / credential material from streamed diagnostics.
+  sed -E \
+    -e 's/X-Amz-[A-Za-z0-9_-]+=[^&\s"]+/X-Amz-REDACTED=REDACTED/g' \
+    -e 's#(password|secret|token|authorization)=[^[:space:]]+#\1=REDACTED#gi' \
+    -e 's#postgresql://[^@[:space:]]+@#postgresql://***@#g'
+}
+
+dump_sidecar_diagnostics() {
+  echo ""
+  echo "==== Live process status ===="
+  for label_pid in "arq-worker:/tmp/arq-worker.pid" "outbox-dispatcher:/tmp/outbox.pid" "document-intelligence:/tmp/di-api.pid"; do
+    label="${label_pid%%:*}"
+    pidfile="${label_pid##*:}"
+    if [[ -f "${pidfile}" ]]; then
+      pid="$(cat "${pidfile}")"
+      if kill -0 "${pid}" 2>/dev/null; then
+        echo "${label}: pid=${pid} alive"
+      else
+        echo "${label}: pid=${pid} DEAD"
+      fi
+    else
+      echo "${label}: pid file missing (${pidfile})"
+    fi
+  done
+
+  echo ""
+  echo "==== ARQ worker log (tail) ===="
+  if [[ -f /tmp/arq-worker.log ]]; then
+    tail -n 150 /tmp/arq-worker.log | sanitize_log || true
+  else
+    echo "(missing /tmp/arq-worker.log)"
+  fi
+
+  echo ""
+  echo "==== Outbox dispatcher log (tail) ===="
+  # Startup writes /tmp/outbox.log; accept alias name too.
+  if [[ -f /tmp/outbox.log ]]; then
+    tail -n 150 /tmp/outbox.log | sanitize_log || true
+  elif [[ -f /tmp/outbox-dispatcher.log ]]; then
+    tail -n 150 /tmp/outbox-dispatcher.log | sanitize_log || true
+  else
+    echo "(missing /tmp/outbox.log)"
+  fi
+
+  echo ""
+  echo "==== Document-intelligence API log (tail) ===="
+  # Startup writes /tmp/di-api.log; workflow also symlinks document-intelligence.log.
+  if [[ -f /tmp/di-api.log ]]; then
+    tail -n 150 /tmp/di-api.log | sanitize_log || true
+  elif [[ -f /tmp/document-intelligence.log ]]; then
+    tail -n 150 /tmp/document-intelligence.log | sanitize_log || true
+  else
+    echo "(missing /tmp/di-api.log)"
+  fi
+}
+
 echo "==> Web live suite"
 set +e
-npx pnpm@9.15.0 --filter @contractradar/web test:live >"${WEB_OUT}" 2>&1
-WEB_RC=$?
+# Keep a full log artifact, but also stream to CI so failures are visible.
+npx pnpm@9.15.0 --filter @contractradar/web test:live 2>&1 | tee "${WEB_OUT}" | sanitize_log
+WEB_RC=${PIPESTATUS[0]}
 set -e
-# Print sanitized summary lines only (avoid dumping signed URLs if any)
-grep -E '✓|×|↓|Test Files|Tests |FAIL|Error:|passed|failed|skipped' "${WEB_OUT}" || true
+
+echo ""
+echo "==> Web live failure excerpts"
+# Always surface diagnostics + assertion/timeout detail (not only ✓/× summary lines).
+grep -E \
+  '✓|×|↓|FAIL|Error:|AssertionError|Timed out|live-ingestion|live-stage|Test Files|Tests |passed|failed|skipped|LiveTestStageError|expected|received' \
+  "${WEB_OUT}" | sanitize_log | tail -n 200 || true
 
 echo "==> Python live suite"
 set +e
 (
   cd services/document-intelligence
   pytest -q -k live --junitxml="${ROOT_DIR}/artifacts/live-python-junit.xml"
-) >"${PY_OUT}" 2>&1
-PY_RC=$?
+) 2>&1 | tee "${PY_OUT}" | sanitize_log
+PY_RC=${PIPESTATUS[0]}
 set -e
-grep -E 'PASSED|FAILED|SKIPPED|passed|failed|skipped|error|=' "${PY_OUT}" || true
+
+grep -E 'PASSED|FAILED|SKIPPED|passed|failed|skipped|error|AssertionError|arq_live_diagnostics|=' "${PY_OUT}" | sanitize_log | tail -n 80 || true
 
 fail_on_skips() {
   local file="$1"
@@ -67,6 +131,10 @@ fail_on_skips "${PY_OUT}" "python-live" || PY_RC=1
 if grep -Eiq 'X-Amz-Signature=|X-Amz-Credential=' "${WEB_OUT}" "${PY_OUT}"; then
   echo "ERROR: signed URL material detected in live test output"
   exit 1
+fi
+
+if [[ "${WEB_RC}" -ne 0 ]]; then
+  dump_sidecar_diagnostics
 fi
 
 if [[ "${WEB_RC}" -ne 0 || "${PY_RC}" -ne 0 ]]; then

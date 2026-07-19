@@ -121,13 +121,24 @@ async def run_loop() -> None:
     settings = get_settings()
     configure_logging(settings.log_level)
     await db.connect()
-    logger.info("outbox_dispatcher_started", extra={"poll": settings.outbox_poll_seconds})
+    logger.info(
+        "outbox_dispatcher_started",
+        extra={
+            "poll": settings.outbox_poll_seconds,
+            "arq_queue_name": settings.arq_queue_name,
+        },
+    )
     try:
         while True:
             try:
-                await dispatch_once()
+                count = await dispatch_once()
+                if count:
+                    logger.info("outbox_dispatch_batch", extra={"dispatched": count})
             except Exception as exc:  # noqa: BLE001
-                logger.error("outbox_loop_error", extra={"error": exc.__class__.__name__})
+                logger.error(
+                    "outbox_loop_error",
+                    extra={"error": exc.__class__.__name__, "detail": str(exc)[:200]},
+                )
             await asyncio.sleep(settings.outbox_poll_seconds)
     finally:
         await db.close()

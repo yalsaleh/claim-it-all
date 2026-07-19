@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 from uuid import uuid4
 
 from document_intelligence.config import get_settings
@@ -18,6 +20,28 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _safe_stage(
+    stage: str,
+    *,
+    processing_run_id: str,
+    document_version_id: str,
+    correlation_id: str,
+    outcome: Optional[str] = None,
+    error_code: Optional[str] = None,
+) -> None:
+    logger.info(
+        "document_job_stage",
+        extra={
+            "stage": stage,
+            "processing_run_id": processing_run_id,
+            "document_version_id": document_version_id,
+            "correlation_id": correlation_id,
+            "outcome": outcome,
+            "error_code": error_code,
+        },
+    )
+
+
 async def process_document_version(
     ctx: dict[str, Any],
     *,
@@ -27,6 +51,12 @@ async def process_document_version(
 ) -> dict[str, str]:
     """ARQ job: malware scan → promote original → extract → persist artifacts/segments."""
     settings = get_settings()
+    _safe_stage(
+        "job-received",
+        processing_run_id=processing_run_id,
+        document_version_id=document_version_id,
+        correlation_id=correlation_id,
+    )
     run = await db.fetchrow(
         """
         SELECT r.id, r."tenantId", r."projectId", r."documentVersionId", r.status, r."attemptNumber"
@@ -37,6 +67,13 @@ async def process_document_version(
     )
     if run is None:
         logger.warning("processing_run_missing", extra={"correlation_id": correlation_id})
+        _safe_stage(
+            "database-finalized",
+            processing_run_id=processing_run_id,
+            document_version_id=document_version_id,
+            correlation_id=correlation_id,
+            outcome="missing_run",
+        )
         return {"status": "missing_run"}
 
     version = await db.fetchrow(
@@ -50,7 +87,21 @@ async def process_document_version(
         document_version_id,
     )
     if version is None:
+        _safe_stage(
+            "database-finalized",
+            processing_run_id=processing_run_id,
+            document_version_id=document_version_id,
+            correlation_id=correlation_id,
+            outcome="missing_version",
+        )
         return {"status": "missing_version"}
+
+    _safe_stage(
+        "authoritative-records-loaded",
+        processing_run_id=processing_run_id,
+        document_version_id=document_version_id,
+        correlation_id=correlation_id,
+    )
 
     # Reject queue payload tampering
     if (
@@ -74,6 +125,13 @@ async def process_document_version(
 
     # Idempotent success short-circuit
     if run["status"] == "SUCCEEDED":
+        _safe_stage(
+            "database-finalized",
+            processing_run_id=processing_run_id,
+            document_version_id=document_version_id,
+            correlation_id=correlation_id,
+            outcome="already_complete",
+        )
         return {"status": "already_succeeded"}
 
     now = datetime.now(timezone.utc)
@@ -129,7 +187,20 @@ async def process_document_version(
         )
         return {"status": "failed"}
 
+    _safe_stage(
+        "scanner-started",
+        processing_run_id=processing_run_id,
+        document_version_id=document_version_id,
+        correlation_id=correlation_id,
+    )
     scan = get_scanner().scan(data, version["originalFilename"])
+    _safe_stage(
+        "scanner-completed",
+        processing_run_id=processing_run_id,
+        document_version_id=document_version_id,
+        correlation_id=correlation_id,
+        outcome=scan.status,
+    )
     await db.execute(
         """
         INSERT INTO ingestion_event
@@ -179,11 +250,25 @@ async def process_document_version(
             f"MALWARE_{scan.status}",
             scan.detail_safe,
         )
+        _safe_stage(
+            "database-finalized",
+            processing_run_id=processing_run_id,
+            document_version_id=document_version_id,
+            correlation_id=correlation_id,
+            outcome="infected" if scan.status == "INFECTED" else "scanner_error",
+            error_code=f"MALWARE_{scan.status}",
+        )
         return {"status": "malware_blocked"}
 
     # Promote quarantine → originals if needed (verify checksum before ACCEPTED)
     storage_key = version["storageKey"]
     if "/quarantine/" in storage_key:
+        _safe_stage(
+            "promotion-started",
+            processing_run_id=processing_run_id,
+            document_version_id=document_version_id,
+            correlation_id=correlation_id,
+        )
         original_key = (
             f"tenants/{version['tenantId']}/projects/{version['projectId']}/"
             f"originals/{document_version_id}/{uuid4().hex}"
@@ -207,8 +292,22 @@ async def process_document_version(
                 f"Quarantine promotion failed: {exc.__class__.__name__}",
                 retryable=True,
             )
+            _safe_stage(
+                "database-finalized",
+                processing_run_id=processing_run_id,
+                document_version_id=document_version_id,
+                correlation_id=correlation_id,
+                outcome="promotion_error",
+                error_code="PROMOTION_FAILED",
+            )
             return {"status": "failed"}
         storage_key = original_key
+        _safe_stage(
+            "promotion-completed",
+            processing_run_id=processing_run_id,
+            document_version_id=document_version_id,
+            correlation_id=correlation_id,
+        )
 
     await db.execute(
         """
@@ -224,6 +323,12 @@ async def process_document_version(
         storage_key,
     )
 
+    _safe_stage(
+        "extraction-started",
+        processing_run_id=processing_run_id,
+        document_version_id=document_version_id,
+        correlation_id=correlation_id,
+    )
     extraction = extract_for_media(version["mediaType"], version["extension"], data)
     artifact_id = str(uuid4())
     text_bytes = (extraction.plain_text or "").encode("utf-8")
@@ -375,6 +480,21 @@ async def process_document_version(
         datetime.now(timezone.utc),
     )
 
+    _safe_stage(
+        "extraction-completed",
+        processing_run_id=processing_run_id,
+        document_version_id=document_version_id,
+        correlation_id=correlation_id,
+        outcome=run_status,
+    )
+    _safe_stage(
+        "database-finalized",
+        processing_run_id=processing_run_id,
+        document_version_id=document_version_id,
+        correlation_id=correlation_id,
+        outcome=run_status.lower(),
+        error_code=None if run_status != "FAILED" else "EXTRACTION_FAILED",
+    )
     logger.info(
         "processing_completed",
         extra={

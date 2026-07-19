@@ -217,10 +217,17 @@ jobs:
           echo $! >/tmp/arq-worker.pid
           nohup python -m document_intelligence.outbox.dispatcher >/tmp/outbox.log 2>&1 &
           echo $! >/tmp/outbox.pid
+          ln -sfn /tmp/outbox.log /tmp/outbox-dispatcher.log
+          ln -sfn /tmp/di-api.log /tmp/document-intelligence.log
           sleep 2
           if ! kill -0 "$(cat /tmp/arq-worker.pid)" 2>/dev/null; then
             echo "ERROR: ARQ worker exited immediately after start"
             tail -n 120 /tmp/arq-worker.log || true
+            exit 1
+          fi
+          if ! kill -0 "$(cat /tmp/outbox.pid)" 2>/dev/null; then
+            echo "ERROR: outbox dispatcher exited immediately after start"
+            tail -n 120 /tmp/outbox.log || true
             exit 1
           fi
 

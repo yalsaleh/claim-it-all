@@ -3,7 +3,14 @@ import { hasCapability } from '@contractradar/authz';
 import { requireProjectCapability } from '@/server/authz/context';
 import { writeAuditLog } from '@/server/audit';
 import { withTenantTransaction } from '@/server/db/tenant-context';
-import { conflict, forbidden, notFound, tooManyRequests, validationError } from '@/server/errors';
+import {
+  AppError,
+  conflict,
+  forbidden,
+  notFound,
+  tooManyRequests,
+  validationError,
+} from '@/server/errors';
 import {
   consumeDownloadRateLimit,
   consumeProcessingRetryRateLimit,
@@ -360,9 +367,15 @@ export async function completeDocumentUpload(rawInput: unknown) {
 
   const env = getServerEnv();
 
-  return withTenantTransaction(
+  // Rejection updates must commit before throwing — a thrown AppError aborts the
+  // interactive transaction and would otherwise roll back REJECTED/FAILED status.
+  type CompleteTxResult =
+    | { ok: true; value: Record<string, unknown> }
+    | { ok: false; error: AppError };
+
+  const outcome = await withTenantTransaction(
     { tenantId: bootstrap.tenantId, userId: bootstrap.user.id },
-    async (tx) => {
+    async (tx): Promise<CompleteTxResult> => {
       const session = await tx.uploadSession.findFirst({
         where: {
           id: parsed.data.uploadSessionId,
@@ -375,12 +388,15 @@ export async function completeDocumentUpload(rawInput: unknown) {
       // Idempotent replay after session accepted (version may still be awaiting malware)
       if (session.status === 'ACCEPTED' && session.documentVersionId) {
         return {
-          uploadSessionId: session.id,
-          sourceDocumentId: session.sourceDocumentId,
-          documentVersionId: session.documentVersionId,
-          status: 'ACCEPTED' as const,
-          duplicate: false,
-          replayed: true,
+          ok: true,
+          value: {
+            uploadSessionId: session.id,
+            sourceDocumentId: session.sourceDocumentId,
+            documentVersionId: session.documentVersionId,
+            status: 'ACCEPTED' as const,
+            duplicate: false,
+            replayed: true,
+          },
         };
       }
 
@@ -390,7 +406,10 @@ export async function completeDocumentUpload(rawInput: unknown) {
           where: { id: session.id },
           data: { status: 'EXPIRED', failureCode: 'EXPIRED' },
         });
-        throw validationError('Upload session has expired');
+        return {
+          ok: false,
+          error: validationError('Upload session has expired'),
+        };
       }
 
       if (session.status !== 'UPLOAD_AUTHORIZED' && session.status !== 'UPLOADED') {
@@ -420,9 +439,12 @@ export async function completeDocumentUpload(rawInput: unknown) {
             failureDetailSafe: 'Uploaded object was not found in storage.',
           },
         });
-        throw validationError(
-          'Uploaded object was not found. Complete only after a successful PUT.',
-        );
+        return {
+          ok: false,
+          error: validationError(
+            'Uploaded object was not found. Complete only after a successful PUT.',
+          ),
+        };
       }
 
       if (head.contentLength !== Number(session.declaredSizeBytes)) {
@@ -434,11 +456,14 @@ export async function completeDocumentUpload(rawInput: unknown) {
             failureDetailSafe: 'Stored object size does not match the declared size.',
           },
         });
-        throw validationError('Stored object size does not match the declared size.');
+        return {
+          ok: false,
+          error: validationError('Stored object size does not match the declared size.'),
+        };
       }
 
       if (head.contentLength === 0) {
-        throw validationError('Zero-byte uploads are rejected.');
+        return { ok: false, error: validationError('Zero-byte uploads are rejected.') };
       }
 
       const bytes = await getObjectBytes({
@@ -456,10 +481,13 @@ export async function completeDocumentUpload(rawInput: unknown) {
             failureDetailSafe: 'Checksum verification failed.',
           },
         });
-        throw validationError('Checksum verification failed.');
+        return { ok: false, error: validationError('Checksum verification failed.') };
       }
       if (parsed.data.clientSha256 && parsed.data.clientSha256.toLowerCase() !== digest) {
-        throw validationError('Client checksum does not match server-computed checksum.');
+        return {
+          ok: false,
+          error: validationError('Client checksum does not match server-computed checksum.'),
+        };
       }
 
       const extension =
@@ -474,6 +502,7 @@ export async function completeDocumentUpload(rawInput: unknown) {
         expectedMediaType: session.declaredMediaType,
       });
       if (!magic.ok) {
+        assertUploadSessionTransition('VALIDATING', 'REJECTED');
         await tx.uploadSession.update({
           where: { id: session.id },
           data: {
@@ -482,7 +511,18 @@ export async function completeDocumentUpload(rawInput: unknown) {
             failureDetailSafe: magic.message,
           },
         });
-        throw validationError(magic.message, { code: magic.code });
+        try {
+          await deleteTemporaryObject({
+            bucket: session.storageBucket,
+            key: session.storageKey,
+          });
+        } catch {
+          // best-effort cleanup of rejected spoof object
+        }
+        return {
+          ok: false,
+          error: validationError(magic.message, { code: magic.code }),
+        };
       }
 
       await writeIngestionEvent(tx, {
@@ -526,21 +566,27 @@ export async function completeDocumentUpload(rawInput: unknown) {
             // best-effort cleanup
           }
           return {
-            uploadSessionId: session.id,
-            status: 'CANCELLED' as const,
-            duplicate: true,
-            existingVersion: duplicate,
+            ok: true,
+            value: {
+              uploadSessionId: session.id,
+              status: 'CANCELLED' as const,
+              duplicate: true,
+              existingVersion: duplicate,
+            },
           };
         }
         // Default: surface duplicate for client decision (do not accept yet)
         if (!parsed.data.duplicateDecision) {
           return {
-            uploadSessionId: session.id,
-            sourceDocumentId: session.sourceDocumentId,
-            status: 'DUPLICATE_CONTENT' as const,
-            duplicate: true,
-            sha256: digest,
-            existingVersion: duplicate,
+            ok: true,
+            value: {
+              uploadSessionId: session.id,
+              sourceDocumentId: session.sourceDocumentId,
+              status: 'DUPLICATE_CONTENT' as const,
+              duplicate: true,
+              sha256: digest,
+              existingVersion: duplicate,
+            },
           };
         }
       }
@@ -667,19 +713,27 @@ export async function completeDocumentUpload(rawInput: unknown) {
       });
 
       return {
-        uploadSessionId: session.id,
-        sourceDocumentId: sourceDoc.id,
-        documentVersionId: version.id,
-        processingRunId: run.id,
-        status: 'ACCEPTED' as const,
-        sha256: digest,
-        malwareScanStatus: 'QUEUED',
-        processingStatus: 'QUEUED',
-        duplicate: Boolean(duplicate),
-        replayed: false,
+        ok: true,
+        value: {
+          uploadSessionId: session.id,
+          sourceDocumentId: sourceDoc.id,
+          documentVersionId: version.id,
+          processingRunId: run.id,
+          status: 'ACCEPTED' as const,
+          sha256: digest,
+          malwareScanStatus: 'QUEUED',
+          processingStatus: 'QUEUED',
+          duplicate: Boolean(duplicate),
+          replayed: false,
+        },
       };
     },
   );
+
+  if (!outcome.ok) {
+    throw outcome.error;
+  }
+  return outcome.value;
 }
 
 export async function cancelDocumentUpload(rawInput: unknown) {
