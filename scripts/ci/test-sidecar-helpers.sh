@@ -89,10 +89,24 @@ else
   assert_fail "all mc docker runs override entrypoint (count=${mc_runs})"
 fi
 
-if grep -Fq 'Startup script commit:' scripts/ci/start-live-sidecars.sh; then
-  assert_ok 'prints startup script commit diagnostic'
+if grep -Fq 'git -C "${ROOT_DIR}" rev-parse --short HEAD' scripts/ci/start-live-sidecars.sh \
+  || grep -Fq "git -C \"\${ROOT_DIR}\" rev-parse --short HEAD" scripts/ci/start-live-sidecars.sh; then
+  assert_ok 'prints runtime git rev-parse commit diagnostic'
 else
-  assert_fail 'prints startup script commit diagnostic'
+  assert_fail 'prints runtime git rev-parse commit diagnostic'
+fi
+
+if grep -Fq '*private*|*none*)' scripts/ci/start-live-sidecars.sh; then
+  assert_ok 'privacy validation uses Bash case on runner'
+else
+  assert_fail 'privacy validation uses Bash case on runner'
+fi
+
+# grep must not appear in any minio/mc docker -c payload (regression of 9d08182).
+if grep -nE 'MINIO_MC_IMAGE' -A20 scripts/ci/start-live-sidecars.sh | grep -E "^\s*(grep|sed|awk|jq)\b" >/dev/null; then
+  assert_fail 'no grep/sed/awk/jq beside MINIO_MC_IMAGE docker runs'
+else
+  assert_ok 'no grep/sed/awk/jq beside MINIO_MC_IMAGE docker runs'
 fi
 
 echo "==> No grep/sed/awk inside minio/mc -c payloads"

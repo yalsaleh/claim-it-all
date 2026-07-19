@@ -30,8 +30,10 @@ on:
       - "pnpm-lock.yaml"
 
 concurrency:
+  # Do not cancel in-progress runs: a manual workflow_dispatch on an older SHA
+  # was cancelling the push run that contained the MinIO privacy fix.
   group: live-ingestion-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   validate-images:

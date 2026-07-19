@@ -17,6 +17,7 @@ source "${ROOT_DIR}/scripts/ci/sidecar-helpers.sh"
 MINIO_USER="${S3_ACCESS_KEY_ID:-ci-minio-access}"
 MINIO_PASS="${S3_SECRET_ACCESS_KEY:-ci-minio-secret-ephemeral}"
 MINIO_BUCKET="${S3_BUCKET:-contractradar-documents}"
+MINIO_CONTAINER="contractradar-ci-minio"
 START_CLAMAV="${START_CLAMAV:-true}"
 CLAMAV_START_ATTEMPTED=false
 FIRST_ERR_LINE=""
@@ -41,17 +42,12 @@ on_err() {
 }
 trap 'status=$?; on_err $LINENO "$status"' ERR
 
-STARTUP_SCRIPT_COMMIT="${GITHUB_SHA:-}"
-if [[ -z "${STARTUP_SCRIPT_COMMIT}" ]]; then
-  STARTUP_SCRIPT_COMMIT="$(git -C "${ROOT_DIR}" rev-parse HEAD 2>/dev/null || echo unknown)"
-fi
-STARTUP_SCRIPT_COMMIT_SHORT="$(printf '%s' "${STARTUP_SCRIPT_COMMIT}" | cut -c1-12)"
-
 echo "Runner: $(uname -a)"
 echo "Docker: $(docker version --format '{{.Server.Version}}' 2>/dev/null || docker version | head -5)"
 echo "Images: MINIO=${MINIO_IMAGE} MC=${MINIO_MC_IMAGE} CLAMAV=${CLAMAV_IMAGE} START_CLAMAV=${START_CLAMAV}"
 echo "Using minio/mc with explicit shell entrypoint: yes"
-echo "Startup script commit: ${STARTUP_SCRIPT_COMMIT_SHORT}"
+echo "Startup script commit: $(git -C "${ROOT_DIR}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+echo "GITHUB_SHA: ${GITHUB_SHA:-unset}"
 
 echo "Pulling sidecar images..."
 docker pull "${MINIO_IMAGE}"
@@ -61,8 +57,8 @@ if [[ "${START_CLAMAV}" == "true" ]]; then
 fi
 
 echo "Starting MinIO (${MINIO_IMAGE})..."
-safe_docker_rm contractradar-ci-minio
-docker run -d --name contractradar-ci-minio \
+safe_docker_rm "${MINIO_CONTAINER}"
+docker run -d --name "${MINIO_CONTAINER}" \
   -p 127.0.0.1:9000:9000 \
   -e "MINIO_ROOT_USER=${MINIO_USER}" \
   -e "MINIO_ROOT_PASSWORD=${MINIO_PASS}" \
@@ -71,10 +67,10 @@ docker run -d --name contractradar-ci-minio \
 
 # Confirm the process stayed up (official image exits immediately without `server /data`).
 sleep 2
-if ! docker_container_running contractradar-ci-minio; then
+if ! docker_container_running "${MINIO_CONTAINER}"; then
   echo "ERROR: MinIO container is not running after start"
-  docker ps -a --filter name=contractradar-ci-minio --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' || true
-  safe_docker_logs contractradar-ci-minio 120
+  docker ps -a --filter "name=${MINIO_CONTAINER}" --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' || true
+  safe_docker_logs "${MINIO_CONTAINER}" 120
   exit 1
 fi
 
@@ -86,15 +82,15 @@ wait_http() {
       echo "OK ${name}"
       return 0
     fi
-    if ! docker_container_running contractradar-ci-minio; then
+    if ! docker_container_running "${MINIO_CONTAINER}"; then
       echo "FAIL ${name}: MinIO container exited while waiting"
-      safe_docker_logs contractradar-ci-minio 120
+      safe_docker_logs "${MINIO_CONTAINER}" 120
       return 1
     fi
     sleep 2
   done
   echo "FAIL ${name} not healthy at ${url}"
-  safe_docker_logs contractradar-ci-minio 80
+  safe_docker_logs "${MINIO_CONTAINER}" 80
   return 1
 }
 
@@ -102,57 +98,74 @@ wait_http "http://127.0.0.1:9000/minio/health/live" "minio" 45
 
 echo "Initializing private MinIO bucket (${MINIO_BUCKET})..."
 echo "Using minio/mc with explicit shell entrypoint: yes"
-echo "Startup script commit: ${STARTUP_SCRIPT_COMMIT_SHORT}"
+echo "Startup script commit: $(git -C "${ROOT_DIR}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 # Override ENTRYPOINT ["mc"] so /bin/sh is the process, not an mc argument.
-# Share MinIO's network namespace so 127.0.0.1:9000 reaches the server.
+# Inside minio/mc: only `mc` commands (no grep/sed/awk/jq).
 docker run --rm \
-  --network container:contractradar-ci-minio \
+  --network "container:${MINIO_CONTAINER}" \
   --entrypoint /bin/sh \
   -e MINIO_USER="${MINIO_USER}" \
   -e MINIO_PASS="${MINIO_PASS}" \
   -e MINIO_BUCKET="${MINIO_BUCKET}" \
   "${MINIO_MC_IMAGE}" \
   -c '
-    set -euo pipefail
+    set -eu
     mc alias set local http://127.0.0.1:9000 "$MINIO_USER" "$MINIO_PASS"
     mc mb --ignore-existing "local/${MINIO_BUCKET}"
     mc anonymous set none "local/${MINIO_BUCKET}"
   '
 
 echo "Verifying MinIO bucket privacy..."
-# minio/mc is minimal (no grep/sed/awk). Run only `mc` inside the container;
-# capture stdout and validate on the GitHub runner.
 docker run --rm \
-  --network container:contractradar-ci-minio \
+  --network "container:${MINIO_CONTAINER}" \
   --entrypoint /bin/sh \
   -e MINIO_USER="${MINIO_USER}" \
   -e MINIO_PASS="${MINIO_PASS}" \
   -e MINIO_BUCKET="${MINIO_BUCKET}" \
   "${MINIO_MC_IMAGE}" \
   -c '
-    set -euo pipefail
+    set -eu
     mc alias set local http://127.0.0.1:9000 "$MINIO_USER" "$MINIO_PASS" >/dev/null
     mc ls "local/${MINIO_BUCKET}" >/dev/null
   '
 
+# Capture mc output on the runner; validate with Bash case (not inside minio/mc).
 anonymous_policy="$(
   docker run --rm \
-    --network container:contractradar-ci-minio \
+    --network "container:${MINIO_CONTAINER}" \
     --entrypoint /bin/sh \
     -e MINIO_USER="${MINIO_USER}" \
     -e MINIO_PASS="${MINIO_PASS}" \
     -e MINIO_BUCKET="${MINIO_BUCKET}" \
     "${MINIO_MC_IMAGE}" \
     -c '
-      set -euo pipefail
+      set -eu
       mc alias set local http://127.0.0.1:9000 "$MINIO_USER" "$MINIO_PASS" >/dev/null
       mc anonymous get "local/${MINIO_BUCKET}"
     '
 )"
-assert_minio_anonymous_private "${anonymous_policy}"
+printf 'anonymous_policy=%s\n' "${anonymous_policy}"
+if [[ -z "${anonymous_policy//[[:space:]]/}" ]]; then
+  echo "ERROR: empty mc anonymous get output (fail closed)" >&2
+  exit 1
+fi
+case "${anonymous_policy}" in
+  *private*|*none*)
+    ;;
+  *)
+    echo "ERROR: MinIO bucket does not have a private anonymous-access policy" >&2
+    exit 1
+    ;;
+esac
+# Reject known public-style policies even if the string somehow matched above.
+case "$(printf '%s' "${anonymous_policy}" | tr '[:upper:]' '[:lower:]')" in
+  *download*|*upload*|*public*|*readwrite*)
+    echo "ERROR: MinIO bucket anonymous policy is public-style: ${anonymous_policy}" >&2
+    exit 1
+    ;;
+esac
 
-# Unauthenticated path-style list/get must not succeed (expect 403/404/405, not 200).
-# curl runs on the GitHub runner, not inside minio/mc.
+# Unauthenticated HTTP check on the GitHub runner (curl is not in minio/mc).
 unauth_code="$(curl -sS -o /tmp/minio-unauth.out -w '%{http_code}' \
   --max-time 5 \
   "http://127.0.0.1:9000/${MINIO_BUCKET}/" || true)"
@@ -169,14 +182,14 @@ echo "OK private bucket verified"
 
 # Idempotent re-init must succeed.
 docker run --rm \
-  --network container:contractradar-ci-minio \
+  --network "container:${MINIO_CONTAINER}" \
   --entrypoint /bin/sh \
   -e MINIO_USER="${MINIO_USER}" \
   -e MINIO_PASS="${MINIO_PASS}" \
   -e MINIO_BUCKET="${MINIO_BUCKET}" \
   "${MINIO_MC_IMAGE}" \
   -c '
-    set -euo pipefail
+    set -eu
     mc alias set local http://127.0.0.1:9000 "$MINIO_USER" "$MINIO_PASS"
     mc mb --ignore-existing "local/${MINIO_BUCKET}"
     mc anonymous set none "local/${MINIO_BUCKET}"

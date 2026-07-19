@@ -50,25 +50,19 @@ assert_minio_anonymous_private() {
     echo "ERROR: empty mc anonymous get output (fail closed)" >&2
     return 1
   fi
-  local normalized
-  normalized="$(printf '%s' "${anonymous_policy}" | tr '[:upper:]' '[:lower:]')"
-  case "${normalized}" in
-    *'is `private`'*|*'`private`'*)
-      return 0
-      ;;
-    *'is `none`'*|*'`none`'*)
-      return 0
-      ;;
-    *'is private'*|*'is none'*)
-      return 0
-      ;;
-    *download*|*upload*|*public*|*readwrite*|*write-only*|*read-only*)
-      echo "ERROR: MinIO bucket anonymous policy is not private: ${anonymous_policy}" >&2
-      return 1
+  case "${anonymous_policy}" in
+    *private*|*none*)
       ;;
     *)
-      echo "ERROR: MinIO bucket is not private (unrecognized policy): ${anonymous_policy}" >&2
+      echo "ERROR: MinIO bucket does not have a private anonymous-access policy" >&2
       return 1
       ;;
   esac
+  case "$(printf '%s' "${anonymous_policy}" | tr '[:upper:]' '[:lower:]')" in
+    *download*|*upload*|*public*|*readwrite*)
+      echo "ERROR: MinIO bucket anonymous policy is public-style: ${anonymous_policy}" >&2
+      return 1
+      ;;
+  esac
+  return 0
 }
