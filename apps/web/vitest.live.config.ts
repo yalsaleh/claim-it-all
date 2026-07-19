@@ -10,6 +10,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.live.integration.test.ts'],
+    setupFiles: ['./src/server/live/live-setup.ts'],
     fileParallelism: false,
     hookTimeout: 120_000,
     testTimeout: 120_000,

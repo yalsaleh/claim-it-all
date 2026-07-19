@@ -6,8 +6,22 @@ import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { requireTestDatabaseUrl } from '@/lib/db-url-guard';
-import { isLiveSkip, requireLiveServices } from '@/server/live/live-gate';
+import { getServerEnv } from '@/lib/env';
+import { verifySignedTenantValue } from '@/server/auth/active-tenant-crypto';
+import { getAuthorizedProject, requireProjectCapability } from '@/server/authz/context';
 import { setRlsContext } from '@/server/db/tenant-context';
+import { AppError } from '@/server/errors';
+import {
+  getLiveSignedActiveTenant,
+  setLiveSignedActiveTenant,
+} from '@/server/live/live-active-tenant-state';
+import { formatLiveError, LiveStageTracker } from '@/server/live/live-diagnostics';
+import {
+  bootstrapLiveTenant,
+  inspectFixtureVisibility,
+  type LiveTenantFixture,
+} from '@/server/live/live-fixtures';
+import { isLiveSkip, requireLiveServices } from '@/server/live/live-gate';
 import { satisfiesReadyInvariant } from '@/server/ready/ready-invariant';
 
 vi.mock('@/server/auth/session', () => ({
@@ -18,11 +32,21 @@ vi.mock('@/server/auth/active-tenant', async () => {
   const actual = await vi.importActual<typeof import('@/server/auth/active-tenant')>(
     '@/server/auth/active-tenant',
   );
+  const state = await import('@/server/live/live-active-tenant-state');
   return {
     ...actual,
-    readActiveTenantId: vi.fn(),
-    writeActiveTenantId: vi.fn(),
-    clearActiveTenantId: vi.fn(),
+    readActiveTenantId: vi.fn(async () => {
+      const signed = state.getLiveSignedActiveTenant();
+      if (!signed) return null;
+      return verifySignedTenantValue(signed, getServerEnv().BETTER_AUTH_SECRET);
+    }),
+    writeActiveTenantId: vi.fn(async (tenantId: string) => {
+      const { signTenantId } = await import('@/server/auth/active-tenant-crypto');
+      state.setLiveSignedActiveTenant(signTenantId(tenantId, getServerEnv().BETTER_AUTH_SECRET));
+    }),
+    clearActiveTenantId: vi.fn(async () => {
+      state.setLiveSignedActiveTenant(null);
+    }),
   };
 });
 
@@ -34,7 +58,7 @@ import {
   initiateDocumentUpload,
   listEvidenceSegments,
 } from '@/server/services/documents';
-import { AppError } from '@/server/errors';
+import { selectActiveTenant } from '@/server/services/tenants';
 
 const CLEAN_PDF = Buffer.from(
   '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\nContractRadar clean fixture\n',
@@ -72,103 +96,23 @@ describe('live ingestion pipeline (authoritative)', () => {
     : null;
 
   let enabled = false;
-  let tenantA = '';
-  let tenantB = '';
-  let projectA = '';
-  let ownerA = { id: '', email: '', name: '' };
-  let ownerB = { id: '', email: '', name: '' };
+  let fixtureA: LiveTenantFixture | null = null;
+  let fixtureB: LiveTenantFixture | null = null;
 
   beforeAll(async () => {
     try {
       requireLiveServices('postgres-pipeline', Boolean(databaseUrl && prisma));
       if (!prisma) return;
       await prisma.$connect();
-
-      // Seeded demo tenant if present; otherwise create isolated fixtures.
-      const demo = await prisma.$transaction(async (tx) => {
-        await setRlsContext(tx, { bypass: true });
-        return tx.tenant.findUnique({ where: { slug: 'demo-gulf-contractor' } });
-      });
-
-      await prisma.$transaction(async (tx) => {
-        await setRlsContext(tx, { bypass: true });
-        const stamp = Date.now();
-        if (demo) {
-          tenantA = demo.id;
-          const project = await tx.project.findFirst({
-            where: { tenantId: demo.id, code: 'KWI-RING-01' },
-          });
-          if (!project) throw new Error('Seed project KWI-RING-01 missing');
-          projectA = project.id;
-          const owner = await tx.user.findUnique({
-            where: { email: 'owner@demo-contractor.example' },
-          });
-          if (!owner) throw new Error('Seed owner missing');
-          ownerA = { id: owner.id, email: owner.email, name: owner.name };
-        } else {
-          const t = await tx.tenant.create({
-            data: { name: 'Live A', slug: `live-a-${stamp}` },
-          });
-          tenantA = t.id;
-          const u = await tx.user.create({
-            data: {
-              email: `owner-a-${stamp}@example.com`,
-              name: 'Owner A',
-              emailVerified: true,
-              status: 'ACTIVE',
-            },
-          });
-          ownerA = { id: u.id, email: u.email, name: u.name };
-          await tx.tenantMembership.create({
-            data: { tenantId: t.id, userId: u.id, role: 'TENANT_OWNER' },
-          });
-          const p = await tx.project.create({
-            data: {
-              tenantId: t.id,
-              name: 'Live Project',
-              code: 'LIVE-01',
-              countryCode: 'AE',
-              defaultCurrency: 'AED',
-              timezone: 'Asia/Dubai',
-              status: 'ACTIVE',
-            },
-          });
-          projectA = p.id;
-          await tx.projectMembership.create({
-            data: {
-              tenantId: t.id,
-              projectId: p.id,
-              userId: u.id,
-              role: 'PROJECT_ADMIN',
-            },
-          });
-        }
-
-        const tb = await tx.tenant.create({
-          data: { name: 'Live B', slug: `live-b-${Date.now()}` },
-        });
-        tenantB = tb.id;
-        const ub = await tx.user.create({
-          data: {
-            email: `owner-b-${Date.now()}@example.com`,
-            name: 'Owner B',
-            emailVerified: true,
-            status: 'ACTIVE',
-          },
-        });
-        ownerB = { id: ub.id, email: ub.email, name: ub.name };
-        await tx.tenantMembership.create({
-          data: { tenantId: tb.id, userId: ub.id, role: 'TENANT_OWNER' },
-        });
-      });
-
+      fixtureA = await bootstrapLiveTenant(prisma, { label: 'tenA' });
+      fixtureB = await bootstrapLiveTenant(prisma, { label: 'tenB' });
       enabled = true;
     } catch (error) {
       if (isLiveSkip(error)) {
         enabled = false;
         return;
       }
-      throw error;
+      throw new Error(formatLiveError(error, 'fixture-bootstrap'), { cause: error });
     }
   }, 60_000);
 
@@ -176,43 +120,178 @@ describe('live ingestion pipeline (authoritative)', () => {
     if (prisma) await prisma.$disconnect();
   });
 
-  function asOwnerA() {
+  function asFixture(fixture: LiveTenantFixture) {
     vi.mocked(getSessionUser).mockResolvedValue({
-      id: ownerA.id,
-      email: ownerA.email,
-      name: ownerA.name,
-      status: 'ACTIVE',
+      id: fixture.owner.id,
+      email: fixture.owner.email,
+      name: fixture.owner.name,
+      status: fixture.owner.status,
     });
-    vi.mocked(readActiveTenantId).mockResolvedValue(tenantA);
+    setLiveSignedActiveTenant(fixture.signedActiveTenant);
   }
 
-  function asOwnerB() {
-    vi.mocked(getSessionUser).mockResolvedValue({
-      id: ownerB.id,
-      email: ownerB.email,
-      name: ownerB.name,
-      status: 'ACTIVE',
-    });
-    vi.mocked(readActiveTenantId).mockResolvedValue(tenantB);
+  async function withStage<T>(
+    stages: LiveStageTracker,
+    stageLabel: string,
+    fixture: LiveTenantFixture,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await fn();
+    } catch (error) {
+      const visibility = prisma
+        ? await inspectFixtureVisibility(prisma, {
+            tenantId: fixture.tenantId,
+            userId: fixture.owner.id,
+            projectId: fixture.projectId,
+          })
+        : null;
+      console.error(
+        JSON.stringify({
+          liveFailure: {
+            stageAttempted: stageLabel,
+            lastSuccessfulStage: stages.lastSuccessful,
+            tenantId: fixture.tenantId,
+            projectId: fixture.projectId,
+            userId: fixture.owner.id,
+            activeTenant: await readActiveTenantId(),
+            signedCookiePresent: Boolean(getLiveSignedActiveTenant()),
+            visibility,
+            error: formatLiveError(error, stageLabel),
+          },
+        }),
+      );
+      throw error;
+    }
   }
 
-  it('clean PDF: upload → outbox → clamav → promote → READY → signed download', async ({
+  it('fixture: tenant, project, active tenant selection, and document.create capability', async ({
     skip,
   }) => {
-    if (!enabled || !prisma) skip();
-    asOwnerA();
+    if (!enabled || !prisma || !fixtureA) skip();
+    const f = fixtureA!;
+    asFixture(f);
+    const stages = new LiveStageTracker();
+    stages.mark('fixture-created');
+
+    const visibility = await inspectFixtureVisibility(prisma!, {
+      tenantId: f.tenantId,
+      userId: f.owner.id,
+      projectId: f.projectId,
+    });
+    expect(visibility.membershipVisible).toBe(true);
+    expect(visibility.projectVisible).toBe(true);
+
+    // Clear then select through production tenant-selection (signs cookie via writeActiveTenantId mock).
+    setLiveSignedActiveTenant(null);
+    const selected = await selectActiveTenant({ tenantId: f.tenantId });
+    expect(selected.tenantId).toBe(f.tenantId);
+    const active = await readActiveTenantId();
+    expect(active).toBe(f.tenantId);
+
+    const project = await getAuthorizedProject(f.projectId);
+    expect(project.project.id).toBe(f.projectId);
+    stages.mark('authorized-project-resolved');
+
+    const capable = await requireProjectCapability(f.projectId, 'document.create');
+    expect(capable.project.id).toBe(f.projectId);
 
     const initiated = await initiateDocumentUpload({
-      projectId: projectA,
-      title: 'Live clean PDF',
+      projectId: f.projectId,
+      title: 'Fixture probe',
       documentType: 'LETTER',
-      filename: 'clean-live.pdf',
+      filename: 'probe.pdf',
       declaredMediaType: 'application/pdf',
       declaredSizeBytes: CLEAN_PDF.length,
     });
     expect(initiated.uploadSessionId).toBeTruthy();
+    stages.mark('upload-session-created');
+  });
+
+  it('fixture: project visible only with tenant context inside the same transaction', async ({
+    skip,
+  }) => {
+    if (!enabled || !prisma || !fixtureA) skip();
+    const f = fixtureA!;
+
+    const withoutContext = await prisma!.$transaction(async (tx) => {
+      await setRlsContext(tx, { bypass: false });
+      return tx.project.findFirst({ where: { id: f.projectId } });
+    });
+    expect(withoutContext).toBeNull();
+
+    const withContext = await prisma!.$transaction(async (tx) => {
+      await setRlsContext(tx, {
+        tenantId: f.tenantId,
+        userId: f.owner.id,
+        bypass: false,
+      });
+      return tx.project.findFirst({ where: { id: f.projectId } });
+    });
+    expect(withContext?.id).toBe(f.projectId);
+
+    // Prior transaction context must not leak.
+    const after = await prisma!.$transaction(async (tx) => {
+      await setRlsContext(tx, { bypass: false });
+      return tx.project.findFirst({ where: { id: f.projectId } });
+    });
+    expect(after).toBeNull();
+  });
+
+  it('fixture: disabled membership and foreign tenant see generic denial', async ({ skip }) => {
+    if (!enabled || !prisma || !fixtureA || !fixtureB) skip();
+    const f = fixtureA!;
+    asFixture(fixtureB!);
+    await expect(getAuthorizedProject(f.projectId)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
+    });
+
+    await prisma!.$transaction(async (tx) => {
+      await setRlsContext(tx, { bypass: true });
+      await tx.tenantMembership.updateMany({
+        where: { tenantId: f.tenantId, userId: f.owner.id },
+        data: { status: 'DISABLED' },
+      });
+    });
+    asFixture(f);
+    await expect(getAuthorizedProject(f.projectId)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    await prisma!.$transaction(async (tx) => {
+      await setRlsContext(tx, { bypass: true });
+      await tx.tenantMembership.updateMany({
+        where: { tenantId: f.tenantId, userId: f.owner.id },
+        data: { status: 'ACTIVE' },
+      });
+    });
+  });
+
+  it('clean PDF: upload → outbox → clamav → promote → READY → signed download', async ({
+    skip,
+  }) => {
+    if (!enabled || !prisma || !fixtureA) skip();
+    const f = fixtureA!;
+    asFixture(f);
+    const stages = new LiveStageTracker();
+    stages.mark('fixture-created');
+
+    const initiated = await withStage(stages, 'upload-session-created', f, async () => {
+      const project = await getAuthorizedProject(f.projectId);
+      expect(project.project.id).toBe(f.projectId);
+      stages.mark('authorized-project-resolved');
+      return initiateDocumentUpload({
+        projectId: f.projectId,
+        title: 'Live clean PDF',
+        documentType: 'LETTER',
+        filename: 'clean-live.pdf',
+        declaredMediaType: 'application/pdf',
+        declaredSizeBytes: CLEAN_PDF.length,
+      });
+    });
+    expect(initiated.uploadSessionId).toBeTruthy();
     expect(initiated.uploadUrl).toBeTruthy();
-    // Do not log uploadUrl.
+    stages.mark('upload-session-created');
 
     const put = await fetch(initiated.uploadUrl, {
       method: 'PUT',
@@ -220,13 +299,17 @@ describe('live ingestion pipeline (authoritative)', () => {
       body: CLEAN_PDF,
     });
     expect(put.ok).toBe(true);
+    stages.mark('object-uploaded');
 
-    const completed = await completeDocumentUpload({
-      uploadSessionId: initiated.uploadSessionId,
-      clientSha256: createHash('sha256').update(CLEAN_PDF).digest('hex'),
-      duplicateDecision: 'new_occurrence',
-    });
+    const completed = await withStage(stages, 'completion-verified', f, () =>
+      completeDocumentUpload({
+        uploadSessionId: initiated.uploadSessionId,
+        clientSha256: createHash('sha256').update(CLEAN_PDF).digest('hex'),
+        duplicateDecision: 'new_occurrence',
+      }),
+    );
     expect(completed.status === 'ACCEPTED' || completed.documentVersionId).toBeTruthy();
+    stages.mark('completion-verified');
     const documentId = completed.sourceDocumentId!;
     const versionId = completed.documentVersionId!;
 
@@ -247,7 +330,8 @@ describe('live ingestion pipeline (authoritative)', () => {
       { label: 'outbox event', timeoutMs: 30_000 },
     );
     expect(outbox).toBeTruthy();
-    // Eventually dispatched by outbox-dispatcher in CI.
+    stages.mark('outbox-created');
+
     await poll(
       async () => {
         return prisma!.$transaction(async (tx) => {
@@ -258,6 +342,7 @@ describe('live ingestion pipeline (authoritative)', () => {
       },
       { label: 'outbox DISPATCHED', timeoutMs: 60_000 },
     );
+    stages.mark('job-dispatched');
 
     const readyDoc = await poll(
       async () => {
@@ -294,14 +379,18 @@ describe('live ingestion pipeline (authoritative)', () => {
     );
 
     expect(readyDoc.version.malwareScanStatus).toBe('CLEAN');
+    stages.mark('malware-clean-or-infected');
     expect(readyDoc.version.storageKey).toContain('/originals/');
     expect(readyDoc.version.storageKey).not.toContain('/quarantine/');
+    stages.mark('object-promoted-or-quarantined');
+    stages.mark('extraction-finished');
 
-    const segments = await listEvidenceSegments(projectA, documentId);
+    const segments = await listEvidenceSegments(f.projectId, documentId);
     expect(Array.isArray(segments)).toBe(true);
     expect(segments.length).toBeGreaterThan(0);
+    stages.mark('evidence-created');
 
-    const download = await createAuthorizedDownload(projectA, versionId);
+    const download = await createAuthorizedDownload(f.projectId, versionId);
     expect(download.downloadUrl).toBeTruthy();
     const downloaded = await fetch(download.downloadUrl);
     expect(downloaded.ok).toBe(true);
@@ -309,20 +398,27 @@ describe('live ingestion pipeline (authoritative)', () => {
     expect(createHash('sha256').update(body).digest('hex')).toBe(
       createHash('sha256').update(CLEAN_PDF).digest('hex'),
     );
+    stages.mark('download-authorized');
   }, 240_000);
 
   it('infected EICAR: quarantine only, no extraction/promotion/download', async ({ skip }) => {
-    if (!enabled || !prisma) skip();
-    asOwnerA();
+    if (!enabled || !prisma || !fixtureA) skip();
+    const f = fixtureA!;
+    asFixture(f);
+    const stages = new LiveStageTracker();
+    stages.mark('fixture-created');
 
-    const initiated = await initiateDocumentUpload({
-      projectId: projectA,
-      title: 'Live infected fixture',
-      documentType: 'OTHER',
-      filename: 'eicar-live.txt',
-      declaredMediaType: 'text/plain',
-      declaredSizeBytes: EICAR.length,
-    });
+    const initiated = await withStage(stages, 'upload-session-created', f, () =>
+      initiateDocumentUpload({
+        projectId: f.projectId,
+        title: 'Live infected fixture',
+        documentType: 'OTHER',
+        filename: 'eicar-live.txt',
+        declaredMediaType: 'text/plain',
+        declaredSizeBytes: EICAR.length,
+      }),
+    );
+    stages.mark('upload-session-created');
 
     const put = await fetch(initiated.uploadUrl, {
       method: 'PUT',
@@ -330,12 +426,14 @@ describe('live ingestion pipeline (authoritative)', () => {
       body: EICAR,
     });
     expect(put.ok).toBe(true);
+    stages.mark('object-uploaded');
 
     const completed = await completeDocumentUpload({
       uploadSessionId: initiated.uploadSessionId,
       clientSha256: createHash('sha256').update(EICAR).digest('hex'),
       duplicateDecision: 'new_occurrence',
     });
+    stages.mark('completion-verified');
     const versionId = completed.documentVersionId!;
     const documentId = completed.sourceDocumentId!;
 
@@ -353,6 +451,8 @@ describe('live ingestion pipeline (authoritative)', () => {
 
     expect(infected.storageKey).toContain('/quarantine/');
     expect(infected.uploadStatus).not.toBe('ACCEPTED');
+    stages.mark('malware-clean-or-infected');
+    stages.mark('object-promoted-or-quarantined');
 
     const artifacts = await prisma!.$transaction(async (tx) => {
       await setRlsContext(tx, { bypass: true });
@@ -360,7 +460,7 @@ describe('live ingestion pipeline (authoritative)', () => {
     });
     expect(artifacts).toBe(0);
 
-    await expect(createAuthorizedDownload(projectA, versionId)).rejects.toBeInstanceOf(AppError);
+    await expect(createAuthorizedDownload(f.projectId, versionId)).rejects.toBeInstanceOf(AppError);
 
     const events = await prisma!.$transaction(async (tx) => {
       await setRlsContext(tx, { bypass: true });
@@ -377,30 +477,43 @@ describe('live ingestion pipeline (authoritative)', () => {
   it('invalid media signature: rejects completion and creates no processing job', async ({
     skip,
   }) => {
-    if (!enabled || !prisma) skip();
-    asOwnerA();
+    if (!enabled || !prisma || !fixtureA) skip();
+    const f = fixtureA!;
+    asFixture(f);
+    const stages = new LiveStageTracker();
+    stages.mark('fixture-created');
     const bogus = Buffer.from('<html>not a pdf</html>');
-    const initiated = await initiateDocumentUpload({
-      projectId: projectA,
-      title: 'Invalid media',
-      documentType: 'LETTER',
-      filename: 'spoof.pdf',
-      declaredMediaType: 'application/pdf',
-      declaredSizeBytes: bogus.length,
-    });
+    const initiated = await withStage(stages, 'upload-session-created', f, () =>
+      initiateDocumentUpload({
+        projectId: f.projectId,
+        title: 'Invalid media',
+        documentType: 'LETTER',
+        filename: 'spoof.pdf',
+        declaredMediaType: 'application/pdf',
+        declaredSizeBytes: bogus.length,
+      }),
+    );
+    stages.mark('upload-session-created');
     const put = await fetch(initiated.uploadUrl, {
       method: 'PUT',
       headers: initiated.uploadHeaders as Record<string, string>,
       body: bogus,
     });
     expect(put.ok).toBe(true);
+    stages.mark('object-uploaded');
 
-    await expect(
-      completeDocumentUpload({
+    let rejected: unknown;
+    try {
+      await completeDocumentUpload({
         uploadSessionId: initiated.uploadSessionId,
         clientSha256: createHash('sha256').update(bogus).digest('hex'),
-      }),
-    ).rejects.toBeInstanceOf(AppError);
+      });
+    } catch (error) {
+      rejected = error;
+    }
+    expect(rejected).toBeInstanceOf(AppError);
+    expect((rejected as AppError).code).toBe('VALIDATION_ERROR');
+    expect(JSON.stringify((rejected as AppError).details ?? {})).toMatch(/SIGNATURE_/);
 
     const runs = await prisma!.$transaction(async (tx) => {
       await setRlsContext(tx, { bypass: true });
@@ -418,7 +531,14 @@ describe('live ingestion pipeline (authoritative)', () => {
       const runCount = await tx.documentProcessingRun.count({
         where: { documentVersionId: session.documentVersionId ?? 'missing' },
       });
-      return versionCount + runCount;
+      const outboxCount = await tx.outboxEvent.count({
+        where: {
+          projectId: f.projectId,
+          eventType: 'process_document_version',
+          aggregateId: session.documentVersionId ?? 'missing',
+        },
+      });
+      return versionCount + runCount + outboxCount;
     });
     expect(runs).toBe(0);
   }, 120_000);
@@ -426,10 +546,12 @@ describe('live ingestion pipeline (authoritative)', () => {
   it('cross-tenant: cannot complete, query, or download another tenant upload', async ({
     skip,
   }) => {
-    if (!enabled || !prisma) skip();
-    asOwnerA();
+    if (!enabled || !prisma || !fixtureA || !fixtureB) skip();
+    const a = fixtureA!;
+    const b = fixtureB!;
+    asFixture(a);
     const initiated = await initiateDocumentUpload({
-      projectId: projectA,
+      projectId: a.projectId,
       title: 'Tenant A only',
       documentType: 'LETTER',
       filename: 'tenant-a.pdf',
@@ -442,19 +564,18 @@ describe('live ingestion pipeline (authoritative)', () => {
       body: CLEAN_PDF,
     });
 
-    asOwnerB();
+    asFixture(b);
     await expect(
       completeDocumentUpload({
         uploadSessionId: initiated.uploadSessionId,
         clientSha256: createHash('sha256').update(CLEAN_PDF).digest('hex'),
       }),
-    ).rejects.toBeInstanceOf(AppError);
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
 
-    // Object key alone does not grant DB access.
     const leaked = await prisma!.$transaction(async (tx) => {
       await setRlsContext(tx, {
-        tenantId: tenantB,
-        userId: ownerB.id,
+        tenantId: b.tenantId,
+        userId: b.owner.id,
         bypass: false,
       });
       return tx.uploadSession.findFirst({ where: { id: initiated.uploadSessionId } });
