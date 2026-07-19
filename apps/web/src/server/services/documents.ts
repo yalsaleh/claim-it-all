@@ -336,15 +336,21 @@ export async function completeDocumentUpload(rawInput: unknown) {
     throw validationError('Invalid upload completion', parsed.error.flatten());
   }
 
-  const { requireAuthenticatedUser, withAuthenticatedUserDb } = await import(
-    '@/server/authz/context'
-  );
-  const user = await requireAuthenticatedUser();
-  const sessionMeta = await withAuthenticatedUserDb(async (tx) =>
-    tx.uploadSession.findFirst({
-      where: { id: parsed.data.uploadSessionId, initiatedByUserId: user.id },
-      select: { projectId: true },
-    }),
+  // upload_session is FORCE RLS tenant-scoped. User-only GUC is insufficient —
+  // resolve via active tenant membership in the same transaction as the lookup.
+  const { requireTenantMembership } = await import('@/server/authz/context');
+  const tenantCtx = await requireTenantMembership();
+  const sessionMeta = await withTenantTransaction(
+    { tenantId: tenantCtx.tenantId, userId: tenantCtx.user.id },
+    async (tx) =>
+      tx.uploadSession.findFirst({
+        where: {
+          id: parsed.data.uploadSessionId,
+          tenantId: tenantCtx.tenantId,
+          initiatedByUserId: tenantCtx.user.id,
+        },
+        select: { projectId: true },
+      }),
   );
   if (!sessionMeta) throw notFound();
 
@@ -681,15 +687,19 @@ export async function cancelDocumentUpload(rawInput: unknown) {
   if (!parsed.success) {
     throw validationError('Invalid cancel request', parsed.error.flatten());
   }
-  const { requireAuthenticatedUser, withAuthenticatedUserDb } = await import(
-    '@/server/authz/context'
-  );
-  const user = await requireAuthenticatedUser();
-  const sessionMeta = await withAuthenticatedUserDb(async (tx) =>
-    tx.uploadSession.findFirst({
-      where: { id: parsed.data.uploadSessionId, initiatedByUserId: user.id },
-      select: { projectId: true },
-    }),
+  const { requireTenantMembership } = await import('@/server/authz/context');
+  const tenantCtx = await requireTenantMembership();
+  const sessionMeta = await withTenantTransaction(
+    { tenantId: tenantCtx.tenantId, userId: tenantCtx.user.id },
+    async (tx) =>
+      tx.uploadSession.findFirst({
+        where: {
+          id: parsed.data.uploadSessionId,
+          tenantId: tenantCtx.tenantId,
+          initiatedByUserId: tenantCtx.user.id,
+        },
+        select: { projectId: true },
+      }),
   );
   if (!sessionMeta) throw notFound();
   const ctx = await requireProjectCapability(sessionMeta.projectId, 'document.create');

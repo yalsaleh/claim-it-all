@@ -114,6 +114,9 @@ jobs:
       LIVE_INGESTION_TESTS: "true"
       REQUIRE_LIVE_INGESTION_TESTS: "true"
       LIVE_ARQ_WORKER: "true"
+      ARQ_QUEUE_NAME: contractradar:document-processing
+      ARQ_WORKER_PID_FILE: /tmp/arq-worker.pid
+      ARQ_WORKER_LOG: /tmp/arq-worker.log
       LOG_LEVEL: info
       ALLOW_DEV_DEFAULTS: "true"
       UPLOAD_SESSION_TTL_SECONDS: "900"
@@ -176,6 +179,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      - name: Print live job identity
+        run: |
+          set -euo pipefail
+          echo "GITHUB_SHA=${GITHUB_SHA}"
+          echo "short_commit=$(git rev-parse --short HEAD)"
+          echo "GITHUB_RUN_ID=${GITHUB_RUN_ID}"
+          echo "test_database=contractradar_test"
+          echo "ARQ_QUEUE_NAME=${ARQ_QUEUE_NAME}"
+
       - name: Prisma generate + validate + migrate from zero
         run: |
           set -euo pipefail
@@ -184,6 +196,8 @@ jobs:
           DATABASE_URL="$DATABASE_MIGRATE_URL" pnpm db:migrate:deploy
           pnpm db:seed
           pnpm --filter @contractradar/web exec prisma migrate status
+          chmod +x scripts/ci/assert-live-schema.sh
+          bash scripts/ci/assert-live-schema.sh
 
       - name: Start DI API, ARQ worker, outbox dispatcher
         working-directory: services/document-intelligence
@@ -194,6 +208,7 @@ jobs:
           CLAMAV_PORT: "3310"
           ALLOW_DEV_DEFAULTS: "true"
           OUTBOX_POLL_SECONDS: "1"
+          ARQ_QUEUE_NAME: contractradar:document-processing
         run: |
           set -euo pipefail
           nohup uvicorn document_intelligence.main:app --host 127.0.0.1 --port 8000 >/tmp/di-api.log 2>&1 &
@@ -202,11 +217,18 @@ jobs:
           echo $! >/tmp/arq-worker.pid
           nohup python -m document_intelligence.outbox.dispatcher >/tmp/outbox.log 2>&1 &
           echo $! >/tmp/outbox.pid
+          sleep 2
+          if ! kill -0 "$(cat /tmp/arq-worker.pid)" 2>/dev/null; then
+            echo "ERROR: ARQ worker exited immediately after start"
+            tail -n 120 /tmp/arq-worker.log || true
+            exit 1
+          fi
 
       - name: Health-gated service wait
         run: |
-          chmod +x scripts/ci/wait-for-live-services.sh
+          chmod +x scripts/ci/wait-for-live-services.sh scripts/ci/check-arq-worker-ready.sh
           bash scripts/ci/wait-for-live-services.sh
+          bash scripts/ci/check-arq-worker-ready.sh
 
       - name: Refuse FakeScanner in live workflow
         working-directory: services/document-intelligence

@@ -1,9 +1,10 @@
-"""Live ARQ enqueue smoke tests."""
+"""Live ARQ enqueue smoke tests (shared queue contract)."""
 
 from __future__ import annotations
 
 import asyncio
 import os
+import uuid
 
 import pytest
 
@@ -12,11 +13,16 @@ LIVE = os.environ.get("LIVE_INGESTION_TESTS", "").lower() in {"1", "true", "yes"
 
 
 async def _enqueue_twice(redis_url: str) -> None:
-    from arq import create_pool
-    from arq.connections import RedisSettings
+    from document_intelligence.arq_queue import create_arq_redis, get_arq_queue_name
+    from document_intelligence.config import reset_settings_cache
 
-    redis = await create_pool(RedisSettings.from_dsn(redis_url))
-    job_id = "process_document_version:live-smoke-idempotent"
+    os.environ["REDIS_URL"] = redis_url
+    os.environ.setdefault("ARQ_QUEUE_NAME", "contractradar:document-processing")
+    reset_settings_cache()
+
+    redis = await create_arq_redis()
+    queue_name = get_arq_queue_name()
+    job_id = f"process_document_version:live-smoke-idempotent-{uuid.uuid4().hex[:12]}"
     try:
         job = await redis.enqueue_job(
             "process_document_version",
@@ -24,6 +30,7 @@ async def _enqueue_twice(redis_url: str) -> None:
             document_version_id="00000000-0000-4000-8000-000000000002",
             correlation_id="00000000-0000-4000-8000-000000000003",
             _job_id=job_id,
+            _queue_name=queue_name,
         )
         job2 = await redis.enqueue_job(
             "process_document_version",
@@ -31,6 +38,7 @@ async def _enqueue_twice(redis_url: str) -> None:
             document_version_id="00000000-0000-4000-8000-000000000002",
             correlation_id="00000000-0000-4000-8000-000000000003",
             _job_id=job_id,
+            _queue_name=queue_name,
         )
         assert job is None or job.job_id == job_id
         assert job2 is None or job2.job_id == job_id
@@ -49,11 +57,7 @@ def test_arq_enqueue_id_only_job_idempotent() -> None:
     os.environ.setdefault("MALWARE_SCANNER", "fake_test")
     os.environ.setdefault("DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN", "test-internal-token-32chars")
     os.environ.setdefault("ALLOW_DEV_DEFAULTS", "true")
-    os.environ["REDIS_URL"] = redis_url
 
-    from document_intelligence.config import reset_settings_cache
-
-    reset_settings_cache()
     try:
         asyncio.run(_enqueue_twice(redis_url))
     except Exception as exc:  # noqa: BLE001

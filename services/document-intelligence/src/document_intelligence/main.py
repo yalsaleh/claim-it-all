@@ -6,12 +6,11 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from arq import create_pool
-from arq.connections import RedisSettings
 from fastapi import FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
 from document_intelligence import __version__
+from document_intelligence.arq_queue import create_arq_redis, sanitize_redis_url_for_logs
 from document_intelligence.config import get_settings
 from document_intelligence.db import db
 from document_intelligence.logging import configure_logging
@@ -97,7 +96,7 @@ def live() -> Dict[str, Any]:
 
 async def _redis_ok() -> bool:
     try:
-        redis = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+        redis = await create_arq_redis()
         try:
             pong = await redis.ping()
             return bool(pong)
@@ -165,7 +164,7 @@ async def enqueue_process_document(
     """Direct enqueue (legacy/admin). Prefer transactional outbox dispatcher."""
     raw = body.model_dump_json().encode("utf-8")
     _require_internal(x_internal_token, x_internal_timestamp, x_internal_signature, raw)
-    redis = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+    redis = await create_arq_redis()
     try:
         job = await redis.enqueue_job(
             "process_document_version",
@@ -173,6 +172,7 @@ async def enqueue_process_document(
             document_version_id=body.document_version_id,
             correlation_id=body.correlation_id,
             _job_id=f"process_document_version:{body.processing_run_id}",
+            _queue_name=settings.arq_queue_name,
         )
     finally:
         await redis.close()
@@ -180,6 +180,8 @@ async def enqueue_process_document(
         "status": "queued",
         "job_id": job.job_id if job else f"process_document_version:{body.processing_run_id}",
         "correlation_id": body.correlation_id,
+        "queue_name": settings.arq_queue_name,
+        "redis": sanitize_redis_url_for_logs(settings.redis_url),
     }
 
 

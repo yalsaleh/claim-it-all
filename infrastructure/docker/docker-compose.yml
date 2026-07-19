@@ -178,6 +178,7 @@ services:
       DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN: dev-internal-token-change-me
       DATABASE_URL: postgresql://contractradar_app:contractradar@postgres:5432/contractradar
       REDIS_URL: redis://redis:6379
+      ARQ_QUEUE_NAME: contractradar:document-processing
       S3_ENDPOINT: http://minio:9000
       S3_REGION: us-east-1
       S3_ACCESS_KEY_ID: minioadmin
@@ -211,6 +212,7 @@ services:
       DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN: dev-internal-token-change-me
       DATABASE_URL: postgresql://contractradar_app:contractradar@postgres:5432/contractradar
       REDIS_URL: redis://redis:6379
+      ARQ_QUEUE_NAME: contractradar:document-processing
       S3_ENDPOINT: http://minio:9000
       S3_REGION: us-east-1
       S3_ACCESS_KEY_ID: minioadmin

@@ -6,6 +6,9 @@ Accepted (Slice 2) · Updated (Slice 2B) — supersedes the open choice in ADR-0
 ## Decision
 Use **ARQ** (async Redis queue) for Python document workers.
 
+### Queue contract
+All producers and the worker share one explicit queue name (env `ARQ_QUEUE_NAME`, default `contractradar:document-processing`). Do not rely on ARQ’s implicit `arq:queue` default in application code — dispatcher, HTTP enqueue, live tests, and `WorkerSettings.queue_name` must match.
+
 ### Compared
 - Celery: powerful but heavier ops surface for this service
 - RQ: sync-first

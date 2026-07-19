@@ -94,6 +94,12 @@ export async function bootstrapLiveTenant(
       throw new Error('live fixture: signed active tenant failed production verification');
     }
 
+    console.info('[live-stage] fixture-user-created: ok');
+    console.info('[live-stage] fixture-tenant-created: ok');
+    console.info('[live-stage] fixture-tenant-membership-created: ok');
+    console.info('[live-stage] fixture-project-created: ok');
+    console.info('[live-stage] fixture-project-membership-created: ok');
+    console.info('[live-stage] signed-active-tenant-context-created: ok');
     console.info(
       JSON.stringify({
         liveFixture: {

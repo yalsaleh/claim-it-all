@@ -15,7 +15,12 @@ import {
   getLiveSignedActiveTenant,
   setLiveSignedActiveTenant,
 } from '@/server/live/live-active-tenant-state';
-import { formatLiveError, LiveStageTracker } from '@/server/live/live-diagnostics';
+import {
+  atStage,
+  describeSafeError,
+  formatLiveError,
+  LiveStageTracker,
+} from '@/server/live/live-diagnostics';
 import {
   bootstrapLiveTenant,
   inspectFixtureVisibility,
@@ -157,7 +162,8 @@ describe('live ingestion pipeline (authoritative)', () => {
             activeTenant: await readActiveTenantId(),
             signedCookiePresent: Boolean(getLiveSignedActiveTenant()),
             visibility,
-            error: formatLiveError(error, stageLabel),
+            error: describeSafeError(error),
+            formatted: formatLiveError(error, stageLabel),
           },
         }),
       );
@@ -276,37 +282,55 @@ describe('live ingestion pipeline (authoritative)', () => {
     const stages = new LiveStageTracker();
     stages.mark('fixture-created');
 
-    const initiated = await withStage(stages, 'upload-session-created', f, async () => {
-      const project = await getAuthorizedProject(f.projectId);
-      expect(project.project.id).toBe(f.projectId);
-      stages.mark('authorized-project-resolved');
-      return initiateDocumentUpload({
+    await atStage('authenticated-user-resolved', async () => {
+      const user = await getSessionUser();
+      expect(user?.id).toBe(f.owner.id);
+      expect(user?.status).toBe('ACTIVE');
+    });
+    await atStage('tenant-membership-resolved', async () => {
+      expect(await readActiveTenantId()).toBe(f.tenantId);
+    });
+    const project = await withStage(stages, 'authorized-project-resolved', f, () =>
+      getAuthorizedProject(f.projectId),
+    );
+    expect(project.project.id).toBe(f.projectId);
+    stages.mark('authorized-project-resolved');
+    await atStage('document-capability-confirmed', () =>
+      requireProjectCapability(f.projectId, 'document.create'),
+    );
+
+    const initiated = await withStage(stages, 'upload-session-created', f, () =>
+      initiateDocumentUpload({
         projectId: f.projectId,
         title: 'Live clean PDF',
         documentType: 'LETTER',
         filename: 'clean-live.pdf',
         declaredMediaType: 'application/pdf',
         declaredSizeBytes: CLEAN_PDF.length,
-      });
-    });
+      }),
+    );
     expect(initiated.uploadSessionId).toBeTruthy();
     expect(initiated.uploadUrl).toBeTruthy();
     stages.mark('upload-session-created');
 
-    const put = await fetch(initiated.uploadUrl, {
-      method: 'PUT',
-      headers: initiated.uploadHeaders as Record<string, string>,
-      body: CLEAN_PDF,
-    });
+    const put = await atStage('object-uploaded', () =>
+      fetch(initiated.uploadUrl, {
+        method: 'PUT',
+        headers: initiated.uploadHeaders as Record<string, string>,
+        body: CLEAN_PDF,
+      }),
+    );
     expect(put.ok).toBe(true);
     stages.mark('object-uploaded');
 
-    const completed = await withStage(stages, 'completion-verified', f, () =>
-      completeDocumentUpload({
-        uploadSessionId: initiated.uploadSessionId,
-        clientSha256: createHash('sha256').update(CLEAN_PDF).digest('hex'),
-        duplicateDecision: 'new_occurrence',
-      }),
+    const completed = await withStage(stages, 'upload-completion-started', f, () =>
+      atStage('upload-completion-started', () =>
+        completeDocumentUpload({
+          uploadSessionId: initiated.uploadSessionId,
+          clientSha256: createHash('sha256').update(CLEAN_PDF).digest('hex'),
+          duplicateDecision: 'new_occurrence',
+        }),
+      ),
     );
     expect(completed.status === 'ACCEPTED' || completed.documentVersionId).toBeTruthy();
     stages.mark('completion-verified');

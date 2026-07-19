@@ -19,6 +19,10 @@ class Settings(BaseSettings):
         alias="DATABASE_URL",
     )
     redis_url: str = Field(default="redis://127.0.0.1:6379", alias="REDIS_URL")
+    arq_queue_name: str = Field(
+        default="contractradar:document-processing",
+        alias="ARQ_QUEUE_NAME",
+    )
     s3_endpoint: str = Field(default="http://127.0.0.1:9000", alias="S3_ENDPOINT")
     s3_region: str = Field(default="us-east-1", alias="S3_REGION")
     s3_access_key_id: str = Field(default="minioadmin", alias="S3_ACCESS_KEY_ID")

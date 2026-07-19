@@ -11,9 +11,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from arq import create_pool
-from arq.connections import RedisSettings
-
+from document_intelligence.arq_queue import create_arq_redis
 from document_intelligence.config import get_settings
 from document_intelligence.db import db
 from document_intelligence.logging import configure_logging
@@ -77,7 +75,7 @@ async def dispatch_once() -> int:
     if not rows:
         return 0
 
-    redis = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+    redis = await create_arq_redis()
     dispatched = 0
     try:
         for row in rows:
@@ -91,6 +89,7 @@ async def dispatch_once() -> int:
                     document_version_id=payload["documentVersionId"],
                     correlation_id=payload["correlationId"],
                     _job_id=row["idempotencyKey"],
+                    _queue_name=settings.arq_queue_name,
                 )
                 await mark_dispatched(row["id"])
                 dispatched += 1

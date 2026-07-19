@@ -1,12 +1,12 @@
 /**
- * Outbox durability tests against real Postgres (+ optional Redis dispatch check).
+ * Outbox durability tests against real Postgres.
+ * Isolated synthetic fixtures — does not wipe the whole database.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { requireTestDatabaseUrl } from '@/lib/db-url-guard';
 import { setRlsContext } from '@/server/db/tenant-context';
-import { formatLiveError } from '@/server/live/live-diagnostics';
-import { wipeLiveDocumentGraph } from '@/server/live/live-fixtures';
+import { describePrismaError, formatLiveError } from '@/server/live/live-diagnostics';
 import { isLiveSkip, requireLiveServices } from '@/server/live/live-gate';
 import { writeProcessDocumentOutbox } from '@/server/queue/outbox';
 
@@ -18,14 +18,76 @@ const databaseUrl = (() => {
   }
 })();
 
+type OutboxFixture = {
+  tenantId: string;
+  projectId: string;
+  userId: string;
+};
+
+async function readSessionGucs(tx: {
+  $queryRaw: <T>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
+}): Promise<{ role: string; tenant: string; bypass: string }> {
+  const rows = await tx.$queryRaw<
+    { role: string; tenant: string; bypass: string }[]
+  >`SELECT current_user AS role,
+           coalesce(current_setting('app.current_tenant_id', true), '') AS tenant,
+           coalesce(current_setting('app.bypass_rls', true), 'off') AS bypass`;
+  return rows[0] ?? { role: 'unknown', tenant: '', bypass: 'off' };
+}
+
+async function bootstrapOutboxFixture(prisma: PrismaClient): Promise<OutboxFixture> {
+  const stamp = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+  return prisma.$transaction(async (tx) => {
+    await setRlsContext(tx, { bypass: true });
+    const user = await tx.user.create({
+      data: {
+        email: `outbox-${stamp}@live-test.example`,
+        name: 'Outbox Live',
+        emailVerified: true,
+        status: 'ACTIVE',
+      },
+    });
+    const tenant = await tx.tenant.create({
+      data: { name: `Outbox ${stamp}`, slug: `outbox-${stamp}`.slice(0, 64) },
+    });
+    const project = await tx.project.create({
+      data: {
+        tenantId: tenant.id,
+        name: `Outbox Project ${stamp}`,
+        code: `OB-${stamp}`.slice(0, 32),
+        countryCode: 'AE',
+        defaultCurrency: 'AED',
+        timezone: 'Asia/Dubai',
+        status: 'ACTIVE',
+      },
+    });
+    return { tenantId: tenant.id, projectId: project.id, userId: user.id };
+  });
+}
+
+function failWithDiagnostics(
+  stage: string,
+  error: unknown,
+  fixture: OutboxFixture,
+  gucs?: { role: string; tenant: string; bypass: string },
+): never {
+  const diagnostic = {
+    stage,
+    fixture,
+    gucs,
+    prisma: describePrismaError(error),
+  };
+  console.error('[outbox-live-failure]', JSON.stringify(diagnostic));
+  const err = new Error(formatLiveError(error, stage));
+  (err as Error & { cause?: unknown }).cause = error;
+  throw err;
+}
+
 describe('outbox transactional durability', () => {
   const prisma = databaseUrl
     ? new PrismaClient({ datasources: { db: { url: databaseUrl } } })
     : null;
   let enabled = false;
-  let tenantId = '';
-  let projectId = '';
-  let userId = '';
 
   beforeAll(async () => {
     try {
@@ -46,100 +108,58 @@ describe('outbox transactional durability', () => {
     if (prisma) await prisma.$disconnect();
   });
 
-  beforeEach(async ({ skip }) => {
-    if (!enabled || !prisma) skip();
-    try {
-      // FK-safe wipe: ingestion live tests leave document graph rows that block project/tenant deletes.
-      await wipeLiveDocumentGraph(prisma!);
-      const stamp = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-      await prisma!.$transaction(async (tx) => {
-        await setRlsContext(tx, { bypass: true });
-        const user = await tx.user.create({
-          data: {
-            email: `outbox-${stamp}@live-test.example`,
-            name: 'Outbox Live',
-            emailVerified: true,
-            status: 'ACTIVE',
-          },
-        });
-        userId = user.id;
-        const tenant = await tx.tenant.create({
-          data: { name: `Outbox ${stamp}`, slug: `outbox-${stamp}`.slice(0, 64) },
-        });
-        tenantId = tenant.id;
-        const project = await tx.project.create({
-          data: {
-            tenantId: tenant.id,
-            name: `Outbox Project ${stamp}`,
-            code: `OB-${stamp}`.slice(0, 32),
-            countryCode: 'AE',
-            defaultCurrency: 'AED',
-            timezone: 'Asia/Dubai',
-            status: 'ACTIVE',
-          },
-        });
-        projectId = project.id;
-      });
-    } catch (error) {
-      throw new Error(formatLiveError(error, 'outbox-beforeEach-fixture'), { cause: error });
-    }
-  });
-
   it('rollback removes business row and outbox event written in the same transaction', async ({
     skip,
   }) => {
     if (!enabled || !prisma) skip();
+    const fixture = await bootstrapOutboxFixture(prisma!);
     const runId = crypto.randomUUID();
     const correlationId = crypto.randomUUID();
     let businessEventId = '';
+    let gucs: { role: string; tenant: string; bypass: string } | undefined;
 
     try {
-      await expect(
-        prisma!.$transaction(async (tx) => {
-          // Runtime app path: tenant context in the same transaction as RLS-protected writes.
-          await setRlsContext(tx, {
-            tenantId,
-            userId,
-            bypass: false,
-          });
-          const business = await tx.ingestionEvent.create({
-            data: {
-              tenantId,
-              projectId,
-              eventType: 'outbox.rollback_probe',
-              correlationId,
-              metadata: { stage: 'pre-outbox' },
-            },
-          });
-          businessEventId = business.id;
-          await writeProcessDocumentOutbox(tx, {
-            tenantId,
-            projectId,
-            processingRunId: runId,
-            documentVersionId: crypto.randomUUID(),
+      await prisma!.$transaction(async (tx) => {
+        await setRlsContext(tx, {
+          tenantId: fixture.tenantId,
+          userId: fixture.userId,
+          bypass: false,
+        });
+        gucs = await readSessionGucs(tx);
+        const business = await tx.ingestionEvent.create({
+          data: {
+            tenantId: fixture.tenantId,
+            projectId: fixture.projectId,
+            eventType: 'outbox.rollback_probe',
             correlationId,
-          });
-          throw new Error('FORCE_ROLLBACK');
-        }),
-      ).rejects.toThrow(/FORCE_ROLLBACK/);
+            metadata: { stage: 'pre-outbox' },
+          },
+        });
+        businessEventId = business.id;
+        await writeProcessDocumentOutbox(tx, {
+          tenantId: fixture.tenantId,
+          projectId: fixture.projectId,
+          processingRunId: runId,
+          documentVersionId: crypto.randomUUID(),
+          correlationId,
+        });
+        throw new Error('FORCE_ROLLBACK');
+      });
+      throw new Error('expected FORCE_ROLLBACK');
     } catch (error) {
-      if (error instanceof Error && /FORCE_ROLLBACK/.test(error.message)) {
-        throw error;
+      if (!(error instanceof Error) || !/FORCE_ROLLBACK/.test(error.message)) {
+        failWithDiagnostics('outbox-rollback-write', error, fixture, gucs);
       }
-      throw new Error(formatLiveError(error, 'outbox-rollback-write'), { cause: error });
     }
 
-    // Privileged inspection: prove absence is rollback, not RLS hiding.
     const counts = await prisma!.$transaction(async (tx) => {
       await setRlsContext(tx, { bypass: true });
       const outbox = await tx.outboxEvent.count({
         where: { idempotencyKey: `process_document_version:${runId}` },
       });
-      const business = businessEventId
-        ? await tx.ingestionEvent.count({ where: { id: businessEventId } })
-        : await tx.ingestionEvent.count({
-            where: { correlationId, eventType: 'outbox.rollback_probe' },
-          });
+      const business = await tx.ingestionEvent.count({
+        where: { id: businessEventId || '00000000-0000-4000-8000-000000000000' },
+      });
       return { outbox, business };
     });
     expect(counts.outbox).toBe(0);
@@ -148,22 +168,25 @@ describe('outbox transactional durability', () => {
 
   it('committed mutation creates a pending outbox event with id-only payload', async ({ skip }) => {
     if (!enabled || !prisma) skip();
+    const fixture = await bootstrapOutboxFixture(prisma!);
     const runId = crypto.randomUUID();
     const versionId = crypto.randomUUID();
     const correlationId = crypto.randomUUID();
     let businessEventId = '';
+    let gucs: { role: string; tenant: string; bypass: string } | undefined;
 
     try {
       await prisma!.$transaction(async (tx) => {
         await setRlsContext(tx, {
-          tenantId,
-          userId,
+          tenantId: fixture.tenantId,
+          userId: fixture.userId,
           bypass: false,
         });
+        gucs = await readSessionGucs(tx);
         const business = await tx.ingestionEvent.create({
           data: {
-            tenantId,
-            projectId,
+            tenantId: fixture.tenantId,
+            projectId: fixture.projectId,
             eventType: 'outbox.commit_probe',
             correlationId,
             metadata: { stage: 'with-outbox' },
@@ -171,15 +194,15 @@ describe('outbox transactional durability', () => {
         });
         businessEventId = business.id;
         await writeProcessDocumentOutbox(tx, {
-          tenantId,
-          projectId,
+          tenantId: fixture.tenantId,
+          projectId: fixture.projectId,
           processingRunId: runId,
           documentVersionId: versionId,
           correlationId,
         });
       });
     } catch (error) {
-      throw new Error(formatLiveError(error, 'outbox-commit-write'), { cause: error });
+      failWithDiagnostics('outbox-commit-write', error, fixture, gucs);
     }
 
     const result = await prisma!.$transaction(async (tx) => {
@@ -188,13 +211,17 @@ describe('outbox transactional durability', () => {
         where: { idempotencyKey: `process_document_version:${runId}` },
       });
       const business = await tx.ingestionEvent.findUnique({ where: { id: businessEventId } });
-      return { event, business };
+      const duplicates = await tx.outboxEvent.count({
+        where: { idempotencyKey: `process_document_version:${runId}` },
+      });
+      return { event, business, duplicates };
     });
 
     expect(result.business?.id).toBe(businessEventId);
+    expect(result.duplicates).toBe(1);
     expect(result.event?.status).toBe('PENDING');
-    expect(result.event?.tenantId).toBe(tenantId);
-    expect(result.event?.projectId).toBe(projectId);
+    expect(result.event?.tenantId).toBe(fixture.tenantId);
+    expect(result.event?.projectId).toBe(fixture.projectId);
     expect(result.event?.payload).toMatchObject({
       processingRunId: runId,
       documentVersionId: versionId,

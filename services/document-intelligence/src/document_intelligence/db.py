@@ -3,6 +3,7 @@ from uuid import uuid4
 
 import asyncpg
 
+from document_intelligence.arq_queue import strip_prisma_schema_param
 from document_intelligence.config import get_settings
 
 
@@ -12,9 +13,8 @@ class Database:
 
     async def connect(self) -> None:
         if self._pool is None:
-            self._pool = await asyncpg.create_pool(
-                get_settings().database_url, min_size=1, max_size=5
-            )
+            dsn = strip_prisma_schema_param(get_settings().database_url)
+            self._pool = await asyncpg.create_pool(dsn, min_size=1, max_size=5)
 
     async def close(self) -> None:
         if self._pool is not None:
