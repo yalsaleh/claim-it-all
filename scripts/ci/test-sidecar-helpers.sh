@@ -95,6 +95,59 @@ else
   assert_fail 'prints startup script commit diagnostic'
 fi
 
+echo "==> No grep/sed/awk inside minio/mc -c payloads"
+set +e
+python3 - <<'PY'
+from pathlib import Path
+import re
+import sys
+text = Path("scripts/ci/start-live-sidecars.sh").read_text()
+# Extract single-quoted -c '...' payloads after MINIO_MC_IMAGE docker runs.
+bad = []
+for m in re.finditer(r'MINIO_MC_IMAGE\}"\s*\\\s*\n\s*-c\s+\'(.*?)\'', text, re.S):
+    payload = m.group(1)
+    for util in ("grep", "sed", "awk", "curl", "bash", "jq"):
+        if re.search(rf'\b{util}\b', payload):
+            bad.append(f"{util} in mc -c payload")
+if bad:
+    print("FAIL:", "; ".join(bad))
+    sys.exit(2)
+print("OK mc -c payloads avoid runner-only utilities")
+PY
+payload_rc=$?
+set -e
+if [[ "${payload_rc}" -eq 0 ]]; then
+  assert_ok 'mc container scripts do not use grep/sed/awk/curl/bash/jq'
+else
+  assert_fail 'mc container scripts do not use grep/sed/awk/curl/bash/jq'
+fi
+
+echo "==> Privacy policy parsing (runner-side)"
+# shellcheck disable=SC1091
+source scripts/ci/sidecar-helpers.sh
+
+set +e
+assert_minio_anonymous_private 'Access permission for `local/contractradar-documents` is `private`' >/dev/null
+rc_private=$?
+assert_minio_anonymous_private 'Access permission for `local/contractradar-documents` is `none`' >/dev/null
+rc_none=$?
+assert_minio_anonymous_private 'Access permission for `local/x` is `download`' >/dev/null
+rc_download=$?
+assert_minio_anonymous_private 'Access permission for `local/x` is `public`' >/dev/null
+rc_public=$?
+assert_minio_anonymous_private '' >/dev/null
+rc_empty=$?
+assert_minio_anonymous_private '   ' >/dev/null
+rc_blank=$?
+set -e
+
+if [[ "${rc_private}" -eq 0 ]]; then assert_ok 'accepts real private response'; else assert_fail 'accepts real private response'; fi
+if [[ "${rc_none}" -eq 0 ]]; then assert_ok 'accepts none response'; else assert_fail 'accepts none response'; fi
+if [[ "${rc_download}" -ne 0 ]]; then assert_ok 'rejects download/public-read policy'; else assert_fail 'rejects download/public-read policy'; fi
+if [[ "${rc_public}" -ne 0 ]]; then assert_ok 'rejects public policy'; else assert_fail 'rejects public policy'; fi
+if [[ "${rc_empty}" -ne 0 ]]; then assert_ok 'empty policy fails closed'; else assert_fail 'empty policy fails closed'; fi
+if [[ "${rc_blank}" -ne 0 ]]; then assert_ok 'blank policy fails closed'; else assert_fail 'blank policy fails closed'; fi
+
 echo "==> Cleanup helpers with mocked docker"
 TMP_BIN="$(mktemp -d)"
 cleanup() { rm -rf "${TMP_BIN}"; }

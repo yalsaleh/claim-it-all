@@ -38,3 +38,37 @@ stop_live_sidecars() {
   echo "Sidecars stopped."
   return 0
 }
+
+# Validate `mc anonymous get` output on the GitHub runner (not inside minio/mc).
+# Real output example:
+#   Access permission for `local/contractradar-documents` is `private`
+# Fail closed on empty/missing or non-private policies.
+assert_minio_anonymous_private() {
+  local anonymous_policy="${1:-}"
+  printf 'anonymous_policy=%s\n' "${anonymous_policy}"
+  if [[ -z "${anonymous_policy//[[:space:]]/}" ]]; then
+    echo "ERROR: empty mc anonymous get output (fail closed)" >&2
+    return 1
+  fi
+  local normalized
+  normalized="$(printf '%s' "${anonymous_policy}" | tr '[:upper:]' '[:lower:]')"
+  case "${normalized}" in
+    *'is `private`'*|*'`private`'*)
+      return 0
+      ;;
+    *'is `none`'*|*'`none`'*)
+      return 0
+      ;;
+    *'is private'*|*'is none'*)
+      return 0
+      ;;
+    *download*|*upload*|*public*|*readwrite*|*write-only*|*read-only*)
+      echo "ERROR: MinIO bucket anonymous policy is not private: ${anonymous_policy}" >&2
+      return 1
+      ;;
+    *)
+      echo "ERROR: MinIO bucket is not private (unrecognized policy): ${anonymous_policy}" >&2
+      return 1
+      ;;
+  esac
+}

@@ -120,7 +120,8 @@ docker run --rm \
   '
 
 echo "Verifying MinIO bucket privacy..."
-# Authenticated listing must succeed.
+# minio/mc is minimal (no grep/sed/awk). Run only `mc` inside the container;
+# capture stdout and validate on the GitHub runner.
 docker run --rm \
   --network container:contractradar-ci-minio \
   --entrypoint /bin/sh \
@@ -130,14 +131,28 @@ docker run --rm \
   "${MINIO_MC_IMAGE}" \
   -c '
     set -euo pipefail
-    mc alias set local http://127.0.0.1:9000 "$MINIO_USER" "$MINIO_PASS"
+    mc alias set local http://127.0.0.1:9000 "$MINIO_USER" "$MINIO_PASS" >/dev/null
     mc ls "local/${MINIO_BUCKET}" >/dev/null
-    anon="$(mc anonymous get "local/${MINIO_BUCKET}" 2>/dev/null || true)"
-    echo "anonymous_policy=${anon}"
-    printf "%s" "${anon}" | grep -Eqi "(Access permission.*none|none)"
   '
 
+anonymous_policy="$(
+  docker run --rm \
+    --network container:contractradar-ci-minio \
+    --entrypoint /bin/sh \
+    -e MINIO_USER="${MINIO_USER}" \
+    -e MINIO_PASS="${MINIO_PASS}" \
+    -e MINIO_BUCKET="${MINIO_BUCKET}" \
+    "${MINIO_MC_IMAGE}" \
+    -c '
+      set -euo pipefail
+      mc alias set local http://127.0.0.1:9000 "$MINIO_USER" "$MINIO_PASS" >/dev/null
+      mc anonymous get "local/${MINIO_BUCKET}"
+    '
+)"
+assert_minio_anonymous_private "${anonymous_policy}"
+
 # Unauthenticated path-style list/get must not succeed (expect 403/404/405, not 200).
+# curl runs on the GitHub runner, not inside minio/mc.
 unauth_code="$(curl -sS -o /tmp/minio-unauth.out -w '%{http_code}' \
   --max-time 5 \
   "http://127.0.0.1:9000/${MINIO_BUCKET}/" || true)"
