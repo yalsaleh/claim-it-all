@@ -26,6 +26,10 @@ Pinned image names live in `scripts/ci/container-images.env`. Job `validate-imag
 
 Digest pinning (`image@sha256:…`) is a follow-up once tags have been proven green on GitHub.
 
+### Why MinIO is not a GitHub `services:` container
+
+Official `minio/minio` requires `server /data`. GitHub Actions `services:` cannot set that command, so the container exits immediately and `Initialize containers` fails. Foundation CI and live ingestion both start MinIO via `scripts/ci/start-live-sidecars.sh`.
+
 ### Known image corrections (2026-07-19)
 
 | Was (invalid) | Now (Docker Hub verified) |

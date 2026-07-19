@@ -65,9 +65,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
-    # Only stable official library images under services: (pulled before steps).
-    # MinIO + ClamAV start via docker run after explicit pulls (Option B) so a bad
-    # tag fails with a named image instead of a generic service-container pull error.
+    # Only Postgres/Redis under services: (pulled before steps).
+    # MinIO cannot use services: — official image requires `server /data` and GHA
+    # cannot pass that command (container exits immediately).
+    # MinIO + ClamAV start via scripts/ci/start-live-sidecars.sh (Option B).
     services:
       postgres:
         image: postgres:16.6-alpine
