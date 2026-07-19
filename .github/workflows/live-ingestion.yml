@@ -1,0 +1,257 @@
+name: Live ingestion
+
+# Mode B — authoritative Slice 2B operational verification.
+# Runs on GitHub-hosted runners (Docker available there). Developers do not need local Docker.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, cursor/**]
+    paths:
+      - 'apps/web/**'
+      - 'services/document-intelligence/**'
+      - 'packages/shared/**'
+      - 'packages/authz/**'
+      - 'infrastructure/docker/**'
+      - '.github/workflows/live-ingestion.yml'
+      - 'scripts/test-live-ci.sh'
+      - 'scripts/ci/**'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - 'services/document-intelligence/**'
+      - 'packages/shared/**'
+      - 'packages/authz/**'
+      - 'infrastructure/docker/**'
+      - '.github/workflows/live-ingestion.yml'
+      - 'scripts/test-live-ci.sh'
+      - 'scripts/ci/**'
+      - 'pnpm-lock.yaml'
+
+concurrency:
+  group: live-ingestion-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-ingestion:
+    name: Live data plane (Postgres/Redis/MinIO/ClamAV/ARQ)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:16.6-alpine
+        env:
+          POSTGRES_USER: contractradar
+          POSTGRES_PASSWORD: contractradar
+          POSTGRES_DB: contractradar_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U contractradar -d contractradar_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:7.4.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+      minio:
+        image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+        env:
+          MINIO_ROOT_USER: ci-minio-access
+          MINIO_ROOT_PASSWORD: ci-minio-secret-ephemeral
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+      clamav:
+        image: clamav/clamav:1.4.1-41
+        ports:
+          - 3310:3310
+        options: >-
+          --health-cmd "clamdscan --ping 3 || exit 1"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 30
+          --health-start-period 180s
+
+    env:
+      NODE_ENV: test
+      APP_ENV: test
+      APP_URL: http://localhost:3000
+      BETTER_AUTH_URL: http://localhost:3000
+      DOCUMENT_INTELLIGENCE_URL: http://127.0.0.1:8000
+      REDIS_URL: redis://127.0.0.1:6379
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: ci-minio-access
+      S3_SECRET_ACCESS_KEY: ci-minio-secret-ephemeral
+      S3_BUCKET: contractradar-documents
+      S3_FORCE_PATH_STYLE: 'true'
+      MALWARE_SCANNER: clamav
+      CLAMAV_HOST: 127.0.0.1
+      CLAMAV_PORT: '3310'
+      LIVE_INGESTION_TESTS: 'true'
+      REQUIRE_LIVE_INGESTION_TESTS: 'true'
+      LIVE_ARQ_WORKER: 'true'
+      LOG_LEVEL: info
+      ALLOW_DEV_DEFAULTS: 'true'
+      UPLOAD_SESSION_TTL_SECONDS: '900'
+      DOWNLOAD_URL_TTL_SECONDS: '120'
+      REQUIRE_INTEGRATION_DB: 'true'
+      DATABASE_URL: postgresql://contractradar_app:contractradar@127.0.0.1:5432/contractradar_test?schema=public
+      INTEGRATION_DATABASE_URL: postgresql://contractradar_app:contractradar@127.0.0.1:5432/contractradar_test?schema=public
+      DATABASE_MIGRATE_URL: postgresql://contractradar:contractradar@127.0.0.1:5432/contractradar_test?schema=public
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate ephemeral application secrets
+        run: |
+          set -euo pipefail
+          {
+            echo "BETTER_AUTH_SECRET=$(openssl rand -hex 32)"
+            echo "DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN=$(openssl rand -hex 24)"
+            echo "SEED_OWNER_PASSWORD=Ci-Owner-$(openssl rand -hex 8)!"
+            echo "SEED_VIEWER_PASSWORD=Ci-Viewer-$(openssl rand -hex 8)!"
+          } >> "$GITHUB_ENV"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python dependencies
+        working-directory: services/document-intelligence
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Ensure MinIO private bucket
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            minio/mc:RELEASE.2024-11-17T19-35-56Z \
+            /bin/sh -c 'mc alias set local http://127.0.0.1:9000 ci-minio-access ci-minio-secret-ephemeral && mc mb --ignore-existing local/contractradar-documents && mc anonymous set none local/contractradar-documents && mc anonymous get local/contractradar-documents | grep -qi none'
+
+      - name: Prisma generate + validate + migrate from zero
+        run: |
+          set -euo pipefail
+          pnpm validate:prisma
+          pnpm db:generate
+          DATABASE_URL="$DATABASE_MIGRATE_URL" pnpm db:migrate:deploy
+          pnpm db:seed
+          pnpm --filter @contractradar/web exec prisma migrate status
+
+      - name: Start DI API, ARQ worker, outbox dispatcher
+        working-directory: services/document-intelligence
+        env:
+          APP_ENV: test
+          MALWARE_SCANNER: clamav
+          CLAMAV_HOST: 127.0.0.1
+          CLAMAV_PORT: '3310'
+          ALLOW_DEV_DEFAULTS: 'true'
+          OUTBOX_POLL_SECONDS: '1'
+        run: |
+          set -euo pipefail
+          nohup uvicorn document_intelligence.main:app --host 127.0.0.1 --port 8000 >/tmp/di-api.log 2>&1 &
+          echo $! >/tmp/di-api.pid
+          nohup arq document_intelligence.workers.WorkerSettings >/tmp/arq-worker.log 2>&1 &
+          echo $! >/tmp/arq-worker.pid
+          nohup python -m document_intelligence.outbox.dispatcher >/tmp/outbox.log 2>&1 &
+          echo $! >/tmp/outbox.pid
+
+      - name: Health-gated service wait
+        run: |
+          chmod +x scripts/ci/wait-for-live-services.sh
+          bash scripts/ci/wait-for-live-services.sh
+
+      - name: Refuse FakeScanner in live workflow
+        working-directory: services/document-intelligence
+        env:
+          APP_ENV: production
+          MALWARE_SCANNER: fake_test
+          S3_ACCESS_KEY_ID: prod-not-example-key
+          S3_SECRET_ACCESS_KEY: prod-not-example-secret
+          CLAMAV_HOST: 127.0.0.1
+        run: |
+          python - <<'PY'
+          from document_intelligence.config import Settings, reset_settings_cache
+          reset_settings_cache()
+          try:
+              Settings()  # type: ignore[call-arg]
+          except Exception as exc:
+              print("OK fake_test refused:", type(exc).__name__)
+          else:
+              raise SystemExit("FakeScanner/fake_test must be refused outside tests")
+          PY
+
+      - name: Run authoritative live suite (fail on skip)
+        run: |
+          chmod +x scripts/test-live-ci.sh
+          bash scripts/test-live-ci.sh
+
+      - name: Sanitize health report artifact
+        if: always()
+        run: |
+          mkdir -p artifacts
+          {
+            echo "postgres: $(pg_isready -h 127.0.0.1 -U contractradar -d contractradar_test >/dev/null && echo ok || echo error)"
+            echo "redis: $(redis-cli -u "$REDIS_URL" ping 2>/dev/null || echo error)"
+            echo "minio: $(curl -fsS "$S3_ENDPOINT/minio/health/live" >/dev/null && echo ok || echo error)"
+            echo "clamav_tcp: $( (echo >/dev/tcp/127.0.0.1/3310) >/dev/null 2>&1 && echo ok || echo error)"
+            echo "di_live: $(curl -fsS "$DOCUMENT_INTELLIGENCE_URL/health/live" >/dev/null && echo ok || echo error)"
+          } > artifacts/service-health.txt
+
+      - name: Upload safe diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-ingestion-diagnostics
+          path: |
+            artifacts/live-summary.json
+            artifacts/live-web.log
+            artifacts/live-python.log
+            artifacts/live-python-junit.xml
+            artifacts/service-health.txt
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Redact check on uploaded logs
+        if: always()
+        run: |
+          if grep -Eiq 'X-Amz-Signature=|X-Amz-Credential=' artifacts/*.log 2>/dev/null; then
+            echo "Potential signed-URL leakage in artifacts"
+            exit 1
+          fi
+
+      - name: Stop background processes
+        if: always()
+        run: |
+          for f in /tmp/di-api.pid /tmp/arq-worker.pid /tmp/outbox.pid; do
+            if [[ -f "$f" ]]; then kill "$(cat "$f")" 2>/dev/null || true; fi
+          done

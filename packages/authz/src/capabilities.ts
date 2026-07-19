@@ -1,0 +1,26 @@
+export const CAPABILITIES = [
+  'tenant.read',
+  'tenant.manage',
+  'tenant.members.read',
+  'tenant.members.manage',
+  'project.create',
+  'project.read',
+  'project.update',
+  'project.archive',
+  'project.members.read',
+  'project.members.manage',
+  'audit.read',
+  'document.create',
+  'document.read',
+  'document.download',
+  'document.update_metadata',
+  'document.add_version',
+  'document.archive',
+  'document.processing.retry',
+  'document.processing.view',
+  'document.quarantine.view',
+  'document.quarantine.manage',
+  'project.storage.manage',
+] as const;
+
+export type Capability = (typeof CAPABILITIES)[number];

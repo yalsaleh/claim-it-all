@@ -8,42 +8,47 @@ Legend: `P0` blocker · `P1` required for MVP · `P2` strong follow-on within Ph
 
 ## Epic A — Repository & toolchain bootstrap
 
-| ID | Priority | Item | Acceptance criteria |
-|----|----------|------|---------------------|
-| A1 | P0 | Scaffold `apps/web` with Next.js + TypeScript | App starts locally; ESLint + TypeScript strict; no dummy dashboards pretending analysis works |
-| A2 | P0 | Scaffold `services/document-intelligence` with FastAPI | Health endpoint; pyproject/requirements pinned; pytest wired |
-| A3 | P0 | pnpm workspace (or chosen tool) + root scripts | `dev`, `lint`, `test`, `typecheck` documented in README |
-| A4 | P0 | Env validation modules (web + Python) | Missing/invalid env fails fast with clear errors |
-| A5 | P1 | CI workflow (lint, typecheck, unit tests) | GitHub Actions runs on PR |
-| A6 | P1 | Prisma init + first migration skeleton | `Tenant`, `User`, memberships, `Project` tables exist |
+| ID | Priority | Item | Acceptance criteria | Status |
+|----|----------|------|---------------------|--------|
+| A1 | P0 | Scaffold `apps/web` with Next.js + TypeScript | App starts locally; ESLint + TypeScript strict; no dummy dashboards pretending analysis works | Done (Slice 1) |
+| A2 | P0 | Scaffold `services/document-intelligence` with FastAPI | Health endpoint; pyproject/requirements pinned; pytest wired | Done (Slice 1) |
+| A3 | P0 | pnpm workspace (or chosen tool) + root scripts | `dev`, `lint`, `test`, `typecheck` documented in README | Done (Slice 1) |
+| A4 | P0 | Env validation modules (web + Python) | Missing/invalid env fails fast with clear errors | Done (Slice 1) |
+| A5 | P1 | CI workflow (lint, typecheck, unit tests) | GitHub Actions runs on PR | Done (Slice 1) |
+| A6 | P1 | Prisma init + first migration skeleton | `Tenant`, `User`, memberships, `Project` tables exist | Done (Slice 1) |
 
 ---
 
 ## Epic B — Identity, tenancy, RBAC
 
-| ID | Priority | Item | Acceptance criteria |
-|----|----------|------|---------------------|
-| B1 | P0 | Auth sessions (library per ADR-010 spike) | Sign-up/sign-in/sign-out; secure cookies |
-| B2 | P0 | Tenant + project creation | User can create tenant and project; data tagged with `tenant_id` |
-| B3 | P0 | Memberships & roles | `tenant_admin`, `project_admin`, `commercial_reviewer`, `project_member`, `auditor_readonly` |
-| B4 | P0 | Server-side authz helpers | Unauthorized cross-project/cross-tenant requests return 401/403 |
-| B5 | P1 | Cross-tenant isolation tests | Automated tests prove denial |
-| B6 | P2 | Invite user to tenant/project | Invitation flow or admin add; audited |
+| ID | Priority | Item | Acceptance criteria | Status |
+|----|----------|------|---------------------|--------|
+| B1 | P0 | Auth sessions (library per ADR-010 spike) | Sign-up/sign-in/sign-out; secure cookies | Done — Better Auth (ADR-010) |
+| B2 | P0 | Tenant + project creation | User can create tenant and project; data tagged with `tenant_id` | Partial — project create done; tenant admin UI deferred |
+| B3 | P0 | Memberships & roles | Capability-mapped tenant/project role enums | Done (Slice 1) |
+| B4 | P0 | Server-side authz helpers | Unauthorized cross-project/cross-tenant requests return 401/403 | Done (Slice 1) |
+| B5 | P1 | Cross-tenant isolation tests | Automated tests prove denial | Done (Slice 1B — RLS + adversarial suite, 0 skips) |
+| B6 | P2 | Invite user to tenant/project | Invitation flow or admin add; audited | Partial — add member by user id |
 
 ---
 
 ## Epic C — Document storage & ingestion skeleton
 
-| ID | Priority | Item | Acceptance criteria |
-|----|----------|------|---------------------|
-| C1 | P0 | S3 client + MinIO integration | Upload original; store `Document` + `DocumentVersion` |
-| C2 | P0 | Pre-signed download | Authorized users only; no public bucket |
-| C3 | P0 | Enqueue ingestion job on upload | Job row + Redis message with tenant/project/document ids |
-| C4 | P1 | Worker: hash, mime, language detect, text extract for PDF/DOCX | Status transitions `pending → processing → ready/failed` |
-| C5 | P1 | Persist `DocumentExtraction` with provenance placeholders | Extraction version retained; originals untouched |
-| C6 | P1 | Arabic/English language metadata | `language` set; mixed docs don’t crash pipeline |
-| C7 | P2 | Malware scan interface | Hook exists; can be no-op locally, enabled in hardened env |
-| C8 | P2 | Upload UI (professional, accessible) | Progress + failure reasons; not a fake “smart analyze” button |
+| ID | Priority | Item | Acceptance criteria | Status |
+|----|----------|------|---------------------|--------|
+| C1 | P0 | S3 client + MinIO integration | Upload original; store document + version; private bucket | Done (Slice 2) |
+| C2 | P0 | Pre-signed download | Authorized users only; CLEAN + ACCEPTED required | Done (Slice 2) |
+| C3 | P0 | Durable enqueue on upload | Transactional outbox → ARQ (ADR-025) | Done (Slice 2B) |
+| C4 | P1 | Worker: scan, promote, extract PDF/DOCX/… | Status transitions through READY/FAILED | Done (Slice 2) |
+| C5 | P1 | Persist artifacts + evidence segments | Provenance retained; originals untouched | Done (Slice 2) |
+| C6 | P1 | Arabic/English language metadata | Mixed docs don’t crash pipeline | Done (Slice 2) |
+| C7 | P0 | Malware scan with env enforcement | ClamAV required in staging/prod; fake_test only in tests | Done (Slice 2B) |
+| C8 | P2 | Upload UI (professional, accessible) | Progress + failure reasons; not a fake “smart analyze” button | Done (Slice 2) |
+| C9 | P0 | Live MinIO/Redis/ClamAV/ARQ verification | GitHub Actions `live-ingestion.yml` (Mode B); no local Docker required | Ready for CI — not verified until workflow green |
+| C10 | P0 | Readiness + reconciliation | Dependency-aware ready; reconcile dry-run | Done (Slice 2B) |
+| C11 | P0 | Local non-Docker verification | `pnpm verify:local` (Mode A) | Done |
+
+**Next slice (only after Mode B live workflow is green):** Epic D — contract structure, clause extraction, obligation modeling, human-verified contract configuration.
 
 ---
 
@@ -102,11 +107,11 @@ Legend: `P0` blocker · `P1` required for MVP · `P2` strong follow-on within Ph
 
 | ID | Priority | Item | Acceptance criteria |
 |----|----------|------|---------------------|
-| H1 | P0 | `AuditLog` writes for authz changes, uploads, review decisions | Append-only API |
+| H1 | P0 | `AuditLog` writes for authz changes, uploads, review decisions | Append-only API + DB immutability (Slice 1B) | Partial — project/tenant audited; uploads/review later |
 | H2 | P0 | Structured logging with redaction | No document body in info logs |
 | H3 | P1 | Internal service auth web ↔ document-intelligence | Unauthorized calls rejected |
 | H4 | P1 | Security checklist in SECURITY.md signed off for staging | Checklist complete |
-| H5 | P2 | Basic rate limits on auth and upload | Abuse resistance |
+| H5 | P2 | Basic rate limits on auth and upload | Partial — login rate limit (Slice 1B); upload later |
 
 ---
 
@@ -127,8 +132,11 @@ Legend: `P0` blocker · `P1` required for MVP · `P2` strong follow-on within Ph
 ### Slice 1 — Platform skeleton
 A1–A6, B1–B4, Docker already running.
 
+### Slice 1B — Verification & security hardening
+Real Postgres migrate/seed/reset, FORCE RLS + `contractradar_app` role, audit immutability triggers, HMAC active-tenant cookie, login rate limit, seed credential safety, integration suite fail-closed (embedded Postgres when Docker unavailable). **Done** — do not start document ingestion until Slice 2.
+
 ### Slice 2 — Documents
-C1–C6, H2–H3, I1.
+C1–C6, H2–H3, I1. Immutable project document ingestion and evidence provenance. **Done** — SourceDocument/DocumentVersion/UploadSession/processing/evidence; MinIO + ARQ + fake/ClamAV adapters; do not start entitlement detection until Slice 3+.
 
 ### Slice 3 — Contract rules + deadlines
 D1–D4, I2.

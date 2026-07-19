@@ -40,14 +40,14 @@ This document describes the production-oriented architecture for ContractRadar. 
         │                   │                   │
         ▼                   ▼                   ▼
 ┌───────────────┐  ┌────────────────┐  ┌──────────────────────────┐
-│  PostgreSQL   │  │ Object Storage │  │ Redis (queues / cache)    │
-│  (Prisma)     │  │ S3 / MinIO     │  │                          │
-└───────────────┘  └───────▲────────┘  └────────────▲─────────────┘
-                           │                        │
-                           │         ┌──────────────┴─────────────┐
-                           │         │ document-intelligence      │
-                           └─────────┤ Python FastAPI + workers   │
-                                     │ OCR · extract · AI orch.   │
+│  PostgreSQL   │  │ Object Storage │  │ Redis (ARQ / rate limits)│
+│  + outbox     │  │ S3 / MinIO     │  │                          │
+└───────┬───────┘  └───────▲────────┘  └────────────▲─────────────┘
+        │                  │                        │
+        │ outbox           │         ┌──────────────┴─────────────┐
+        └──────────────────┼─────────┤ document-intelligence      │
+                           └─────────┤ API · ARQ worker · dispatch│
+                                     │ ClamAV · extract           │
                                      └──────────────┬─────────────┘
                                                     │
                                      ┌──────────────▼─────────────┐
@@ -56,6 +56,10 @@ This document describes the production-oriented architecture for ContractRadar. 
                                      │ / local / future vendors   │
                                      └────────────────────────────┘
 ```
+
+Ingestion control plane (Slice 2B): web accept transaction writes `OutboxEvent` → dispatcher enqueues ARQ → worker scans/promotes/extracts. See ADR-025.
+
+Verification: Mode A `pnpm verify:local` (no Docker) for unit/embedded checks; Mode B GitHub Actions `live-ingestion.yml` for real MinIO/Redis/ClamAV/ARQ.
 
 ---
 

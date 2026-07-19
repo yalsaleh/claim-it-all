@@ -65,7 +65,13 @@ Tenant
 
 - `TenantMembership`: user + tenant + tenant-level role
 - `ProjectMembership`: user + project + project-level role
-- Permissions are derived from roles (RBAC). Custom roles may be added later without changing entity shape.
+- Permissions are derived from roles via **capabilities** in `@contractradar/authz` (not scattered role-name checks).
+
+**Tenant roles (Slice 1):** `TENANT_OWNER`, `TENANT_ADMIN`, `COMMERCIAL_MANAGER`, `CONTRACTS_MANAGER`, `PROJECT_MANAGER`, `REVIEWER`, `VIEWER`
+
+**Project roles (Slice 1):** `PROJECT_ADMIN`, `COMMERCIAL_LEAD`, `CONTRACTS_LEAD`, `PROJECT_MANAGER`, `REVIEWER`, `CONTRIBUTOR`, `VIEWER`
+
+Elevated tenant roles may read all tenant projects; `REVIEWER` / `VIEWER` tenant roles are project-scoped through `ProjectMembership`.
 
 ---
 
@@ -100,7 +106,14 @@ Tenant
 
 - Immutable bytes pointer: `storage_key`, `byte_size`, `mime_type`, `checksum`
 - `version_number`, `uploaded_by`, `created_at`
+- Custody fields: `uploadStatus`, `malwareScanStatus`, `processingStatus`
+- Quarantine keys until CLEAN scan; then promoted under `/originals/`
 - Replacing a file always creates a new version.
+
+### OutboxEvent
+
+- Durable job intent written in the same transaction as upload acceptance
+- Payload: processing/version/correlation IDs only (ADR-025)
 
 ### DocumentExtraction
 

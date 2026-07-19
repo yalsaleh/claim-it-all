@@ -1,34 +1,30 @@
-# `apps/web` — ContractRadar web application
+# `@contractradar/web`
 
-Next.js + TypeScript application for authenticated project workspaces, document upload, event review, notice drafts, and audit views.
+Next.js App Router application for ContractRadar platform foundation.
 
-## Status
+## Scripts
 
-**Not scaffolded yet.** Phase 1 backlog item `A1` creates the Next.js app here.
-
-## Planned responsibilities
-
-- UI (including RTL-capable Arabic/English chrome)
-- Domain API / server actions
-- Authentication and session handling
-- Tenant/project authorization enforcement
-- Prisma client and migrations (schema ownership)
-- Enqueue jobs for document-intelligence workers
-
-## Non-responsibilities
-
-- Long-running OCR / LLM pipelines (see `services/document-intelligence`)
-- Autonomous notice dispatch
-
-## Planned layout
-
-```
-src/
-  app/           # App Router
-  components/
-  server/        # auth, authz, domain services
-  lib/
-prisma/          # schema + migrations
+```bash
+pnpm --filter @contractradar/web dev
+pnpm --filter @contractradar/web test:unit
+pnpm --filter @contractradar/web test:integration
+pnpm --filter @contractradar/web db:migrate:deploy
+pnpm --filter @contractradar/web db:seed
 ```
 
-See [ARCHITECTURE.md](../../ARCHITECTURE.md) and [docs/backlog/phase-1.md](../../docs/backlog/phase-1.md).
+## Routes (Slice 1)
+
+- `/` landing
+- `/login`
+- `/select-organization`
+- `/projects`
+- `/projects/[projectId]`
+- `/unauthorized`
+- `/api/health`
+- `/api/auth/[...all]` Better Auth handler
+
+## Notes
+
+- Tenant context comes from authenticated membership + `cr_active_tenant` cookie.
+- Client-supplied `tenantId` is never trusted for authorization.
+- No entitlement analytics or AI surfaces in this slice.

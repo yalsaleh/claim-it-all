@@ -141,18 +141,19 @@ Statuses: **Proposed** · **Accepted** · **Superseded** · **Rejected**
 
 ---
 
-## ADR-010 — Auth library choice deferred to first implementation sprint
+## ADR-010 — Authentication with Better Auth
 
 | Field | Detail |
 |-------|--------|
-| Status | Proposed |
+| Status | Accepted |
 | Date | 2026-07-18 |
+| Details | [docs/adrs/ADR-010-authentication.md](./docs/adrs/ADR-010-authentication.md) |
 
-**Context:** Auth.js and better-auth (and similar) can both satisfy cookie sessions; enterprise SSO arrives later.
+**Context:** Slice 1 required a real credential/session foundation with Prisma, secure cookies, and an SSO upgrade path — without trusting headers/query/localStorage.
 
-**Decision (pending implementation spike):** Choose a maintained TypeScript auth library during Phase 1 scaffolding based on session security, organization support, and SSO upgrade path. Record the final choice as ADR-010a.
+**Decision:** Use **Better Auth** for authentication (email/password + Prisma adapter + DB sessions). Keep ContractRadar `Tenant` / membership models authoritative; do not use Better Auth organizations for tenancy. Active tenant is an httpOnly cookie validated against `TenantMembership`.
 
-**Consequences:** Avoids locking docs to a library before a short spike; does not block domain modeling.
+**Consequences:** Hashed passwords and revocable sessions out of the box; tenancy/RBAC remain custom and testable; Auth.js remains a viable future alternative only if Better Auth stalls on enterprise IdP needs.
 
 ---
 
@@ -215,3 +216,150 @@ Statuses: **Proposed** · **Accepted** · **Superseded** · **Rejected**
 **Decision leaning:** Python owns heavy document/AI jobs; Node enqueues and may run light jobs (emails, simple recalcs). Exact Python queue library chosen at service scaffold time (Celery/RQ/arq).
 
 **Consequences:** Document in ADR-014a at implementation; keep Redis as the broker to preserve Compose simplicity.
+
+---
+
+## ADR-015 — Capability-based RBAC over scattered role checks
+
+| Field | Detail |
+|-------|--------|
+| Status | Accepted |
+| Date | 2026-07-18 |
+
+**Context:** Role-name comparisons scattered through UI/API code become inconsistent and hard to test.
+
+**Decision:** Map tenant/project roles to explicit capabilities in `@contractradar/authz`. Server modules check capabilities (`project.create`, `project.update`, …). Role assignment authority is ranked so users cannot grant higher privilege than they hold. Archived projects drop mutating capabilities.
+
+**Consequences:** Centralized permission tests; UI may hide actions but never authorizes them.
+
+---
+
+## ADR-016 — PostgreSQL RLS
+
+| Field | Detail |
+|-------|--------|
+| Status | Accepted |
+| Date | 2026-07-18 |
+| Details | [docs/adrs/ADR-016-postgresql-rls.md](./docs/adrs/ADR-016-postgresql-rls.md) |
+
+**Decision:** FORCE RLS on tenant-owned business tables with transaction-local `app.current_tenant_id` / `app.current_user_id` / `app.bypass_rls`. Auth tables excluded.
+
+---
+
+## ADR-017 — Audit immutability
+
+| Field | Detail |
+|-------|--------|
+| Status | Accepted |
+| Date | 2026-07-18 |
+| Details | [docs/adrs/ADR-017-audit-immutability.md](./docs/adrs/ADR-017-audit-immutability.md) |
+
+**Decision:** DB triggers block UPDATE/DELETE on `audit_log` except controlled purge with dual GUCs.
+
+---
+
+## ADR-018 — Tenant context cookie
+
+| Field | Detail |
+|-------|--------|
+| Status | Accepted |
+| Date | 2026-07-18 |
+| Details | [docs/adrs/ADR-018-tenant-context-propagation.md](./docs/adrs/ADR-018-tenant-context-propagation.md) |
+
+**Decision:** Signed httpOnly active-tenant cookie is a selector only; membership revalidated every request.
+
+---
+
+## ADR-019 — Auth rate limiting
+
+| Field | Detail |
+|-------|--------|
+| Status | Accepted |
+| Date | 2026-07-18 |
+| Details | [docs/adrs/ADR-019-auth-rate-limiting.md](./docs/adrs/ADR-019-auth-rate-limiting.md) |
+
+**Decision:** Redis-backed login rate limit; fail closed in production when Redis is down.
+
+---
+
+## ADR-020 — Object storage key layout
+
+| Field | Detail |
+|-------|--------|
+| Status | Accepted |
+| Date | 2026-07-19 |
+| Details | [docs/adrs/ADR-020-object-storage-keys.md](./docs/adrs/ADR-020-object-storage-keys.md) |
+
+**Decision:** Private bucket with `quarantine` / `originals` / `derived` prefixes under tenant/project paths.
+
+---
+
+## ADR-021 — Upload architecture
+
+| Field | Detail |
+|-------|--------|
+| Status | Accepted |
+| Date | 2026-07-19 |
+| Details | [docs/adrs/ADR-021-upload-architecture.md](./docs/adrs/ADR-021-upload-architecture.md) |
+
+**Decision:** Presigned PUT into quarantine; server verifies HEAD/checksum/magic on complete.
+
+---
+
+## ADR-022 — ARQ workers
+
+| Field | Detail |
+|-------|--------|
+| Status | Accepted (updated Slice 2B) |
+| Date | 2026-07-19 |
+| Details | [docs/adrs/ADR-022-queue-arq.md](./docs/adrs/ADR-022-queue-arq.md) |
+
+**Decision:** ARQ for document jobs; primary enqueue via transactional outbox.
+
+---
+
+## ADR-023 — Malware scanning boundary
+
+| Field | Detail |
+|-------|--------|
+| Status | Accepted (updated Slice 2B) |
+| Date | 2026-07-19 |
+| Details | [docs/adrs/ADR-023-malware-boundary.md](./docs/adrs/ADR-023-malware-boundary.md) |
+
+**Decision:** Modes `clamav` / `fake_test` / `disabled_reject_all`; fake refused outside tests.
+
+---
+
+## ADR-024 — Evidence and duplicates
+
+| Field | Detail |
+|-------|--------|
+| Status | Accepted |
+| Date | 2026-07-19 |
+| Details | [docs/adrs/ADR-024-evidence-and-duplicates.md](./docs/adrs/ADR-024-evidence-and-duplicates.md) |
+
+**Decision:** Evidence segments + tenant-scoped checksum duplicate detection.
+
+---
+
+## ADR-025 — Transactional outbox
+
+| Field | Detail |
+|-------|--------|
+| Status | Accepted |
+| Date | 2026-07-19 |
+| Details | [docs/adrs/ADR-025-transactional-outbox.md](./docs/adrs/ADR-025-transactional-outbox.md) |
+
+**Decision:** At-least-once delivery via Postgres outbox + dispatcher → ARQ; idempotent consumers.
+
+---
+
+## ADR-026 — Service-to-service auth
+
+| Field | Detail |
+|-------|--------|
+| Status | Accepted |
+| Date | 2026-07-19 |
+| Details | [docs/adrs/ADR-026-service-to-service-auth.md](./docs/adrs/ADR-026-service-to-service-auth.md) |
+
+**Decision:** Internal token + HMAC timestamp for HTTP DI routes; prefer outbox/ARQ without browser sessions.

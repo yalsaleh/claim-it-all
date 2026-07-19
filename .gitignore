@@ -26,6 +26,9 @@ build/
 secrets/
 credentials/
 
+# Local / CI diagnostic outputs
+artifacts/
+
 # Next.js / frontend
 apps/web/.next/
 apps/web/out/
@@ -62,11 +65,13 @@ htmlcov/
 
 # Local object storage / data dumps
 .minio/
+.embedded-postgres/
 tmp/
 .tmp/
 *.tmp
 data/local/
 uploads/
+apps/web/.env.test
 
 # Terraform
 infrastructure/terraform/.terraform/
@@ -81,3 +86,4 @@ infrastructure/docker/volumes/
 # Generated
 *.generated.*
 .cache/
+apps/web/next-env.d.ts

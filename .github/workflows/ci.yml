@@ -2,32 +2,169 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, cursor/**]
   pull_request:
 
+env:
+  NODE_ENV: test
+  APP_ENV: test
+  APP_URL: http://localhost:3000
+  DATABASE_URL: postgresql://contractradar_app:contractradar@localhost:5432/contractradar_test?schema=public
+  INTEGRATION_DATABASE_URL: postgresql://contractradar_app:contractradar@localhost:5432/contractradar_test?schema=public
+  DATABASE_MIGRATE_URL: postgresql://contractradar:contractradar@localhost:5432/contractradar_test?schema=public
+  BETTER_AUTH_SECRET: ci-test-secret-with-sufficient-length-32
+  BETTER_AUTH_URL: http://localhost:3000
+  DOCUMENT_INTELLIGENCE_URL: http://localhost:8000
+  DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN: ci-internal-token-32chars
+  REDIS_URL: redis://localhost:6379
+  S3_ENDPOINT: http://localhost:9000
+  S3_REGION: us-east-1
+  S3_ACCESS_KEY_ID: minioadmin
+  S3_SECRET_ACCESS_KEY: minioadmin
+  S3_BUCKET: contractradar-documents
+  S3_FORCE_PATH_STYLE: "true"
+  LOG_LEVEL: info
+  REQUIRE_INTEGRATION_DB: "true"
+  ALLOW_DEV_DEFAULTS: "true"
+  MALWARE_SCANNER: fake_test
+  SEED_OWNER_PASSWORD: "ChangeMe-Owner-2026!"
+  SEED_VIEWER_PASSWORD: "ChangeMe-Viewer-2026!"
+
 jobs:
-  foundation:
-    name: Foundation checks
+  verify:
+    name: Verify foundation + security
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16.6-alpine
+        env:
+          POSTGRES_USER: contractradar
+          POSTGRES_PASSWORD: contractradar
+          POSTGRES_DB: contractradar_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U contractradar -d contractradar_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7.4.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      minio:
+        image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate Docker Compose file
-        run: docker compose -f infrastructure/docker/docker-compose.yml config --quiet
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-      - name: Verify required documentation exists
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python dependencies
+        working-directory: services/document-intelligence
         run: |
-          set -e
-          for f in \
-            README.md \
-            ARCHITECTURE.md \
-            DOMAIN_MODEL.md \
-            ROADMAP.md \
-            DECISIONS.md \
-            SECURITY.md \
-            docs/backlog/phase-1.md
-          do
-            test -f "$f" || (echo "Missing $f" && exit 1)
-          done
-          echo "Documentation set present."
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Ensure MinIO bucket private
+        run: |
+          docker run --rm --network host minio/mc:RELEASE.2024-11-17T19-35-56Z \
+            /bin/sh -c "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/contractradar-documents && mc anonymous set none local/contractradar-documents"
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Prisma validate + generate
+        run: |
+          pnpm validate:prisma
+          pnpm db:generate
+
+      - name: Migrate test database
+        env:
+          DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
+        run: pnpm db:migrate:deploy
+
+      - name: Seed test database
+        run: pnpm db:seed
+
+      - name: Lint
+        run: pnpm --filter @contractradar/shared lint && pnpm --filter @contractradar/authz lint && pnpm --filter @contractradar/web lint
+
+      - name: Typecheck
+        run: pnpm --filter @contractradar/shared typecheck && pnpm --filter @contractradar/authz typecheck && pnpm --filter @contractradar/web typecheck
+
+      - name: Python lint + typecheck + unit/contract tests
+        working-directory: services/document-intelligence
+        env:
+          APP_ENV: test
+          MALWARE_SCANNER: fake_test
+          DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN: ci-internal-token-32chars
+          ALLOW_DEV_DEFAULTS: "true"
+        run: |
+          ruff check src tests
+          mypy src
+          pytest -q -k "not live"
+
+      - name: Unit tests
+        run: pnpm test:unit
+
+      - name: Integration / security tests (no skips allowed)
+        run: |
+          set -euo pipefail
+          OUTPUT=$(pnpm test:integration 2>&1 | tee /tmp/integration.out)
+          if echo "$OUTPUT" | grep -E '[1-9][0-9]* skipped'; then
+            echo "Security integration tests must not skip."
+            exit 1
+          fi
+          echo "$OUTPUT" | grep -E 'Test Files|Tests '
+
+      - name: Reset + remigrate + reseed (reproducibility)
+        run: |
+          pnpm db:reset
+          pnpm db:migrate:deploy
+          pnpm db:seed
+
+      - name: Build packages and web
+        run: pnpm build
+
+      - name: Verification summary
+        if: always()
+        run: |
+          echo "## Mode A / foundation CI"
+          echo "- Postgres/Redis/MinIO (GitHub service containers): used for migrate + security integration"
+          echo "- Unit + embedded-equivalent integration (fail on skip): required"
+          echo "- Python lint/type/unit (non-live): required"
+          echo "- Live ClamAV/ARQ/full ingestion: see workflow live-ingestion.yml (Mode B)"

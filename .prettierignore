@@ -1,0 +1,13 @@
+node_modules
+.next
+dist
+coverage
+pnpm-lock.yaml
+apps/web/prisma/migrations
+**/.venv
+**/__pycache__
+*.generated.*
+*.md
+infrastructure/docker/docker-compose.yml
+.github/workflows/ci.yml
+.github/workflows/live-ingestion.yml

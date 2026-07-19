@@ -98,11 +98,18 @@ Optional later: PostgreSQL Row Level Security as defense-in-depth; dedicated DB/
 
 ## 7. Document upload safety
 
-- Validate content types and size limits.
+- Validate content types and size limits; server regenerates storage keys.
 - Compute hashes; store separately from filename (filenames are display metadata only).
-- Malware scanning interface; required in hardened deployments.
+- Quarantine → ClamAV scan → promote to immutable originals (prefix separation).
+- `MALWARE_SCANNER=fake_test` is test-only; staging/production require ClamAV.
+- Scanner timeout/unavailable/malformed response never yields CLEAN.
+- Download requires ACCEPTED + CLEAN; infected files stay quarantined.
+- Transactional outbox prevents accepted-but-never-queued processing jobs.
 - Isolate parsing/OCR in workers with resource limits.
 - Do not execute embedded macros or external links during processing.
+- Privileged reconciliation detects custody drift without silent repair.
+- Local Mode A (`pnpm verify:local`) never claims live MinIO/Redis/ClamAV/ARQ proof.
+- Authoritative live ingestion verification is the GitHub Actions **Live ingestion** workflow (Mode B).
 
 ---
 
@@ -177,13 +184,27 @@ Alert on: repeated auth failures, cross-tenant denial spikes, malware detections
 
 ## 15. Phase 1 security checklist
 
-- [ ] `.env.example` without real secrets; `.env` gitignored
-- [ ] Session cookies secured
-- [ ] Tenant scoping middleware / query helpers
-- [ ] Cross-tenant integration tests
-- [ ] Pre-signed downloads only
-- [ ] Internal token between web and document-intelligence
-- [ ] Redacted structured logging
-- [ ] Upload size/type limits
-- [ ] Legal disclaimer copy: AI outputs are not final legal advice
-- [ ] No notice auto-send code paths
+- [x] `.env.example` without real secrets; `.env` gitignored
+- [x] Session cookies secured (Better Auth; Secure in production)
+- [x] Tenant scoping helpers (`requireTenantMembership`, etc.)
+- [x] Cross-tenant integration tests (require Postgres)
+- [ ] Pre-signed downloads only (Slice 2)
+- [x] Internal token for document-intelligence ready checks
+- [x] Redacted structured logging (web + DI)
+- [ ] Upload size/type limits (Slice 2)
+- [ ] Legal disclaimer copy: AI outputs are not final legal advice (later slice)
+- [x] No notice auto-send code paths
+
+
+---
+
+## 16. Slice 1B verification controls
+
+- [x] PostgreSQL RLS (FORCE) on tenant-owned business tables
+- [x] Transaction-local tenant GUCs (`SET LOCAL` / `set_config(..., true)`)
+- [x] Audit UPDATE/DELETE blocked by triggers
+- [x] Active-tenant cookie integrity (HMAC) + membership revalidation
+- [x] Login rate limiting (Redis, fail-closed in production)
+- [x] Seed refuses production / remote hosts without explicit override
+- [x] Integration tests fail when PostgreSQL is unavailable (no silent skips)
+- [x] CI provisions Postgres + Redis and runs security integration suite

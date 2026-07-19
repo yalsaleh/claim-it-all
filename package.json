@@ -1,16 +1,44 @@
 {
   "name": "contractradar",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "ContractRadar monorepo — GCC construction entitlement and notice-detection platform",
   "packageManager": "pnpm@9.15.0",
   "scripts": {
+    "dev": "pnpm --filter @contractradar/web dev",
+    "dev:web": "pnpm --filter @contractradar/web dev",
+    "dev:di": "pnpm --filter @contractradar/document-intelligence --if-present start || (cd services/document-intelligence && .venv/bin/uvicorn document_intelligence.main:app --reload --port 8000)",
+    "build": "pnpm -r --filter @contractradar/shared --filter @contractradar/authz --filter @contractradar/web build",
+    "lint": "pnpm -r --filter './packages/*' --filter @contractradar/web lint && pnpm lint:python",
+    "lint:python": "cd services/document-intelligence && (.venv/bin/ruff check src tests || ruff check src tests)",
+    "format": "prettier --write . && (cd services/document-intelligence && (.venv/bin/ruff format src tests || true))",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r --filter './packages/*' --filter @contractradar/web typecheck && pnpm typecheck:python",
+    "typecheck:python": "cd services/document-intelligence && (.venv/bin/mypy src || mypy src)",
+    "test": "pnpm test:unit && pnpm test:integration && pnpm test:python",
+    "test:unit": "pnpm -r --filter './packages/*' --filter @contractradar/web test:unit",
+    "test:integration": "pnpm --filter @contractradar/web test:integration",
+    "test:integration:embedded": "pnpm --filter @contractradar/web test:integration:embedded",
+    "test:security": "pnpm --filter @contractradar/web test:security",
+    "test:python": "cd services/document-intelligence && (.venv/bin/pytest || pytest)",
+    "test:live": "pnpm --filter @contractradar/web test:live && cd services/document-intelligence && (.venv/bin/pytest -k live || pytest -k live)",
+    "test:live:ci": "bash scripts/test-live-ci.sh",
+    "verify:local": "bash scripts/verify-local.sh",
+    "reconcile:ingestion": "pnpm --filter @contractradar/web exec tsx scripts/reconcile-ingestion.ts",
+    "db:generate": "pnpm --filter @contractradar/web db:generate",
+    "db:migrate": "pnpm --filter @contractradar/web db:migrate",
+    "db:migrate:deploy": "pnpm --filter @contractradar/web exec env DATABASE_URL=${DATABASE_MIGRATE_URL:-$DATABASE_URL} prisma migrate deploy",
+    "db:reset": "pnpm --filter @contractradar/web db:reset",
+    "db:seed": "pnpm --filter @contractradar/web db:seed",
+    "db:studio": "pnpm --filter @contractradar/web db:studio",
     "data-plane:up": "bash scripts/dev-data-plane.sh up",
     "data-plane:down": "bash scripts/dev-data-plane.sh down",
     "data-plane:ps": "bash scripts/dev-data-plane.sh ps",
-    "lint": "echo \"Apps not scaffolded yet — see docs/backlog/phase-1.md (A1/A2)\"",
-    "test": "echo \"Apps not scaffolded yet — see docs/backlog/phase-1.md (A1/A2)\"",
-    "typecheck": "echo \"Apps not scaffolded yet — see docs/backlog/phase-1.md (A1/A2)\""
+    "validate:prisma": "pnpm --filter @contractradar/web exec prisma validate"
+  },
+  "devDependencies": {
+    "prettier": "3.4.2",
+    "typescript": "5.7.2"
   },
   "engines": {
     "node": ">=20"

@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f3f6f7;
+  --ink: #0f1c24;
+  --muted: #5b6b75;
+  --line: #d5dee3;
+  --accent: #0f6b5c;
+  --surface: #ffffff;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background: radial-gradient(1200px 600px at 10% -10%, #d9ebe6 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #e7eef2 0%, transparent 50%), var(--bg);
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

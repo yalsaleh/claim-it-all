@@ -1,0 +1,693 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+enum TenantRole {
+  TENANT_OWNER
+  TENANT_ADMIN
+  COMMERCIAL_MANAGER
+  CONTRACTS_MANAGER
+  PROJECT_MANAGER
+  REVIEWER
+  VIEWER
+}
+
+enum ProjectRole {
+  PROJECT_ADMIN
+  COMMERCIAL_LEAD
+  CONTRACTS_LEAD
+  PROJECT_MANAGER
+  REVIEWER
+  CONTRIBUTOR
+  VIEWER
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  CLOSED
+  ARCHIVED
+}
+
+/// Platform user identity. Passwords live only on Account (Better Auth), never plaintext.
+model User {
+  id            String     @id @default(cuid())
+  name          String
+  email         String     @unique
+  emailVerified Boolean    @default(false)
+  image         String?
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  sessions              Session[]
+  accounts              Account[]
+  tenantMemberships     TenantMembership[]
+  projectMemberships    ProjectMembership[]
+  auditLogs             AuditLog[]             @relation("AuditActor")
+  sourceDocumentsCreated SourceDocument[]      @relation("SourceDocumentCreator")
+  documentVersionsUploaded DocumentVersion[]   @relation("DocumentVersionUploader")
+  uploadSessionsInitiated UploadSession[]      @relation("UploadSessionInitiator")
+
+  @@map("user")
+}
+
+model Session {
+  id                   String   @id @default(cuid())
+  expiresAt            DateTime
+  token                String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+model Tenant {
+  id        String       @id @default(uuid())
+  name      String
+  slug      String       @unique
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  memberships           TenantMembership[]
+  projects              Project[]
+  projectMemberships    ProjectMembership[]
+  auditLogs             AuditLog[]
+  sourceDocuments       SourceDocument[]
+  documentVersions      DocumentVersion[]
+  uploadSessions        UploadSession[]
+  processingRuns        DocumentProcessingRun[]
+  extractedArtifacts    ExtractedArtifact[]
+  evidenceSegments      EvidenceSegment[]
+  documentRelationships DocumentRelationship[]
+  ingestionEvents       IngestionEvent[]
+  outboxEvents          OutboxEvent[]
+
+  @@map("tenant")
+}
+
+model TenantMembership {
+  id        String           @id @default(uuid())
+  tenantId  String
+  userId    String
+  role      TenantRole
+  status    MembershipStatus @default(ACTIVE)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+  @@map("tenant_membership")
+}
+
+model Project {
+  id              String        @id @default(uuid())
+  tenantId        String
+  name            String
+  code            String
+  description     String?
+  status          ProjectStatus @default(DRAFT)
+  countryCode     String        @db.Char(2)
+  defaultCurrency String        @db.Char(3)
+  timezone        String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberships        ProjectMembership[]
+  auditLogs          AuditLog[]
+  sourceDocuments    SourceDocument[]
+  documentVersions   DocumentVersion[]
+  uploadSessions     UploadSession[]
+  processingRuns     DocumentProcessingRun[]
+  extractedArtifacts ExtractedArtifact[]
+  evidenceSegments   EvidenceSegment[]
+  documentRelationships DocumentRelationship[]
+  ingestionEvents    IngestionEvent[]
+  outboxEvents       OutboxEvent[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@map("project")
+}
+
+model ProjectMembership {
+  id        String           @id @default(uuid())
+  tenantId  String
+  projectId String
+  userId    String
+  role      ProjectRole
+  status    MembershipStatus @default(ACTIVE)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([tenantId, userId])
+  @@index([userId])
+  @@map("project_membership")
+}
+
+/// Append-only audit trail. Application code must not update or delete rows.
+model AuditLog {
+  id            String   @id @default(uuid())
+  tenantId      String?
+  projectId     String?
+  actorUserId   String?
+  action        String
+  entityType    String
+  entityId      String?
+  metadata      Json?
+  correlationId String?
+  createdAt     DateTime @default(now())
+
+  tenant  Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  actor   User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_log")
+}
+
+// ---------------------------------------------------------------------------
+// Slice 2 — Immutable project document ingestion & evidence provenance
+// Logical name SourceDocument (not Document) to avoid ambiguity with DOM/docs.
+// ---------------------------------------------------------------------------
+
+enum DocumentType {
+  CONTRACT
+  CONTRACT_AMENDMENT
+  LETTER
+  EMAIL
+  RFI
+  ENGINEER_INSTRUCTION
+  SITE_INSTRUCTION
+  DRAWING
+  MEETING_MINUTES
+  DAILY_REPORT
+  PAYMENT_CERTIFICATE
+  PAYMENT_APPLICATION
+  VARIATION
+  SCHEDULE
+  COST_RECORD
+  PHOTOGRAPH
+  SPREADSHEET
+  OTHER
+}
+
+enum DocumentOrigin {
+  MANUAL_UPLOAD
+  EMAIL_IMPORT
+  SHAREPOINT_IMPORT
+  ACONEX_IMPORT
+  PRIMAVERA_IMPORT
+  API_IMPORT
+  SYSTEM_GENERATED
+}
+
+enum DocumentLanguage {
+  EN
+  AR
+  MIXED
+  UNKNOWN
+}
+
+enum DocumentConfidentiality {
+  STANDARD
+  CONFIDENTIAL
+  RESTRICTED
+}
+
+enum SourceDocumentStatus {
+  UPLOADING
+  RECEIVED
+  QUARANTINED
+  PROCESSING
+  READY
+  PARTIALLY_PROCESSED
+  FAILED
+  REJECTED
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum UploadSessionStatus {
+  INITIATED
+  UPLOAD_AUTHORIZED
+  UPLOADED
+  VALIDATING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+  FAILED
+}
+
+enum VersionUploadStatus {
+  PENDING
+  UPLOADED
+  VALIDATING
+  ACCEPTED
+  REJECTED
+}
+
+enum MalwareScanStatus {
+  NOT_SCANNED
+  QUEUED
+  SCANNING
+  CLEAN
+  INFECTED
+  ERROR
+  SKIPPED_BY_APPROVED_POLICY
+}
+
+enum VersionProcessingStatus {
+  NOT_STARTED
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  PARTIALLY_SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum ProcessingRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  PARTIALLY_SUCCEEDED
+  FAILED
+  CANCELLED
+  DEAD_LETTERED
+}
+
+enum StorageProvider {
+  S3_COMPATIBLE
+}
+
+enum ArtifactType {
+  PLAIN_TEXT
+  STRUCTURED_TEXT
+  OCR_TEXT
+  PAGE_IMAGE
+  THUMBNAIL
+  METADATA_JSON
+  EMAIL_BODY
+  ATTACHMENT_MANIFEST
+  PDF_PREVIEW
+  SPREADSHEET_SHEET_META
+  WARNING_JSON
+}
+
+enum EvidenceSegmentKind {
+  PAGE
+  PARAGRAPH
+  SECTION
+  EMAIL_HEADER
+  EMAIL_BODY
+  ATTACHMENT
+  SPREADSHEET_SHEET
+  SPREADSHEET_RANGE
+  SCHEDULE_ACTIVITY
+  METADATA_FIELD
+  LINE_CHUNK
+  OTHER
+}
+
+enum DocumentRelationshipType {
+  SUPERSEDES
+  REPLACES
+  RESPONDS_TO
+  ATTACHMENT_OF
+  AMENDS
+  REFERENCES
+  RELATED_TO
+  DUPLICATE_CONTENT_OF
+  REVISION_OF
+}
+
+/// Logical project record (contract, letter, RFI, …). Bytes live on DocumentVersion.
+model SourceDocument {
+  id                 String                   @id @default(uuid())
+  tenantId           String
+  projectId          String
+  documentNumber     String?
+  title              String
+  documentType       DocumentType
+  description        String?
+  origin             DocumentOrigin           @default(MANUAL_UPLOAD)
+  sourceSystem       String?
+  sourceReference    String?
+  correspondenceDate DateTime?
+  receivedAt         DateTime?
+  issuedAt           DateTime?
+  senderName         String?
+  senderOrganization String?
+  recipientSummary   String?
+  language           DocumentLanguage         @default(UNKNOWN)
+  confidentiality    DocumentConfidentiality  @default(STANDARD)
+  status             SourceDocumentStatus     @default(UPLOADING)
+  currentVersionId   String?                  @unique
+  createdByUserId    String
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy      User              @relation("SourceDocumentCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  currentVersion DocumentVersion?  @relation("CurrentDocumentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions       DocumentVersion[] @relation("DocumentVersions")
+  uploadSessions UploadSession[]
+  relationshipsFrom DocumentRelationship[] @relation("RelationshipFrom")
+  relationshipsTo   DocumentRelationship[] @relation("RelationshipTo")
+  ingestionEvents   IngestionEvent[]
+
+  @@index([tenantId, projectId, status])
+  @@index([tenantId, projectId, documentType])
+  @@index([tenantId, projectId, createdAt])
+  @@map("source_document")
+}
+
+/// Immutable accepted source-file version. Storage object must never be overwritten.
+model DocumentVersion {
+  id                  String                  @id @default(uuid())
+  tenantId            String
+  projectId           String
+  sourceDocumentId    String
+  versionNumber       Int
+  originalFilename    String
+  normalizedFilename  String
+  mediaType           String
+  extension           String
+  sizeBytes           BigInt
+  sha256              String
+  storageProvider     StorageProvider         @default(S3_COMPATIBLE)
+  storageBucket       String
+  storageKey          String
+  storageVersionId    String?
+  storageEtag         String?
+  uploadStatus        VersionUploadStatus     @default(PENDING)
+  malwareScanStatus   MalwareScanStatus       @default(NOT_SCANNED)
+  processingStatus    VersionProcessingStatus @default(NOT_STARTED)
+  uploadedByUserId    String
+  uploadedAt          DateTime                @default(now())
+  acceptedAt          DateTime?
+  supersedesVersionId String?
+  createdAt           DateTime                @default(now())
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceDocument SourceDocument  @relation("DocumentVersions", fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  uploadedBy     User            @relation("DocumentVersionUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  supersedes     DocumentVersion?  @relation("VersionSupersedes", fields: [supersedesVersionId], references: [id], onDelete: SetNull)
+  supersededBy   DocumentVersion[] @relation("VersionSupersedes")
+  asCurrentFor   SourceDocument? @relation("CurrentDocumentVersion")
+  uploadSessions UploadSession[]
+  processingRuns DocumentProcessingRun[]
+  artifacts      ExtractedArtifact[]
+  segments       EvidenceSegment[]
+  ingestionEvents IngestionEvent[]
+
+  @@unique([sourceDocumentId, versionNumber])
+  @@unique([tenantId, storageKey])
+  @@index([tenantId, projectId, sha256])
+  @@index([tenantId, projectId, sourceDocumentId])
+  @@map("document_version")
+}
+
+/// Controlled lifecycle for one upload attempt (temporary object → acceptance).
+model UploadSession {
+  id                 String              @id @default(uuid())
+  tenantId           String
+  projectId          String
+  initiatedByUserId  String
+  sourceDocumentId   String?
+  documentVersionId  String?
+  intendedFilename   String
+  declaredMediaType  String
+  declaredSizeBytes  BigInt
+  expectedSha256     String?
+  storageKey         String
+  storageBucket      String
+  status             UploadSessionStatus @default(INITIATED)
+  expiresAt          DateTime
+  completedAt        DateTime?
+  failureCode        String?
+  failureDetailSafe  String?
+  idempotencyKey     String?
+  correlationId      String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  initiatedBy    User            @relation("UploadSessionInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  sourceDocument SourceDocument? @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  documentVersion DocumentVersion? @relation(fields: [documentVersionId], references: [id], onDelete: SetNull)
+  ingestionEvents IngestionEvent[]
+
+  @@unique([tenantId, storageKey])
+  @@unique([tenantId, initiatedByUserId, idempotencyKey])
+  @@index([tenantId, projectId, status])
+  @@index([expiresAt, status])
+  @@map("upload_session")
+}
+
+/// One processing attempt against one immutable DocumentVersion. Retries create new runs.
+model DocumentProcessingRun {
+  id                 String              @id @default(uuid())
+  tenantId           String
+  projectId          String
+  documentVersionId  String
+  processingProfile  String              @default("basic_v1")
+  processorName      String
+  processorVersion   String
+  status             ProcessingRunStatus @default(QUEUED)
+  attemptNumber      Int                 @default(1)
+  queuedAt           DateTime            @default(now())
+  startedAt          DateTime?
+  completedAt        DateTime?
+  failureCode        String?
+  failureMessageSafe String?
+  correlationId      String
+  createdAt          DateTime            @default(now())
+
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentVersion DocumentVersion    @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  artifacts       ExtractedArtifact[]
+  segments        EvidenceSegment[]
+  ingestionEvents IngestionEvent[]
+
+  @@index([tenantId, projectId, documentVersionId])
+  @@index([tenantId, status, queuedAt])
+  @@index([correlationId])
+  @@map("document_processing_run")
+}
+
+/// Derived output from a processing run — never original evidence.
+model ExtractedArtifact {
+  id                String       @id @default(uuid())
+  tenantId          String
+  projectId         String
+  documentVersionId String
+  processingRunId   String
+  artifactType      ArtifactType
+  mediaType         String
+  storageBucket     String?
+  storageKey        String?
+  inlineContent     String?      @db.Text
+  sha256            String
+  sizeBytes         BigInt
+  processorName     String
+  processorVersion  String
+  createdAt         DateTime     @default(now())
+
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentVersion DocumentVersion       @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  processingRun   DocumentProcessingRun @relation(fields: [processingRunId], references: [id], onDelete: Cascade)
+  segments        EvidenceSegment[]
+
+  @@index([tenantId, projectId, documentVersionId])
+  @@index([processingRunId])
+  @@map("extracted_artifact")
+}
+
+/// Machine-resolvable evidence location (page, paragraph, email part, sheet, …).
+model EvidenceSegment {
+  id                String             @id @default(uuid())
+  tenantId          String
+  projectId         String
+  documentVersionId String
+  processingRunId   String
+  artifactId        String?
+  kind              EvidenceSegmentKind
+  ordinal           Int                @default(0)
+  label             String?
+  textContent       String?            @db.Text
+  textSha256        String?
+  locator           Json
+  ocrConfidence     Float?
+  language          DocumentLanguage?
+  createdAt         DateTime           @default(now())
+
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentVersion DocumentVersion        @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  processingRun   DocumentProcessingRun  @relation(fields: [processingRunId], references: [id], onDelete: Cascade)
+  artifact        ExtractedArtifact?     @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, documentVersionId])
+  @@index([processingRunId, kind, ordinal])
+  @@map("evidence_segment")
+}
+
+model DocumentRelationship {
+  id                   String                   @id @default(uuid())
+  tenantId             String
+  projectId            String
+  fromSourceDocumentId String
+  toSourceDocumentId   String
+  relationshipType     DocumentRelationshipType
+  createdByUserId      String?
+  metadata             Json?
+  createdAt            DateTime                 @default(now())
+
+  tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project            Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromSourceDocument SourceDocument @relation("RelationshipFrom", fields: [fromSourceDocumentId], references: [id], onDelete: Cascade)
+  toSourceDocument   SourceDocument @relation("RelationshipTo", fields: [toSourceDocumentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, fromSourceDocumentId, toSourceDocumentId, relationshipType])
+  @@index([tenantId, projectId])
+  @@map("document_relationship")
+}
+
+/// Append-only operational ingestion timeline (distinct from security AuditLog).
+model IngestionEvent {
+  id                String   @id @default(uuid())
+  tenantId          String
+  projectId         String
+  sourceDocumentId  String?
+  documentVersionId String?
+  uploadSessionId   String?
+  processingRunId   String?
+  eventType         String
+  metadata          Json?
+  correlationId     String?
+  createdAt         DateTime @default(now())
+
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceDocument  SourceDocument?        @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  documentVersion DocumentVersion?       @relation(fields: [documentVersionId], references: [id], onDelete: SetNull)
+  uploadSession   UploadSession?         @relation(fields: [uploadSessionId], references: [id], onDelete: SetNull)
+  processingRun   DocumentProcessingRun? @relation(fields: [processingRunId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, createdAt])
+  @@index([sourceDocumentId, createdAt])
+  @@index([correlationId])
+  @@map("ingestion_event")
+}
+
+enum OutboxStatus {
+  PENDING
+  DISPATCHING
+  DISPATCHED
+  FAILED
+  DEAD_LETTERED
+}
+
+/// Durable job delivery (at-least-once). Dispatcher enqueues ARQ; worker is idempotent.
+model OutboxEvent {
+  id                String       @id @default(uuid())
+  tenantId          String
+  projectId         String
+  eventType         String
+  aggregateType     String
+  aggregateId       String
+  payload           Json
+  status            OutboxStatus @default(PENDING)
+  attempts          Int          @default(0)
+  availableAt       DateTime     @default(now())
+  dispatchedAt      DateTime?
+  lastErrorSafe     String?
+  correlationId     String?
+  idempotencyKey    String       @unique
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+  @@index([tenantId, projectId, createdAt])
+  @@map("outbox_event")
+}
