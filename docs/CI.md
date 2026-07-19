@@ -18,10 +18,20 @@ This mode **must not** be described as live MinIO/Redis/ClamAV/ARQ verification.
 
 Authoritative Slice 2B operational verification. Uses GitHub-hosted runners to provision:
 
-- PostgreSQL, Redis, MinIO (private bucket), ClamAV
+- PostgreSQL, Redis (GitHub `services:`)
+- MinIO + ClamAV (explicit `docker run` sidecars after image validation)
 - document-intelligence API, ARQ worker, outbox dispatcher
 
-Command inside the workflow: `pnpm test:live:ci` (`scripts/test-live-ci.sh`), which fails on unexpected skips when `REQUIRE_LIVE_INGESTION_TESTS=true`.
+Pinned image names live in `scripts/ci/container-images.env`. Job `validate-images` pulls each image independently before live tests. Command: `pnpm test:live:ci` (fails on unexpected skips when `REQUIRE_LIVE_INGESTION_TESTS=true`).
+
+Digest pinning (`image@sha256:…`) is a follow-up once tags have been proven green on GitHub.
+
+### Known image corrections (2026-07-19)
+
+| Was (invalid) | Now (Docker Hub verified) |
+|---------------|---------------------------|
+| `clamav/clamav:1.4.1-41` | `clamav/clamav:1.5-debian13-slim` |
+| `minio/mc:RELEASE.2024-11-17T19-35-56Z` | `minio/mc:RELEASE.2024-11-21T17-21-54Z` |
 
 ### Manual trigger (no local Docker)
 

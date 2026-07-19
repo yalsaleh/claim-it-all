@@ -24,6 +24,7 @@
     "test:live": "pnpm --filter @contractradar/web test:live && cd services/document-intelligence && (.venv/bin/pytest -k live || pytest -k live)",
     "test:live:ci": "bash scripts/test-live-ci.sh",
     "verify:local": "bash scripts/verify-local.sh",
+    "ci:validate-images": "bash scripts/ci/validate-container-images.sh",
     "reconcile:ingestion": "pnpm --filter @contractradar/web exec tsx scripts/reconcile-ingestion.ts",
     "db:generate": "pnpm --filter @contractradar/web db:generate",
     "db:migrate": "pnpm --filter @contractradar/web db:migrate",

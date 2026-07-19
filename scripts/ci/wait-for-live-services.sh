@@ -68,7 +68,23 @@ echo "Waiting for MinIO..."
 wait_http "${S3_ENDPOINT%/}/minio/health/live" "minio" 45
 
 echo "Waiting for ClamAV (signature DB may take minutes on first pull)..."
-wait_tcp "${CLAMAV_HOST}" "${CLAMAV_PORT}" "clamav" 90
+# Prefer clamdscan --ping inside sidecar when present; do not treat "container running" as ready.
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'contractradar-ci-clamav'; then
+  for i in $(seq 1 90); do
+    if docker exec contractradar-ci-clamav clamdscan --ping 3 >/dev/null 2>&1; then
+      echo "OK clamav clamdscan --ping"
+      break
+    fi
+    sleep 2
+    if [[ "${i}" -eq 90 ]]; then
+      echo "FAIL clamav clamdscan --ping"
+      docker ps -a --filter name=contractradar-ci-clamav --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' || true
+      exit 1
+    fi
+  done
+else
+  wait_tcp "${CLAMAV_HOST}" "${CLAMAV_PORT}" "clamav" 90
+fi
 
 if [[ -n "${INTERNAL_TOKEN}" ]]; then
   echo "Waiting for document-intelligence ready..."

@@ -78,7 +78,8 @@ services:
           memory: 512M
 
   minio-init:
-    image: minio/mc:RELEASE.2024-11-17T19-35-56Z
+    # Tag validated on Docker Hub; RELEASE.2024-11-17T19-35-56Z does not exist.
+    image: minio/mc:RELEASE.2024-11-21T17-21-54Z
     container_name: contractradar-minio-init
     depends_on:
       minio:
@@ -94,7 +95,8 @@ services:
     restart: "no"
 
   clamav:
-    image: clamav/clamav:1.4.1-41
+    # Tag validated on Docker Hub; clamav/clamav:1.4.1-41 does not exist.
+    image: clamav/clamav:1.5-debian13-slim
     container_name: contractradar-clamav
     restart: unless-stopped
     ports:
@@ -102,11 +104,11 @@ services:
     volumes:
       - clamav_data:/var/lib/clamav
     healthcheck:
-      test: ["CMD-SHELL", "clamdcheck.sh || clamdscan --ping 3 || exit 1"]
+      test: ["CMD-SHELL", "clamdscan --ping 3 || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 20
-      start_period: 120s
+      retries: 30
+      start_period: 180s
     deploy:
       resources:
         limits:
