@@ -225,11 +225,17 @@ jobs:
         if: always()
         run: |
           mkdir -p artifacts
+          # shellcheck disable=SC1091
+          source scripts/ci/sidecar-helpers.sh
           {
             echo "postgres: $(pg_isready -h 127.0.0.1 -U contractradar -d contractradar_test >/dev/null && echo ok || echo error)"
             echo "redis: $(redis-cli -u "$REDIS_URL" ping 2>/dev/null || echo error)"
             echo "minio: $(curl -fsS "$S3_ENDPOINT/minio/health/live" >/dev/null && echo ok || echo error)"
-            echo "clamav_ping: $(docker exec contractradar-ci-clamav clamdscan --ping 3 >/dev/null 2>&1 && echo ok || echo error)"
+            if docker_container_exists contractradar-ci-clamav; then
+              echo "clamav_ping: $(docker exec contractradar-ci-clamav clamdscan --ping 3 >/dev/null 2>&1 && echo ok || echo error)"
+            else
+              echo "clamav_ping: skipped (container not created)"
+            fi
             echo "di_live: $(curl -fsS "$DOCUMENT_INTELLIGENCE_URL/health/live" >/dev/null && echo ok || echo error)"
             echo "sidecar_status:"
             docker ps -a --filter name=contractradar-ci- --format '{{.Names}} {{.Status}} {{.Image}}' 2>/dev/null || true
@@ -239,10 +245,18 @@ jobs:
         if: failure()
         run: |
           mkdir -p artifacts
-          docker logs --tail 200 contractradar-ci-minio 2>&1 \
-            | sed -E 's/(secret|password|MINIO_ROOT_PASSWORD)=[^ ]+/\\1=REDACTED/gi' \
-            > artifacts/minio-sidecar.log || true
-          docker logs --tail 200 contractradar-ci-clamav 2>&1 > artifacts/clamav-sidecar.log || true
+          # shellcheck disable=SC1091
+          source scripts/ci/sidecar-helpers.sh
+          if docker_container_exists contractradar-ci-minio; then
+            safe_docker_logs contractradar-ci-minio 200 > artifacts/minio-sidecar.log
+          else
+            echo "minio container not created" > artifacts/minio-sidecar.log
+          fi
+          if docker_container_exists contractradar-ci-clamav; then
+            safe_docker_logs contractradar-ci-clamav 200 > artifacts/clamav-sidecar.log
+          else
+            echo "clamav container not created (startup not reached or skipped)" > artifacts/clamav-sidecar.log
+          fi
           tail -n 120 /tmp/di-api.log 2>/dev/null > artifacts/di-api.log || true
           tail -n 120 /tmp/arq-worker.log 2>/dev/null > artifacts/arq-worker.log || true
           tail -n 120 /tmp/outbox.log 2>/dev/null > artifacts/outbox.log || true

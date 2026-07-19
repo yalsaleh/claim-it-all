@@ -25,6 +25,7 @@
     "test:live:ci": "bash scripts/test-live-ci.sh",
     "verify:local": "bash scripts/verify-local.sh",
     "ci:validate-images": "bash scripts/ci/validate-container-images.sh",
+    "ci:test-sidecars": "bash scripts/ci/test-sidecar-helpers.sh",
     "reconcile:ingestion": "pnpm --filter @contractradar/web exec tsx scripts/reconcile-ingestion.ts",
     "db:generate": "pnpm --filter @contractradar/web db:generate",
     "db:migrate": "pnpm --filter @contractradar/web db:migrate",
