@@ -41,9 +41,17 @@ on_err() {
 }
 trap 'status=$?; on_err $LINENO "$status"' ERR
 
+STARTUP_SCRIPT_COMMIT="${GITHUB_SHA:-}"
+if [[ -z "${STARTUP_SCRIPT_COMMIT}" ]]; then
+  STARTUP_SCRIPT_COMMIT="$(git -C "${ROOT_DIR}" rev-parse HEAD 2>/dev/null || echo unknown)"
+fi
+STARTUP_SCRIPT_COMMIT_SHORT="$(printf '%s' "${STARTUP_SCRIPT_COMMIT}" | cut -c1-12)"
+
 echo "Runner: $(uname -a)"
 echo "Docker: $(docker version --format '{{.Server.Version}}' 2>/dev/null || docker version | head -5)"
 echo "Images: MINIO=${MINIO_IMAGE} MC=${MINIO_MC_IMAGE} CLAMAV=${CLAMAV_IMAGE} START_CLAMAV=${START_CLAMAV}"
+echo "Using minio/mc with explicit shell entrypoint: yes"
+echo "Startup script commit: ${STARTUP_SCRIPT_COMMIT_SHORT}"
 
 echo "Pulling sidecar images..."
 docker pull "${MINIO_IMAGE}"
@@ -93,6 +101,8 @@ wait_http() {
 wait_http "http://127.0.0.1:9000/minio/health/live" "minio" 45
 
 echo "Initializing private MinIO bucket (${MINIO_BUCKET})..."
+echo "Using minio/mc with explicit shell entrypoint: yes"
+echo "Startup script commit: ${STARTUP_SCRIPT_COMMIT_SHORT}"
 # Override ENTRYPOINT ["mc"] so /bin/sh is the process, not an mc argument.
 # Share MinIO's network namespace so 127.0.0.1:9000 reaches the server.
 docker run --rm \

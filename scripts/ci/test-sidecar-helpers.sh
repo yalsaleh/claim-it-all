@@ -53,12 +53,33 @@ else
   assert_fail 're-runs bucket init for idempotency'
 fi
 
-# Broken pattern: default entrypoint left as mc, then /bin/sh as first arg.
-if grep -nE 'MINIO_MC_IMAGE\}"[[:space:]]*$' -A3 scripts/ci/start-live-sidecars.sh \
-  | grep -qE '[[:space:]]/bin/sh'; then
-  assert_fail 'does not pass /bin/sh as argument to default mc entrypoint'
+# Broken pattern from a2bb4ea: image then /bin/sh without --entrypoint in the same run.
+set +e
+python3 - <<'PY'
+from pathlib import Path
+import re
+import sys
+text = Path("scripts/ci/start-live-sidecars.sh").read_text()
+bad = []
+for chunk in text.split("docker run"):
+    if "MINIO_MC_IMAGE" not in chunk:
+        continue
+    block = "docker run" + chunk.split("\necho ")[0].split("\nif ")[0]
+    if "--entrypoint /bin/sh" not in block:
+        bad.append("missing --entrypoint in mc docker run")
+    if re.search(r'MINIO_MC_IMAGE\}"\s*\\\s*\n\s*/bin/sh\b', block):
+        bad.append("passes /bin/sh after image as mc argv")
+if bad:
+    print("FAIL old mc /bin/sh pattern:", "; ".join(bad))
+    sys.exit(2)
+print("OK no pre-fix mc /bin/sh argv pattern")
+PY
+py_rc=$?
+set -e
+if [[ "${py_rc}" -eq 0 ]]; then
+  assert_ok 'rejects pre-fix mc /bin/sh-as-argument pattern'
 else
-  assert_ok 'does not pass /bin/sh as argument to default mc entrypoint'
+  assert_fail 'rejects pre-fix mc /bin/sh-as-argument pattern'
 fi
 
 mc_runs="$(grep -c -- '--entrypoint /bin/sh' scripts/ci/start-live-sidecars.sh || true)"
@@ -66,6 +87,12 @@ if [[ "${mc_runs}" -ge 3 ]]; then
   assert_ok "all mc docker runs override entrypoint (count=${mc_runs})"
 else
   assert_fail "all mc docker runs override entrypoint (count=${mc_runs})"
+fi
+
+if grep -Fq 'Startup script commit:' scripts/ci/start-live-sidecars.sh; then
+  assert_ok 'prints startup script commit diagnostic'
+else
+  assert_fail 'prints startup script commit diagnostic'
 fi
 
 echo "==> Cleanup helpers with mocked docker"

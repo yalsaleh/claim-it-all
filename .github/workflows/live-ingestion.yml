@@ -152,7 +152,17 @@ jobs:
 
       - name: Start MinIO + ClamAV sidecars
         run: |
-          chmod +x scripts/ci/start-live-sidecars.sh scripts/ci/stop-live-sidecars.sh
+          set -euo pipefail
+          echo "Live ingestion commit: ${GITHUB_SHA}"
+          echo "Sidecar script: scripts/ci/start-live-sidecars.sh"
+          test -f scripts/ci/start-live-sidecars.sh
+          grep -Fq -- '--entrypoint /bin/sh' scripts/ci/start-live-sidecars.sh
+          # Fail fast if the pre-fix broken pattern is present.
+          if grep -nE 'MINIO_MC_IMAGE\}"[[:space:]]*$' -A2 scripts/ci/start-live-sidecars.sh | grep -qE '[[:space:]]/bin/sh'; then
+            echo "ERROR: start-live-sidecars.sh still passes /bin/sh to default mc entrypoint"
+            exit 1
+          fi
+          chmod +x scripts/ci/start-live-sidecars.sh scripts/ci/stop-live-sidecars.sh scripts/ci/sidecar-helpers.sh
           bash scripts/ci/start-live-sidecars.sh
 
       - name: Install JS dependencies
