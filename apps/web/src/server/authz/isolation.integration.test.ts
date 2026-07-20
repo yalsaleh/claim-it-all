@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PrismaClient } from '@prisma/client';
 import { hashPassword } from 'better-auth/crypto';
 import { requireTestDatabaseUrl } from '@/lib/db-url-guard';
+import { prisma } from '@/server/db';
 
 vi.mock('@/server/auth/session', () => ({
   getSessionUser: vi.fn(),
@@ -32,8 +32,7 @@ import { selectActiveTenant } from '@/server/services/tenants';
 import { AppError } from '@/server/errors';
 import { setRlsContext } from '@/server/db/tenant-context';
 
-const databaseUrl = requireTestDatabaseUrl();
-const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+requireTestDatabaseUrl();
 
 async function withBypass<T>(
   fn: (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => Promise<T>,
@@ -85,6 +84,27 @@ describe('tenant isolation + hardening integration', () => {
     await withBypass(async (tx) => {
       await tx.$executeRaw`SELECT set_config('app.allow_audit_purge', 'on', true)`;
       await tx.$executeRaw`SELECT set_config('app.allow_contract_revision_purge', 'on', true)`;
+      await tx.$executeRaw`SELECT set_config('app.allow_deadline_purge', 'on', true)`;
+      await tx.notificationIntent.deleteMany();
+      await tx.deadlineStatusHistory.deleteMany();
+      await tx.projectDeadline.deleteMany();
+      await tx.deadlineMilestone.deleteMany();
+      await tx.deadlineCalculation.deleteMany();
+      await tx.eventRuleAssessment.deleteMany();
+      await tx.calendarException.deleteMany();
+      await tx.projectCalendar.updateMany({ data: { currentRevisionId: null } });
+      await tx.projectCalendarRevision.updateMany({
+        where: { status: 'APPROVED' },
+        data: { status: 'SUPERSEDED' },
+      });
+      await tx.projectCalendarRevision.deleteMany();
+      await tx.projectCalendar.deleteMany();
+      await tx.deadlineWarningPolicy.deleteMany();
+      await tx.projectEventRole.deleteMany();
+      await tx.projectEventEvidence.deleteMany();
+      await tx.projectEventDate.deleteMany();
+      await tx.projectEvent.deleteMany();
+      await tx.approvedNoticeRuleSnapshot.deleteMany();
       await tx.contractPackage.updateMany({ data: { currentConfigurationRevisionId: null } });
       await tx.reviewDecision.deleteMany();
       await tx.contractExtractionSuggestion.deleteMany();

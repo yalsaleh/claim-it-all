@@ -123,7 +123,7 @@ ContractRadar uses a **modular monolith for the web/API domain** plus a **separa
 
 - `packages/shared`: TypeScript types for API payloads and domain enums.
 - OpenAPI / JSON Schema exported from Python for cross-language validation where needed.
-- `packages/contract-rules`: Slice 3 validation/normalization for human-approved contract configuration (duration units, time-bar classifications, clause-number digit normalization). Pure functions only — **does not** calculate project-event deadlines (ADR-036).
+- `packages/contract-rules`: validation/normalization (Slice 3) plus pure Luxon-based `calculateDeadline` against serializable approved-rule + calendar inputs (Slice 4). No DB/AI/authz inside the package.
 
 ---
 
@@ -259,7 +259,7 @@ AI providers are optional, adapter-based, and disabled by default (`CONTRACT_AI_
 
 Threat model: [docs/threat-models/contract-intelligence.md](./docs/threat-models/contract-intelligence.md).
 
-Phase 1 Slice 3 delivers human-confirmed configuration revisions. Full automated FIDIC amendment reasoning and project-event deadline execution are later slices.
+Phase 1 Slice 4 delivers human-confirmed project events and deterministic deadline calculation against approved rule snapshots. AI event detection from correspondence remains a later slice.
 
 ---
 
@@ -300,7 +300,7 @@ Phase 1 Slice 3 delivers human-confirmed configuration revisions. Full automated
 
 Deadlines are computed by **deterministic services**, not free-form LLM arithmetic.
 
-**Slice 3 boundary:** `@contractradar/contract-rules` validates and normalizes approved rule inputs only. Calculating contractual deadlines against live project events is explicitly deferred to the next slice (ADR-036).
+**Slice 4:** `@contractradar/contract-rules` provides pure Luxon-based `calculateDeadline` against approved rule snapshots + calendar revisions (ADR-037–047). Still no DB/AI/authz inside the package. Project events are human-confirmed only — no AI event detection.
 
 **Inputs**
 

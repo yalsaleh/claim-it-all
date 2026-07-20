@@ -379,4 +379,22 @@ Statuses: **Proposed** · **Accepted** · **Superseded** · **Rejected**
 | [ADR-033](./docs/adrs/ADR-033-human-review-and-approval.md) | Human review and approval | `ReviewDecision` audit; no auto-approve of suggestions or rules |
 | [ADR-034](./docs/adrs/ADR-034-ai-assisted-extraction-boundary.md) | AI extraction boundary | Provider-neutral adapters; fake provider test-only; schema-validated suggestions; smallest evidence segments |
 | [ADR-035](./docs/adrs/ADR-035-bilingual-contract-handling.md) | Bilingual handling | Language fields + `BILINGUAL_CONFLICT` issues; no silent language preference |
-| [ADR-036](./docs/adrs/ADR-036-contract-rules-package-boundary.md) | Contract-rules package boundary | Slice 3 = validation/normalization only; no project-event deadline calc |
+| [ADR-036](./docs/adrs/ADR-036-contract-rules-package-boundary.md) | Contract-rules package boundary | Slice 3 validation; Slice 4 adds pure deadline calc (see follow-up) |
+
+---
+
+## Slice 4 — Deterministic deadlines (ADR-037–047)
+
+| ADR | Title | Decision (brief) |
+|-----|-------|------------------|
+| [ADR-037](./docs/adrs/ADR-037-approved-notice-rule-snapshot.md) | Approved rule snapshots | Immutable snapshots on configuration approval; only snapshots execute |
+| [ADR-038](./docs/adrs/ADR-038-project-event-factual-model.md) | Project events | Manual/human-confirmed facts; no AI detection |
+| [ADR-039](./docs/adrs/ADR-039-event-date-assertions.md) | Event dates | Typed, verified, precision-gated dates |
+| [ADR-040](./docs/adrs/ADR-040-rule-applicability-assessment.md) | Rule applicability | Human confirmation required; candidates are not conclusions |
+| [ADR-041](./docs/adrs/ADR-041-datetime-library-luxon.md) | Date/time library | Luxon in `contract-rules` |
+| [ADR-042](./docs/adrs/ADR-042-deadline-calculation-trace.md) | Calculation trace | Machine-readable ordered steps |
+| [ADR-043](./docs/adrs/ADR-043-project-calendar-revision.md) | Project calendars | Immutable approved revisions; no hardcoded GCC calendars |
+| [ADR-044](./docs/adrs/ADR-044-verified-calculation-immutability.md) | Verified immutability | Verified calculations immutable |
+| [ADR-045](./docs/adrs/ADR-045-recalculation-supersession.md) | Recalculation | New result + supersession; mandatory reason |
+| [ADR-046](./docs/adrs/ADR-046-internal-warning-policy.md) | Internal warnings | Separate from contractual deadlines; no send |
+| [ADR-047](./docs/adrs/ADR-047-deadline-status-updater.md) | Status updater | Idempotent status only; no messaging |

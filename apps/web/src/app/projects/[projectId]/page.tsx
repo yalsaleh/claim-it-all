@@ -70,6 +70,28 @@ export default async function ProjectDetailPage({
             Contract packages
           </Link>
         ) : null}
+        {hasCapability(ctx.capabilities, 'project_event.read') ? (
+          <>
+            <Link
+              className="rounded-md border border-ink-300 px-4 py-2 text-sm font-medium text-ink-900"
+              href={`/projects/${projectId}/events` as Route}
+            >
+              Project events
+            </Link>
+            <Link
+              className="rounded-md border border-ink-300 px-4 py-2 text-sm font-medium text-ink-900"
+              href={`/projects/${projectId}/deadlines` as Route}
+            >
+              Deadlines
+            </Link>
+            <Link
+              className="rounded-md border border-ink-300 px-4 py-2 text-sm font-medium text-ink-900"
+              href={`/projects/${projectId}/calendars` as Route}
+            >
+              Calendars
+            </Link>
+          </>
+        ) : null}
       </div>
       <ContextBanner
         organization={tenant?.name ?? ctx.tenantId}

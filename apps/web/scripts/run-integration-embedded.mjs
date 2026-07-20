@@ -24,7 +24,8 @@ const pg = new EmbeddedPostgres({
 
 const migrateUrl = `postgresql://contractradar:contractradar@127.0.0.1:${port}/${databaseName}?schema=public`;
 // App/tests must use non-superuser role so FORCE RLS is enforced.
-const appUrl = `postgresql://contractradar_app:contractradar@127.0.0.1:${port}/${databaseName}?schema=public`;
+// Keep the pool small so aborted interactive transactions cannot exhaust embedded Postgres.
+const appUrl = `postgresql://contractradar_app:contractradar@127.0.0.1:${port}/${databaseName}?schema=public&connection_limit=5`;
 
 async function main() {
   if (!fs.existsSync(path.join(dataDir, 'data', 'PG_VERSION'))) {
@@ -116,19 +117,66 @@ async function main() {
   }
 
   console.log('Running integration tests (fail if DB unavailable)…');
-  result = spawnSync(
-    'pnpm',
-    ['exec', 'vitest', 'run', '--config', 'vitest.integration.config.ts', '--reporter=verbose'],
-    {
-      cwd: webRoot,
-      env,
-      stdio: 'inherit',
-      shell: process.platform === 'win32',
-    },
-  );
+  const vitestArgs = process.argv.slice(2);
+  // Run each suite in a fresh Vitest process. Interactive transactions that hit
+  // DB immutability/parent-guard triggers can leave the Prisma pool wedged for
+  // later files in the same process (embedded runner).
+  const defaultSuites = [
+    'src/server/authz/isolation.integration.test.ts',
+    'src/server/documents/ingestion.integration.test.ts',
+    'src/server/queue/outbox.integration.test.ts',
+    'src/server/contracts/contracts.integration.test.ts',
+    'src/server/deadlines/deadlines.integration.test.ts',
+  ];
+  const suites = vitestArgs.length > 0 ? vitestArgs : defaultSuites;
+  for (const suite of suites) {
+    for (const sql of [
+      "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'contractradar_test' AND pid <> pg_backend_pid() AND backend_type = 'client backend'",
+      'TRUNCATE TABLE "tenant" CASCADE',
+    ]) {
+      const reset = spawnSync(
+        'pnpm',
+        ['exec', 'prisma', 'db', 'execute', '--url', migrateUrl, '--stdin'],
+        {
+          cwd: webRoot,
+          env: migrateEnv,
+          input: `${sql};\n`,
+          stdio: ['pipe', 'inherit', 'inherit'],
+          shell: process.platform === 'win32',
+        },
+      );
+      if (reset.status !== 0) {
+        console.warn(`Warning: between-suite SQL failed (${reset.status}): ${sql}`);
+      }
+    }
+
+    console.log(`\n=== Integration suite: ${suite} ===`);
+    result = spawnSync(
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        'run',
+        '--config',
+        'vitest.integration.config.ts',
+        '--reporter=verbose',
+        suite,
+      ],
+      {
+        cwd: webRoot,
+        env,
+        stdio: 'inherit',
+        shell: process.platform === 'win32',
+      },
+    );
+    if (result.status !== 0) {
+      await pg.stop();
+      process.exit(result.status ?? 1);
+    }
+  }
 
   await pg.stop();
-  process.exit(result.status ?? 1);
+  process.exit(0);
 }
 
 main().catch(async (error) => {

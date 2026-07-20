@@ -31,6 +31,22 @@ export const CAPABILITIES = [
   'contract_configuration.approve',
   'contract_configuration.supersede',
   'contract_issue.manage',
+  'project_event.create',
+  'project_event.read',
+  'project_event.update',
+  'project_event.confirm',
+  'project_event.dispute',
+  'deadline_rule.assess',
+  'deadline.calculate',
+  'deadline.review',
+  'deadline.verify',
+  'deadline.track',
+  'deadline.assign',
+  'deadline.complete',
+  'deadline.recalculate',
+  'project_calendar.manage',
+  'project_calendar.approve',
+  'warning_policy.manage',
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];

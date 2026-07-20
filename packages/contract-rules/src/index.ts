@@ -169,3 +169,31 @@ export function parseCrossReferenceCandidate(raw: string): {
     ambiguous: false,
   };
 }
+
+export {
+  calculateDeadline,
+  compareCalculationResults,
+  validateExecutableRule,
+  validateTriggerDate,
+  validateCalendarRevision,
+  ExecutableRuleInputSchema,
+  CalendarRevisionInputSchema,
+  CalculateDeadlineInputSchema,
+  CalculationTraceStepSchema,
+  StartDateConventionSchema,
+  EndDateConventionSchema,
+  NonWorkingAdjustmentSchema,
+  TriggerPrecisionSchema,
+} from './deadline-engine';
+export type {
+  ExecutableRuleInput,
+  CalendarRevisionInput,
+  CalculateDeadlineInput,
+  CalculateDeadlineResult,
+  CalculationTraceStep,
+  InternalMilestone,
+  StartDateConvention,
+  EndDateConvention,
+  NonWorkingAdjustment,
+  TriggerPrecision,
+} from './deadline-engine';

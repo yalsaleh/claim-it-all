@@ -57,6 +57,50 @@ function segregationEnabled(): boolean {
   return process.env.CONTRACT_CONFIG_SEGREGATION_OF_DUTIES !== 'false';
 }
 
+type NoticeRuleSnapshotSource = {
+  reviewStatus: string;
+  durationUnit: string | null;
+  durationValue: { toNumber(): number } | null;
+  countingConvention: 'INCLUSIVE' | 'EXCLUSIVE' | 'UNSPECIFIED';
+  calendarBasis: string | null;
+  startDateRule: string | null;
+  timeBarClassification: string;
+  ambiguityStatus: string;
+};
+
+function buildStructuredRuleForSnapshot(rule: NoticeRuleSnapshotSource) {
+  const isBusiness = rule.durationUnit === 'BUSINESS_DAY' || rule.calendarBasis === 'BUSINESS_DAYS';
+
+  const humanApproved =
+    (rule.reviewStatus === 'APPROVED' || rule.reviewStatus === 'VERIFIED') &&
+    (rule.ambiguityStatus === 'CLEAR' || rule.ambiguityStatus === 'PARTIALLY_AMBIGUOUS') &&
+    rule.countingConvention !== 'UNSPECIFIED';
+
+  let startDateConvention: 'EXCLUDE_TRIGGER_DAY' | 'INCLUDE_TRIGGER_DAY' = 'EXCLUDE_TRIGGER_DAY';
+  if (rule.startDateRule) {
+    const normalized = rule.startDateRule.toUpperCase();
+    if (normalized.includes('INCLUDE')) {
+      startDateConvention = 'INCLUDE_TRIGGER_DAY';
+    }
+  }
+
+  const durationValue = rule.durationValue != null ? Number(rule.durationValue) : null;
+
+  return {
+    durationUnit: rule.durationUnit,
+    durationValue,
+    counting: rule.countingConvention,
+    startDateConvention,
+    endDateConvention: 'END_OF_DAY' as const,
+    nonWorkingAdjustment: isBusiness ? ('FORWARD' as const) : ('NONE' as const),
+    timeBarClassification: rule.timeBarClassification,
+    ambiguityNotes: [] as string[],
+    humanApproved,
+    requiredRecipientsApproved: true,
+    executable: humanApproved && rule.durationUnit != null,
+  };
+}
+
 export async function listContractPackages(projectId: string) {
   const ctx = await requireProjectCapability(projectId, 'contract_package.read');
   return withTenantTransaction({ tenantId: ctx.tenantId, userId: ctx.user.id }, async (tx) =>
@@ -771,6 +815,70 @@ export async function approveConfigurationRevision(
       },
     });
 
+    const noticeRules = await tx.noticeRule.findMany({
+      where: {
+        contractPackageId: packageId,
+        tenantId: ctx.tenantId,
+        projectId,
+        reviewStatus: { in: ['VERIFIED', 'APPROVED'] },
+        durationUnit: { not: null },
+      },
+      include: {
+        obligation: { select: { id: true, sourceClauseId: true } },
+      },
+    });
+
+    const reviewDecisions = noticeRules.length
+      ? await tx.reviewDecision.findMany({
+          where: {
+            contractPackageId: packageId,
+            entityType: 'notice_rule',
+            entityId: { in: noticeRules.map((rule) => rule.id) },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      : [];
+
+    const reviewDecisionByRuleId = new Map<string, string>();
+    for (const decision of reviewDecisions) {
+      if (!reviewDecisionByRuleId.has(decision.entityId)) {
+        reviewDecisionByRuleId.set(decision.entityId, decision.id);
+      }
+    }
+
+    if (noticeRules.length > 0) {
+      await tx.approvedNoticeRuleSnapshot.createMany({
+        data: noticeRules.map((rule) => ({
+          tenantId: ctx.tenantId,
+          projectId,
+          contractPackageId: packageId,
+          configurationRevisionId: approved.id,
+          sourceNoticeRuleId: rule.id,
+          sourceObligationId: rule.obligationId,
+          sourceClauseId: rule.obligation.sourceClauseId,
+          durationValue: rule.durationValue,
+          durationUnit: rule.durationUnit,
+          calendarBasis: rule.calendarBasis,
+          countingConvention: rule.countingConvention,
+          startDateRule: rule.startDateRule,
+          endDateRule: rule.endDateRule,
+          businessDayAdjustment: rule.businessDayAdjustment,
+          timeBarClassification: rule.timeBarClassification,
+          ambiguityStatus: rule.ambiguityStatus,
+          recipientRequirements: rule.recipientRequirements,
+          deliveryMethodRequirements: rule.deliveryMethodRequirements,
+          contentRequirements: rule.contentRequirements,
+          consequenceText: rule.consequenceText,
+          triggerBasis: rule.triggerBasis,
+          noticeCategory: rule.noticeCategory,
+          evidenceSegmentId: rule.evidenceSegmentId,
+          evidenceLocator: rule.evidenceLocator ?? undefined,
+          structuredRule: buildStructuredRuleForSnapshot(rule),
+          reviewDecisionId: reviewDecisionByRuleId.get(rule.id) ?? null,
+        })),
+      });
+    }
+
     await tx.reviewDecision.create({
       data: {
         tenantId: ctx.tenantId,
@@ -796,6 +904,7 @@ export async function approveConfigurationRevision(
         metadata: {
           contractPackageId: packageId,
           revisionNumber: approved.revisionNumber,
+          noticeRuleSnapshotCount: noticeRules.length,
         },
       },
       tx,

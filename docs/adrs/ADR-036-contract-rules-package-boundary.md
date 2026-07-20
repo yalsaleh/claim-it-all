@@ -15,3 +15,6 @@ Accepted (Slice 3)
 ## Consequences
 - Slice 3 can land package/clause/obligation/notice-rule models and review without false “deadline engine complete” claims.
 - D3 (deadline calculator) is deferred to the next slice after configuration approval paths exist.
+
+## Follow-up (Slice 4)
+ADR-037–047 supersede the deferral: `@contractradar/contract-rules` now exposes pure `calculateDeadline` against serializable approved-rule snapshots and calendar revisions. Validation/normalization from Slice 3 remains required before execution. AI event detection and entitlement conclusions stay out of scope.

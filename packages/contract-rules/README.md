@@ -1,11 +1,11 @@
 # @contractradar/contract-rules
 
-Pure deterministic helpers for contract-rule **validation and normalization**.
+Pure deterministic helpers for contract-rule **validation/normalization** (Slice 3) and **deadline calculation** (Slice 4).
 
 This package does **not**:
-- calculate project-event deadlines
-- call LLMs
-- access databases
-- mutate approved configuration
+- query databases or call Prisma
+- call LLMs or read files
+- perform authorization
+- mutate project data
 
-Inputs must already be human-approved structured rules before any future deadline engine uses them.
+Deadline inputs must be serializable approved-rule snapshots, verified trigger dates, and approved calendar revisions. Vague timing (`PROMPT` / `REASONABLE_TIME`) always blocks contractual calculation.

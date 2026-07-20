@@ -7,8 +7,8 @@ ContractRadar supports two verification modes. Ordinary local development **does
 Runs on a developer Mac without Docker:
 
 - format, lint, typecheck
-- TypeScript unit tests (including `@contractradar/contract-rules`)
-- embedded PostgreSQL integration / security tests (tenant isolation, Slice 3 contract revision immutability)
+- TypeScript unit tests (including `@contractradar/contract-rules` deadline engine)
+- embedded PostgreSQL integration / security tests (tenant isolation, Slice 3 contract revision immutability, Slice 4 deadline workflow)
 - Python Ruff, mypy, non-live pytest (parsers + scanner contract tests)
 - production web build
 

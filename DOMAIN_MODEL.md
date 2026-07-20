@@ -14,7 +14,7 @@ This document defines the primary business entities, their meaning, and relation
 | **Contract package** | Governing agreement set for a project (base + amendments) |
 | **Clause** | A contractual provision with identity and text |
 | **Contract configuration revision** | Versioned, human-approved snapshot of structured interpretation |
-| **Obligation / notice rule** | Structured duty and notice-timing fields derived from clauses (deadline engines later) |
+| **Obligation / notice rule** | Structured duty and notice-timing fields; executable only via approved configuration snapshots |
 | **Entitlement event** | A detected project occurrence that may give rise to entitlement / notice duties |
 | **Evidence** | Source material supporting an event or notice |
 | **Deadline** | A calculated date for contractual or internal action |
@@ -131,7 +131,7 @@ Elevated tenant roles may read all tenant projects; `REVIEWER` / `VIEWER` tenant
 
 ## 6. Contract intelligence
 
-Aligned with Prisma models under Slice 3. **EntitlementEvent detection and project-event deadline engines remain later slices** (ADR-036); this section describes structure, review, and approved configuration only.
+Aligned with Prisma models under Slice 3–4. **AI entitlement-event detection remains a later slice**; Slice 4 requires human-confirmed project events before deadline calculation (ADR-037–047).
 
 ### ContractPackage
 
@@ -166,7 +166,7 @@ Aligned with Prisma models under Slice 3. **EntitlementEvent detection and proje
 - Structured notice-timing representation attached to an obligation.
 - Duration, calendar basis, counting convention, start/end rules, holiday calendar link, recipient/content/delivery requirements.
 - `timeBarClassification` (default `UNCERTAIN`), `ambiguityStatus`, `reviewStatus`.
-- Slice 3 stores and validates structure; **does not** compute project-event deadlines.
+- Slice 3 stores and validates structure; Slice 4 executes only **approved notice-rule snapshots** against human-confirmed events and calendars.
 
 ### ContractConfigurationRevision
 

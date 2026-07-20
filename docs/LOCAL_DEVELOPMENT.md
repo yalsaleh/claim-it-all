@@ -27,7 +27,7 @@ Supports:
 - Static checks + production build
 - Deterministic DI tests with `MALWARE_SCANNER=fake_test` (test-only)
 
-Slice 3 local work covers contract structure APIs, human review, and `packages/contract-rules` validation. It does **not** run a project-event deadline engine and does not require a live commercial LLM.
+Slice 4 local work covers human-confirmed project events, approved calendars, and deterministic deadline calculation via `packages/contract-rules`. It does **not** detect events from correspondence and does not require a live commercial LLM.
 
 ### Install (no Docker)
 

@@ -81,6 +81,23 @@ model User {
   configurationIssuesAssigned     ContractConfigurationIssue[]    @relation("ConfigurationIssueAssignee")
   configurationIssuesResolved     ContractConfigurationIssue[]    @relation("ConfigurationIssueResolver")
   reviewDecisions                 ReviewDecision[]                @relation("ReviewDecisionActor")
+  projectEventsReported           ProjectEvent[]                  @relation("ProjectEventReporter")
+  projectEventsConfirmed          ProjectEvent[]                  @relation("ProjectEventConfirmer")
+  projectEventDatesAsserted       ProjectEventDate[]              @relation("EventDateAsserter")
+  projectEventDatesVerified       ProjectEventDate[]              @relation("EventDateVerifier")
+  projectEventEvidenceLinked      ProjectEventEvidence[]          @relation("EventEvidenceLinker")
+  projectEventRoles               ProjectEventRole[]              @relation("ProjectEventRoleUser")
+  eventRuleAssessments            EventRuleAssessment[]           @relation("EventRuleAssessor")
+  projectCalendarsCreated         ProjectCalendar[]               @relation("CalendarCreator")
+  projectCalendarsApproved        ProjectCalendar[]               @relation("CalendarApprover")
+  calendarRevisionsApproved       ProjectCalendarRevision[]       @relation("CalendarRevisionApprover")
+  deadlineCalculationsCalculated  DeadlineCalculation[]           @relation("DeadlineCalculator")
+  deadlineCalculationsReviewed    DeadlineCalculation[]           @relation("DeadlineCalculationReviewer")
+  projectDeadlinesResponsible     ProjectDeadline[]               @relation("DeadlineResponsibleUser")
+  deadlineStatusHistoryChanges    DeadlineStatusHistory[]         @relation("DeadlineStatusChanger")
+  deadlineWarningPoliciesCreated  DeadlineWarningPolicy[]         @relation("WarningPolicyCreator")
+  deadlineWarningPoliciesApproved DeadlineWarningPolicy[]         @relation("WarningPolicyApprover")
+  notificationIntentsRecipient    NotificationIntent[]            @relation("NotificationIntentRecipient")
 
   @@map("user")
 }
@@ -174,6 +191,21 @@ model Tenant {
   reviewDecisions                ReviewDecision[]
   contractAnalysisRuns           ContractAnalysisRun[]
   contractExtractionSuggestions  ContractExtractionSuggestion[]
+  approvedNoticeRuleSnapshots    ApprovedNoticeRuleSnapshot[]
+  projectEvents                  ProjectEvent[]
+  projectEventDates              ProjectEventDate[]
+  projectEventEvidence           ProjectEventEvidence[]
+  projectEventRoles              ProjectEventRole[]
+  eventRuleAssessments           EventRuleAssessment[]
+  projectCalendars               ProjectCalendar[]
+  projectCalendarRevisions       ProjectCalendarRevision[]
+  calendarExceptions             CalendarException[]
+  deadlineCalculations           DeadlineCalculation[]
+  deadlineMilestones             DeadlineMilestone[]
+  deadlineWarningPolicies        DeadlineWarningPolicy[]
+  projectDeadlines               ProjectDeadline[]
+  deadlineStatusHistory          DeadlineStatusHistory[]
+  notificationIntents            NotificationIntent[]
 
   @@map("tenant")
 }
@@ -244,6 +276,21 @@ model Project {
   reviewDecisions                ReviewDecision[]
   contractAnalysisRuns           ContractAnalysisRun[]
   contractExtractionSuggestions  ContractExtractionSuggestion[]
+  approvedNoticeRuleSnapshots    ApprovedNoticeRuleSnapshot[]
+  projectEvents                  ProjectEvent[]
+  projectEventDates              ProjectEventDate[]
+  projectEventEvidence           ProjectEventEvidence[]
+  projectEventRoles              ProjectEventRole[]
+  eventRuleAssessments           EventRuleAssessment[]
+  projectCalendars               ProjectCalendar[]
+  projectCalendarRevisions       ProjectCalendarRevision[]
+  calendarExceptions             CalendarException[]
+  deadlineCalculations           DeadlineCalculation[]
+  deadlineMilestones             DeadlineMilestone[]
+  deadlineWarningPolicies        DeadlineWarningPolicy[]
+  projectDeadlines               ProjectDeadline[]
+  deadlineStatusHistory          DeadlineStatusHistory[]
+  notificationIntents            NotificationIntent[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -484,8 +531,9 @@ model SourceDocument {
   uploadSessions    UploadSession[]
   relationshipsFrom DocumentRelationship[] @relation("RelationshipFrom")
   relationshipsTo   DocumentRelationship[] @relation("RelationshipTo")
-  ingestionEvents   IngestionEvent[]
-  contractDocuments ContractDocument[]
+  ingestionEvents     IngestionEvent[]
+  contractDocuments   ContractDocument[]
+  projectEventEvidence ProjectEventEvidence[]
 
   @@index([tenantId, projectId, status])
   @@index([tenantId, projectId, documentType])
@@ -532,8 +580,9 @@ model DocumentVersion {
   artifacts         ExtractedArtifact[]
   segments          EvidenceSegment[]
   ingestionEvents   IngestionEvent[]
-  contractDocuments ContractDocument[]
-  contractClauses   ContractClause[]
+  contractDocuments    ContractDocument[]
+  contractClauses      ContractClause[]
+  projectEventEvidence ProjectEventEvidence[]
 
   @@unique([sourceDocumentId, versionNumber])
   @@unique([tenantId, storageKey])
@@ -663,7 +712,8 @@ model EvidenceSegment {
   project         Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
   documentVersion DocumentVersion       @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
   processingRun   DocumentProcessingRun @relation(fields: [processingRunId], references: [id], onDelete: Cascade)
-  artifact        ExtractedArtifact?    @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  artifact             ExtractedArtifact?     @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  projectEventEvidence ProjectEventEvidence[]
 
   @@index([tenantId, projectId, documentVersionId])
   @@index([processingRunId, kind, ordinal])
@@ -1195,6 +1245,11 @@ model ContractPackage {
   reviewDecisions              ReviewDecision[]
   analysisRuns                 ContractAnalysisRun[]
   extractionSuggestions        ContractExtractionSuggestion[]
+  approvedNoticeRuleSnapshots  ApprovedNoticeRuleSnapshot[]
+  projectEvents                ProjectEvent[]
+  eventRuleAssessments         EventRuleAssessment[]
+  deadlineCalculations         DeadlineCalculation[]
+  projectDeadlines             ProjectDeadline[]
 
   @@index([tenantId, projectId, status])
   @@index([tenantId, projectId, createdAt])
@@ -1346,6 +1401,7 @@ model ContractClause {
   roles               ContractRole[]
   contactPoints       ContactPoint[]
   obligations         ContractObligation[]
+  approvedRuleSnapshots ApprovedNoticeRuleSnapshot[]
 
   @@index([tenantId, projectId, contractPackageId])
   @@index([contractDocumentId, sequence])
@@ -1523,6 +1579,7 @@ model ContractParty {
   contactPoints          ContactPoint[]
   obligatedObligations   ContractObligation[] @relation("ObligationObligatedParty")
   beneficiaryObligations ContractObligation[] @relation("ObligationBeneficiaryParty")
+  projectEventRoles      ProjectEventRole[]
 
   @@index([tenantId, projectId, contractPackageId])
   @@map("contract_party")
@@ -1555,6 +1612,9 @@ model ContractRole {
   obligatedObligations   ContractObligation[]  @relation("ObligationObligatedRole")
   beneficiaryObligations ContractObligation[]  @relation("ObligationBeneficiaryRole")
   obligationRecipients   ObligationRecipient[]
+  projectEventRoles      ProjectEventRole[]
+  projectDeadlinesResponsible ProjectDeadline[] @relation("DeadlineResponsibleRole")
+  notificationIntentsRecipient NotificationIntent[] @relation("NotificationIntentRecipientRole")
 
   @@index([tenantId, projectId, contractPackageId])
   @@index([assignedPartyId])
@@ -1641,6 +1701,7 @@ model ContractObligation {
   recipients            ObligationRecipient[]
   evidenceRequirements  ObligationEvidenceRequirement[]
   noticeRules           NoticeRule[]
+  approvedRuleSnapshots ApprovedNoticeRuleSnapshot[]
 
   @@index([tenantId, projectId, contractPackageId])
   @@index([sourceClauseId])
@@ -1757,6 +1818,7 @@ model NoticeRule {
   obligation            ContractObligation             @relation(fields: [obligationId], references: [id], onDelete: Cascade)
   holidayCalendarRule   CalendarRule?                  @relation(fields: [holidayCalendarRuleId], references: [id], onDelete: SetNull)
   configurationRevision ContractConfigurationRevision? @relation(fields: [configurationRevisionId], references: [id], onDelete: SetNull)
+  approvedSnapshots     ApprovedNoticeRuleSnapshot[]
 
   @@index([tenantId, projectId, contractPackageId])
   @@index([obligationId])
@@ -1830,8 +1892,11 @@ model ContractConfigurationRevision {
   noticeRules     NoticeRule[]
   calendarRules   CalendarRule[]
   issues          ContractConfigurationIssue[]
-  reviewDecisions ReviewDecision[]
-  analysisRuns    ContractAnalysisRun[]
+  reviewDecisions             ReviewDecision[]
+  analysisRuns                ContractAnalysisRun[]
+  approvedNoticeRuleSnapshots ApprovedNoticeRuleSnapshot[]
+  eventRuleAssessments        EventRuleAssessment[]
+  deadlineCalculations        DeadlineCalculation[]
 
   @@unique([contractPackageId, revisionNumber])
   @@index([tenantId, projectId, contractPackageId])
@@ -1893,6 +1958,7 @@ model ReviewDecision {
   contractPackage       ContractPackage                @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
   configurationRevision ContractConfigurationRevision? @relation(fields: [configurationRevisionId], references: [id], onDelete: SetNull)
   actor                 User                           @relation("ReviewDecisionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  approvedNoticeRuleSnapshots ApprovedNoticeRuleSnapshot[]
 
   @@index([tenantId, projectId, contractPackageId, createdAt])
   @@index([entityType, entityId])
@@ -1965,4 +2031,718 @@ model ContractExtractionSuggestion {
   @@index([analysisRunId, status])
   @@index([status])
   @@map("contract_extraction_suggestion")
+}
+
+// ---------------------------------------------------------------------------
+// Slice 4 — Human-confirmed project events, approved rule snapshots, deadlines
+// ---------------------------------------------------------------------------
+
+enum ProjectEventCategory {
+  LATE_DRAWING_OR_APPROVAL
+  SUSPENSION
+  RESTRICTED_ACCESS
+  SCOPE_CHANGE
+  ADDITIONAL_WORK
+  DELAYED_PAYMENT
+  UNFORESEEN_SITE_CONDITION
+  INSTRUCTION
+  REJECTION
+  CERTIFICATION
+  PAYMENT_EVENT
+  OTHER
+}
+
+enum ProjectEventStatus {
+  DRAFT
+  UNDER_REVIEW
+  CONFIRMED
+  DISPUTED
+  WITHDRAWN
+  CLOSED
+}
+
+enum ProjectEventConfirmationStatus {
+  UNCONFIRMED
+  CONFIRMED_FACT
+  CONFIRMED_FOR_DEADLINE_ANALYSIS
+  DISPUTED
+  INSUFFICIENT_EVIDENCE
+}
+
+enum ProjectEventSource {
+  MANUAL
+  IMPORTED
+  HUMAN_CONFIRMED_RECORD
+}
+
+enum ProjectEventDateType {
+  OCCURRENCE_DATE
+  AWARENESS_DATE
+  INSTRUCTION_DATE
+  RECEIPT_DATE
+  ACCESS_DENIAL_DATE
+  PAYMENT_DUE_DATE
+  CERTIFICATE_DATE
+  DISCOVERY_DATE
+  CONTINUING_EVENT_START
+  CONTINUING_EVENT_END
+  CUSTOM
+}
+
+enum ProjectEventDatePrecision {
+  EXACT_DATETIME
+  EXACT_DATE
+  APPROXIMATE_DATE
+  DATE_RANGE
+  UNKNOWN
+}
+
+enum ProjectEventDateVerificationStatus {
+  UNVERIFIED
+  VERIFIED
+  DISPUTED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ProjectEventEvidencePurpose {
+  PROVES_OCCURRENCE
+  PROVES_AWARENESS
+  PROVES_RECEIPT
+  PROVES_INSTRUCTION
+  PROVES_CONTINUING_EFFECT
+  SUPPORTS_CLASSIFICATION
+  CONTRADICTS_EVENT
+  OTHER
+}
+
+enum ProjectEventRoleType {
+  ISSUING_PARTY
+  RECEIVING_PARTY
+  AFFECTED_PARTY
+  CONFIRMING_REVIEWER
+  RESPONSIBLE_INTERNAL_OWNER
+  CONTRACTUAL_RECIPIENT
+  EVENT_CAUSING_PARTY
+}
+
+enum EventRuleApplicabilityStatus {
+  CANDIDATE
+  SELECTED_FOR_ANALYSIS
+  APPLICABLE
+  NOT_APPLICABLE
+  UNCERTAIN
+  SUPERSEDED
+}
+
+enum EventRuleAssessmentSource {
+  DETERMINISTIC_MATCH
+  HUMAN_SELECTED
+  HUMAN_CONFIRMED
+  IMPORTED
+  FUTURE_AI_SUGGESTION
+}
+
+enum ProjectCalendarSource {
+  CONTRACT_DEFINED
+  JURISDICTIONAL
+  PROJECT_POLICY
+  INTERNAL_POLICY
+}
+
+enum ProjectCalendarStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum ProjectCalendarRevisionStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  SUPERSEDED
+}
+
+enum CalendarExceptionKind {
+  PUBLIC_HOLIDAY
+  DECLARED_HOLIDAY
+  WORKING_DAY_OVERRIDE
+  WEEKEND_OVERRIDE
+  EMERGENCY_CLOSURE
+  PARTIAL_DAY
+  PROJECT_SPECIFIC_CLOSURE
+}
+
+enum DeadlineCalculationStatus {
+  DRAFT
+  BLOCKED
+  CALCULATED
+  REVIEW_REQUIRED
+  VERIFIED
+  SUPERSEDED
+  CANCELLED
+}
+
+enum DeadlineMilestoneKind {
+  INITIAL_NOTICE
+  UPDATED_NOTICE
+  DETAILED_PARTICULARS
+  FINAL_CLAIM_SUBMISSION
+  RECURRING_MONTHLY_UPDATE
+  RESPONSE_DEADLINE
+  INTERNAL_REVIEW_TARGET
+  INTERNAL_ESCALATION_TARGET
+}
+
+enum DeadlineMilestoneClassification {
+  CONTRACTUAL
+  INTERNAL
+  ADVISORY
+  UNCERTAIN
+}
+
+enum DeadlineWarningPolicyStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum ProjectDeadlineStatus {
+  UPCOMING
+  DUE_SOON
+  DUE_TODAY
+  OVERDUE
+  COMPLETED
+  CANCELLED
+  SUPERSEDED
+  BLOCKED
+}
+
+enum ProjectDeadlineRiskStatus {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+  UNKNOWN
+}
+
+enum NotificationIntentStatus {
+  PENDING
+  SUPPRESSED
+  CANCELLED
+  FUTURE_DELIVERY
+}
+
+/// Immutable executable notice-rule copy bound to an approved configuration revision.
+model ApprovedNoticeRuleSnapshot {
+  id                         String                   @id @default(uuid())
+  tenantId                   String
+  projectId                  String
+  contractPackageId          String
+  configurationRevisionId    String
+  sourceNoticeRuleId         String
+  sourceObligationId         String
+  sourceClauseId             String?
+  durationValue              Decimal?                 @db.Decimal(12, 4)
+  durationUnit               NoticeDurationUnit?
+  calendarBasis              NoticeCalendarBasis?
+  countingConvention         NoticeCountingConvention
+  startDateRule              String?
+  endDateRule                String?
+  businessDayAdjustment      String?
+  timeBarClassification      TimeBarClassification
+  ambiguityStatus            NoticeAmbiguityStatus
+  recipientRequirements      String?                  @db.Text
+  deliveryMethodRequirements String?                  @db.Text
+  contentRequirements        String?                  @db.Text
+  consequenceText            String?                  @db.Text
+  triggerBasis               String?
+  noticeCategory             String?
+  evidenceSegmentId          String?
+  evidenceLocator            Json?
+  structuredRule             Json
+  reviewDecisionId           String?
+  createdAt                  DateTime                 @default(now())
+
+  tenant                Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project                       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage       ContractPackage               @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  configurationRevision ContractConfigurationRevision @relation(fields: [configurationRevisionId], references: [id], onDelete: Cascade)
+  sourceNoticeRule      NoticeRule                    @relation(fields: [sourceNoticeRuleId], references: [id], onDelete: Restrict)
+  sourceObligation      ContractObligation            @relation(fields: [sourceObligationId], references: [id], onDelete: Restrict)
+  sourceClause          ContractClause?               @relation(fields: [sourceClauseId], references: [id], onDelete: SetNull)
+  reviewDecision        ReviewDecision?               @relation(fields: [reviewDecisionId], references: [id], onDelete: SetNull)
+  eventRuleAssessments  EventRuleAssessment[]
+  deadlineCalculations  DeadlineCalculation[]
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([configurationRevisionId])
+  @@index([sourceNoticeRuleId])
+  @@map("approved_notice_rule_snapshot")
+}
+
+/// Human-confirmed factual project event (not AI-detected entitlement).
+model ProjectEvent {
+  id                     String                         @id @default(uuid())
+  tenantId               String
+  projectId              String
+  contractPackageId      String?
+  eventReference         String?
+  title                  String
+  description            String?                        @db.Text
+  eventCategory          ProjectEventCategory
+  eventSubcategory       String?
+  eventStatus            ProjectEventStatus             @default(DRAFT)
+  confirmationStatus     ProjectEventConfirmationStatus @default(UNCONFIRMED)
+  occurredAt             DateTime?
+  becameKnownAt          DateTime?
+  receivedAt             DateTime?
+  instructionDate        DateTime?
+  awarenessDate          DateTime?
+  continuingEventStartAt DateTime?
+  continuingEventEndAt   DateTime?
+  timezone               String
+  reportedByUserId       String
+  confirmedByUserId      String?
+  confirmedAt            DateTime?
+  source                 ProjectEventSource             @default(MANUAL)
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project              Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage      ContractPackage?      @relation(fields: [contractPackageId], references: [id], onDelete: SetNull)
+  reportedBy           User                  @relation("ProjectEventReporter", fields: [reportedByUserId], references: [id], onDelete: Restrict)
+  confirmedBy          User?                 @relation("ProjectEventConfirmer", fields: [confirmedByUserId], references: [id], onDelete: SetNull)
+  dates                ProjectEventDate[]
+  evidence             ProjectEventEvidence[]
+  roles                ProjectEventRole[]
+  eventRuleAssessments EventRuleAssessment[]
+  deadlineCalculations DeadlineCalculation[]
+  projectDeadlines     ProjectDeadline[]
+
+  @@index([tenantId, projectId, eventStatus])
+  @@index([tenantId, projectId, confirmationStatus])
+  @@index([contractPackageId])
+  @@map("project_event")
+}
+
+/// Structured date assertion for trigger-relevant event dates.
+model ProjectEventDate {
+  id                 String                           @id @default(uuid())
+  tenantId           String
+  projectId          String
+  projectEventId     String
+  dateType           ProjectEventDateType
+  dateValue          DateTime
+  timezone           String
+  precision          ProjectEventDatePrecision
+  verificationStatus ProjectEventDateVerificationStatus @default(UNVERIFIED)
+  assertedByUserId   String
+  verifiedByUserId   String?
+  verifiedAt         DateTime?
+  notes              String?                          @db.Text
+  createdAt          DateTime                         @default(now())
+  updatedAt          DateTime                         @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectEvent ProjectEvent @relation(fields: [projectEventId], references: [id], onDelete: Cascade)
+  assertedBy   User         @relation("EventDateAsserter", fields: [assertedByUserId], references: [id], onDelete: Restrict)
+  verifiedBy   User?        @relation("EventDateVerifier", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, projectEventId])
+  @@index([projectEventId, dateType])
+  @@map("project_event_date")
+}
+
+/// Evidence link for a project event (same tenant/project as parent event).
+model ProjectEventEvidence {
+  id                String                    @id @default(uuid())
+  tenantId          String
+  projectId         String
+  projectEventId    String
+  sourceDocumentId  String
+  documentVersionId String
+  evidenceSegmentId String?
+  purpose           ProjectEventEvidencePurpose
+  factualNote       String?                   @db.Text
+  linkedByUserId    String
+  createdAt         DateTime                  @default(now())
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectEvent    ProjectEvent     @relation(fields: [projectEventId], references: [id], onDelete: Cascade)
+  sourceDocument  SourceDocument   @relation(fields: [sourceDocumentId], references: [id], onDelete: Restrict)
+  documentVersion DocumentVersion  @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  evidenceSegment EvidenceSegment? @relation(fields: [evidenceSegmentId], references: [id], onDelete: SetNull)
+  linkedBy        User             @relation("EventEvidenceLinker", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, projectId, projectEventId])
+  @@index([sourceDocumentId])
+  @@index([documentVersionId])
+  @@map("project_event_evidence")
+}
+
+/// Event-specific actor role (distinct from contract roles).
+model ProjectEventRole {
+  id              String               @id @default(uuid())
+  tenantId        String
+  projectId       String
+  projectEventId  String
+  roleType        ProjectEventRoleType
+  partyName       String?
+  organization    String?
+  contractPartyId String?
+  contractRoleId  String?
+  userId          String?
+  notes           String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectEvent   ProjectEvent    @relation(fields: [projectEventId], references: [id], onDelete: Cascade)
+  contractParty  ContractParty?  @relation(fields: [contractPartyId], references: [id], onDelete: SetNull)
+  contractRole   ContractRole?   @relation(fields: [contractRoleId], references: [id], onDelete: SetNull)
+  user           User?           @relation("ProjectEventRoleUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, projectEventId])
+  @@map("project_event_role")
+}
+
+/// Human-confirmed link between a project event and an approved notice-rule snapshot.
+model EventRuleAssessment {
+  id                      String                       @id @default(uuid())
+  tenantId                String
+  projectId               String
+  projectEventId          String
+  contractPackageId       String
+  configurationRevisionId String
+  approvedRuleSnapshotId  String
+  applicabilityStatus     EventRuleApplicabilityStatus @default(CANDIDATE)
+  assessmentSource        EventRuleAssessmentSource
+  reviewerUserId          String?
+  reviewedAt              DateTime?
+  rationale               String?                      @db.Text
+  assumptions             Json?
+  unresolvedIssues        Json?
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
+
+  tenant                Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectEvent          ProjectEvent               @relation(fields: [projectEventId], references: [id], onDelete: Cascade)
+  contractPackage       ContractPackage            @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  configurationRevision ContractConfigurationRevision @relation(fields: [configurationRevisionId], references: [id], onDelete: Restrict)
+  approvedRuleSnapshot  ApprovedNoticeRuleSnapshot @relation(fields: [approvedRuleSnapshotId], references: [id], onDelete: Restrict)
+  reviewer              User?                      @relation("EventRuleAssessor", fields: [reviewerUserId], references: [id], onDelete: SetNull)
+  deadlineCalculations  DeadlineCalculation[]
+
+  @@index([tenantId, projectId, projectEventId])
+  @@index([projectEventId, applicabilityStatus])
+  @@index([approvedRuleSnapshotId])
+  @@map("event_rule_assessment")
+}
+
+/// Project-scoped working calendar (execution input for deadline engine).
+model ProjectCalendar {
+  id                 String                @id @default(uuid())
+  tenantId           String
+  projectId          String
+  name               String
+  timezone           String
+  workingWeekMask    String?
+  defaultWorkingHours Json?
+  weekendDays        Json?
+  effectiveFrom      DateTime?
+  effectiveTo        DateTime?
+  source             ProjectCalendarSource @default(PROJECT_POLICY)
+  status             ProjectCalendarStatus @default(DRAFT)
+  currentRevisionId  String?               @unique
+  createdByUserId    String
+  approvedByUserId   String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  tenant          Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy       User                      @relation("CalendarCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  approvedBy      User?                     @relation("CalendarApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  currentRevision ProjectCalendarRevision?  @relation("CurrentCalendarRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
+  revisions       ProjectCalendarRevision[] @relation("CalendarRevisions")
+  deadlineCalculations DeadlineCalculation[]
+
+  @@index([tenantId, projectId, status])
+  @@map("project_calendar")
+}
+
+/// Immutable approved calendar revision used by deadline calculations.
+model ProjectCalendarRevision {
+  id                  String                      @id @default(uuid())
+  tenantId            String
+  projectId           String
+  projectCalendarId   String
+  revisionNumber      Int
+  timezone            String
+  workingWeekMask     String?
+  weekendDays         Json
+  holidayDates        Json?
+  specialWorkingDays  Json?
+  partialWorkingDays  Json?
+  effectiveFrom       DateTime?
+  effectiveTo         DateTime?
+  status              ProjectCalendarRevisionStatus @default(DRAFT)
+  sourceEvidence      Json?
+  approvedByUserId    String?
+  approvedAt          DateTime?
+  supersedesRevisionId String?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectCalendar   ProjectCalendar    @relation("CalendarRevisions", fields: [projectCalendarId], references: [id], onDelete: Cascade)
+  approvedBy        User?              @relation("CalendarRevisionApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  supersedes        ProjectCalendarRevision?  @relation("CalendarRevisionSupersedes", fields: [supersedesRevisionId], references: [id], onDelete: SetNull)
+  supersededBy      ProjectCalendarRevision[] @relation("CalendarRevisionSupersedes")
+  asCurrentFor      ProjectCalendar?   @relation("CurrentCalendarRevision")
+  exceptions        CalendarException[]
+  deadlineCalculations DeadlineCalculation[]
+
+  @@unique([projectCalendarId, revisionNumber])
+  @@index([tenantId, projectId, projectCalendarId])
+  @@map("project_calendar_revision")
+}
+
+/// Holiday or working-day exception on a calendar revision.
+model CalendarException {
+  id                 String                @id @default(uuid())
+  tenantId           String
+  projectId          String
+  calendarRevisionId String
+  exceptionDate      DateTime              @db.Date
+  kind               CalendarExceptionKind
+  description        String?
+  partialHours       Json?
+  createdAt          DateTime              @default(now())
+
+  tenant           Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project          Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  calendarRevision ProjectCalendarRevision @relation(fields: [calendarRevisionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId, calendarRevisionId])
+  @@index([calendarRevisionId, exceptionDate])
+  @@map("calendar_exception")
+}
+
+/// Deterministic deadline calculation with full machine-readable trace.
+model DeadlineCalculation {
+  id                      String                    @id @default(uuid())
+  tenantId                String
+  projectId               String
+  projectEventId          String
+  eventRuleAssessmentId   String
+  contractPackageId       String
+  configurationRevisionId String
+  approvedRuleSnapshotId  String
+  calendarRevisionId      String
+  projectCalendarId       String
+  calculationStatus       DeadlineCalculationStatus @default(DRAFT)
+  calculationVersion      Int                       @default(1)
+  triggerDateType         ProjectEventDateType
+  triggerDateValue        DateTime
+  triggerTimezone         String
+  triggerDateEvidence     Json?
+  durationValue           Decimal?                  @db.Decimal(12, 4)
+  durationUnit            NoticeDurationUnit?
+  countingConvention      NoticeCountingConvention?
+  startDateRule           String?
+  endDateRule             String?
+  businessDayAdjustment   String?
+  calculatedDeadlineAt    DateTime?
+  calculatedDeadlineDate  String?
+  deadlineTimezone        String
+  blockedReason           String?                   @db.Text
+  ambiguityFlags          Json?
+  calculationTrace        Json
+  calculatedByUserId      String
+  reviewedByUserId        String?
+  reviewedAt              DateTime?
+  supersedesCalculationId String?
+  recalculationReason     String?                   @db.Text
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+
+  tenant                Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectEvent          ProjectEvent               @relation(fields: [projectEventId], references: [id], onDelete: Restrict)
+  eventRuleAssessment   EventRuleAssessment        @relation(fields: [eventRuleAssessmentId], references: [id], onDelete: Restrict)
+  contractPackage       ContractPackage            @relation(fields: [contractPackageId], references: [id], onDelete: Restrict)
+  configurationRevision ContractConfigurationRevision @relation(fields: [configurationRevisionId], references: [id], onDelete: Restrict)
+  approvedRuleSnapshot  ApprovedNoticeRuleSnapshot @relation(fields: [approvedRuleSnapshotId], references: [id], onDelete: Restrict)
+  calendarRevision      ProjectCalendarRevision    @relation(fields: [calendarRevisionId], references: [id], onDelete: Restrict)
+  projectCalendar       ProjectCalendar            @relation(fields: [projectCalendarId], references: [id], onDelete: Restrict)
+  calculatedBy          User                       @relation("DeadlineCalculator", fields: [calculatedByUserId], references: [id], onDelete: Restrict)
+  reviewedBy            User?                      @relation("DeadlineCalculationReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  supersedes            DeadlineCalculation?       @relation("CalculationSupersedes", fields: [supersedesCalculationId], references: [id], onDelete: SetNull)
+  supersededBy          DeadlineCalculation[]      @relation("CalculationSupersedes")
+  milestones            DeadlineMilestone[]
+  projectDeadlines      ProjectDeadline[]
+
+  @@index([tenantId, projectId, projectEventId])
+  @@index([projectEventId, calculationStatus])
+  @@index([approvedRuleSnapshotId])
+  @@index([calendarRevisionId])
+  @@map("deadline_calculation")
+}
+
+/// Contractual or internal milestone derived from a calculation.
+model DeadlineMilestone {
+  id                       String                          @id @default(uuid())
+  tenantId                 String
+  projectId                String
+  deadlineCalculationId    String
+  kind                     DeadlineMilestoneKind
+  classification           DeadlineMilestoneClassification
+  label                    String?
+  dueAt                    DateTime?
+  dueDate                  String?
+  timezone                 String
+  offsetDaysBeforeDeadline Int?
+  sequence                 Int                             @default(0)
+  createdAt                DateTime                        @default(now())
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project             Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deadlineCalculation DeadlineCalculation @relation(fields: [deadlineCalculationId], references: [id], onDelete: Cascade)
+  projectDeadlines    ProjectDeadline[]
+  notificationIntents NotificationIntent[]
+
+  @@index([tenantId, projectId, deadlineCalculationId])
+  @@map("deadline_milestone")
+}
+
+/// Internal warning offsets — never alter contractual deadlines.
+model DeadlineWarningPolicy {
+  id                 String                      @id @default(uuid())
+  tenantId           String
+  projectId          String
+  name               String
+  deadlineType       String?
+  warningOffsets     Json
+  escalationOffsets  Json?
+  responsibleRoleType String?
+  channelPlaceholder String?
+  severity           String?
+  status             DeadlineWarningPolicyStatus @default(DRAFT)
+  approvedRevisionNumber Int?
+  createdByUserId    String
+  approvedByUserId   String?
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  tenant     Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy  User    @relation("WarningPolicyCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  approvedBy User?   @relation("WarningPolicyApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, status])
+  @@map("deadline_warning_policy")
+}
+
+/// Tracked deadline derived from a verified calculation.
+model ProjectDeadline {
+  id                    String                    @id @default(uuid())
+  tenantId              String
+  projectId             String
+  projectEventId        String
+  contractPackageId     String
+  deadlineCalculationId String
+  deadlineMilestoneId   String?
+  title                 String
+  deadlineType          String
+  dueAt                 DateTime?
+  timezone              String
+  status                ProjectDeadlineStatus     @default(UPCOMING)
+  riskStatus            ProjectDeadlineRiskStatus @default(UNKNOWN)
+  responsibleUserId     String?
+  responsibleRoleId     String?
+  acknowledgedAt        DateTime?
+  completedAt           DateTime?
+  completionEvidence    Json?
+  supersededById        String?                   @unique
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project             Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectEvent        ProjectEvent        @relation(fields: [projectEventId], references: [id], onDelete: Restrict)
+  contractPackage     ContractPackage     @relation(fields: [contractPackageId], references: [id], onDelete: Restrict)
+  deadlineCalculation DeadlineCalculation @relation(fields: [deadlineCalculationId], references: [id], onDelete: Restrict)
+  deadlineMilestone   DeadlineMilestone?  @relation(fields: [deadlineMilestoneId], references: [id], onDelete: SetNull)
+  responsibleUser     User?               @relation("DeadlineResponsibleUser", fields: [responsibleUserId], references: [id], onDelete: SetNull)
+  responsibleRole     ContractRole?       @relation("DeadlineResponsibleRole", fields: [responsibleRoleId], references: [id], onDelete: SetNull)
+  supersededBy        ProjectDeadline?    @relation("DeadlineSupersedes", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes          ProjectDeadline?    @relation("DeadlineSupersedes")
+  statusHistory       DeadlineStatusHistory[]
+  notificationIntents NotificationIntent[]
+
+  @@index([tenantId, projectId, status])
+  @@index([projectEventId])
+  @@index([deadlineCalculationId])
+  @@map("project_deadline")
+}
+
+/// Append-only deadline status transition history.
+model DeadlineStatusHistory {
+  id                String                 @id @default(uuid())
+  tenantId          String
+  projectId         String
+  projectDeadlineId String
+  fromStatus        ProjectDeadlineStatus?
+  toStatus          ProjectDeadlineStatus
+  changedAt         DateTime               @default(now())
+  changedByUserId   String?
+  reason            String?
+  metadata          Json?
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectDeadline ProjectDeadline @relation(fields: [projectDeadlineId], references: [id], onDelete: Cascade)
+  changedBy       User?           @relation("DeadlineStatusChanger", fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, projectDeadlineId])
+  @@index([projectDeadlineId, changedAt])
+  @@map("deadline_status_history")
+}
+
+/// Future notification intent — no outbound delivery in Slice 4.
+model NotificationIntent {
+  id                  String                   @id @default(uuid())
+  tenantId            String
+  projectId           String
+  projectDeadlineId   String
+  deadlineMilestoneId String?
+  recipientUserId     String?
+  recipientRoleId     String?
+  channelType         String
+  status              NotificationIntentStatus @default(PENDING)
+  scheduledAt         DateTime?
+  payloadTemplate     Json?
+  createdAt           DateTime                 @default(now())
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectDeadline   ProjectDeadline    @relation(fields: [projectDeadlineId], references: [id], onDelete: Cascade)
+  deadlineMilestone DeadlineMilestone? @relation(fields: [deadlineMilestoneId], references: [id], onDelete: SetNull)
+  recipientUser     User?              @relation("NotificationIntentRecipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  recipientRole     ContractRole?      @relation("NotificationIntentRecipientRole", fields: [recipientRoleId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, status, scheduledAt])
+  @@index([projectDeadlineId])
+  @@map("notification_intent")
 }

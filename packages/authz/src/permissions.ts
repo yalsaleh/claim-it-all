@@ -1,11 +1,31 @@
 import type { Capability } from './capabilities';
 import type { ProjectRole, ProjectStatus, TenantRole } from './roles';
 
+const EVENT_DEADLINE: Capability[] = [
+  'project_event.create',
+  'project_event.read',
+  'project_event.update',
+  'project_event.confirm',
+  'project_event.dispute',
+  'deadline_rule.assess',
+  'deadline.calculate',
+  'deadline.review',
+  'deadline.verify',
+  'deadline.track',
+  'deadline.assign',
+  'deadline.complete',
+  'deadline.recalculate',
+  'project_calendar.manage',
+  'project_calendar.approve',
+  'warning_policy.manage',
+];
+
 const DOCUMENT_READ: Capability[] = [
   'document.read',
   'document.download',
   'document.processing.view',
   'contract_package.read',
+  'project_event.read',
 ];
 
 const DOCUMENT_CONTRIBUTE: Capability[] = [
@@ -36,6 +56,7 @@ const DOCUMENT_MANAGE: Capability[] = [
   'document.archive',
   'document.processing.retry',
   ...CONTRACT_MANAGE,
+  ...EVENT_DEADLINE,
 ];
 
 const DOCUMENT_QUARANTINE: Capability[] = [
@@ -182,6 +203,21 @@ const MUTATING_PROJECT_CAPABILITIES = new Set<Capability>([
   'contract_configuration.approve',
   'contract_configuration.supersede',
   'contract_issue.manage',
+  'project_event.create',
+  'project_event.update',
+  'project_event.confirm',
+  'project_event.dispute',
+  'deadline_rule.assess',
+  'deadline.calculate',
+  'deadline.review',
+  'deadline.verify',
+  'deadline.track',
+  'deadline.assign',
+  'deadline.complete',
+  'deadline.recalculate',
+  'project_calendar.manage',
+  'project_calendar.approve',
+  'warning_policy.manage',
 ]);
 
 export function capabilitiesForTenantRole(role: TenantRole): ReadonlySet<Capability> {

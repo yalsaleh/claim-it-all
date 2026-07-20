@@ -30,7 +30,8 @@ Phases are sequential for dependency reasons, but engineering spikes may overlap
 - Auth, RBAC, tenant + project isolation
 - Document upload to S3-compatible storage; immutable versions
 - Ingestion pipeline skeleton with real status transitions
-- Contract package + human-confirmed clause/obligation register (assisted extraction optional) — **Slice 3 in progress:** contract configuration (packages, clauses, obligations, notice rules, human-approved revisions) when green; deadline engine deferred per ADR-036
+- Contract package + human-confirmed clause/obligation register — **Slice 3 done**
+- Deterministic deadline engine + human-confirmed project events — **Slice 4 done** (ADR-037–047); AI detection deferred
 - Historical detection for:
   1. Late drawings or approvals
   2. Suspension or restricted site access

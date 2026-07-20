@@ -218,4 +218,13 @@ Alert on: repeated auth failures, cross-tenant denial spikes, malware detections
 - [x] Segregation of duties for configuration approval (configurable)
 - [x] Audit + ReviewDecision trails for review/approval mutations (entity IDs, not full clause text)
 - [x] Fake AI provider rejected in production-like environments
-- [ ] Project-event deadline engine (deferred — next slice)
+
+## 18. Slice 4 — Deadline engine controls
+
+- [x] Only active approved notice-rule snapshots may execute
+- [x] Human confirmation required for event + rule applicability
+- [x] Verified calculations immutable; recalculation supersedes
+- [x] FORCE RLS on project-event / calendar / deadline tables
+- [x] Contractual vs internal deadlines labeled separately
+- [x] Threat model: [docs/threat-models/deadline-engine.md](./docs/threat-models/deadline-engine.md)
+- [ ] AI event detection from correspondence (deferred — next slice)

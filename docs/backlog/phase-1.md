@@ -48,7 +48,8 @@ Legend: `P0` blocker · `P1` required for MVP · `P2` strong follow-on within Ph
 | C10 | P0 | Readiness + reconciliation | Dependency-aware ready; reconcile dry-run | Done (Slice 2B) |
 | C11 | P0 | Local non-Docker verification | `pnpm verify:local` (Mode A) | Done |
 
-**Slice 3 (in progress):** Epic D — contract structure, clause/obligation/notice-rule modeling, human-approved configuration revisions. Live ingestion verification remains Mode B (Slice 2B).
+**Slice 3 (done):** Epic D structure + human-approved configuration revisions.  
+**Slice 4 (done):** Deterministic deadline engine + human-confirmed project events (D3–D4, I2).
 
 ---
 
@@ -58,8 +59,8 @@ Legend: `P0` blocker · `P1` required for MVP · `P2` strong follow-on within Ph
 |----|----------|------|---------------------|--------|
 | D1 | P0 | `ContractPackage`, `ContractDocument`, `ContractClause`, obligation/notice-rule schema | Matches DOMAIN_MODEL §6 / Prisma | In progress — Slice 3 expanded for structure + review |
 | D2 | P0 | Manual clause/obligation entry UI or admin API + human review | Human can confirm a minimal notice rule; `ReviewDecision` / configuration revision gates | In progress — Slice 3 expanded for structure + review |
-| D3 | P1 | Deterministic deadline calculator in `packages/contract-rules` | Unit tests for calendar-day and working-day examples | Deferred to next slice (ADR-036 — Slice 3 = validation/normalization only) |
-| D4 | P1 | Distinguish contractual vs recommended internal deadlines | Two deadline records + calculation trails | Deferred with D3 (depends on deadline engine) |
+| D3 | P1 | Deterministic deadline calculator in `packages/contract-rules` | Unit tests for calendar-day and working-day examples | Done — Slice 4 |
+| D4 | P1 | Distinguish contractual vs recommended internal deadlines | Two deadline records + calculation trails | Done — Slice 4 |
 | D5 | P2 | Assisted clause extraction (AI) into **proposed** rows | Adapter-only; schema-validated suggestions; fake/fixture provider test-only; no auto-approve (ADR-034) | Adapter-only with deterministic fixtures |
 
 ---
@@ -138,14 +139,14 @@ Real Postgres migrate/seed/reset, FORCE RLS + `contractradar_app` role, audit im
 ### Slice 2 — Documents
 C1–C6, H2–H3, I1. Immutable project document ingestion and evidence provenance. **Done** — SourceDocument/DocumentVersion/UploadSession/processing/evidence; MinIO + ARQ + fake/ClamAV adapters; do not start entitlement detection until Slice 3+.
 
-### Slice 3 — Contract structure + human-approved configuration (in progress)
-D1–D2 (expanded), D5 adapter/fixtures only; I2 deferred with D3. Validation/normalization in `contract-rules`; **no** project-event deadline engine (ADR-036). D3–D4 → next slice.
+### Slice 3 — Contract structure + human-approved configuration
+D1–D2 (expanded), D5 adapter/fixtures. **Done** on `e8348ab`.
 
-### Slice 4 — Detection + evidence
-E1–E6, F1–F4.
+### Slice 4 — Deterministic deadlines + human-confirmed events
+D3–D4, I2. Approved rule snapshots, project events/dates, calendars, calculation traces, tracked deadlines. No AI event detection. **Done**.
 
-### Slice 5 — Review UX
-G1–G5, H1, B5, I3–I4.
+### Slice 5 — Evidence-backed event detection (next)
+Human-confirmed detection from correspondence/project records before deadline activation. Do not auto-activate deadlines from AI suggestions.
 
 ---
 
