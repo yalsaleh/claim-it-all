@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import uuid4
 
@@ -12,6 +11,7 @@ from document_intelligence.db import db
 from document_intelligence.extractors.registry import extract_for_media
 from document_intelligence.malware import get_scanner
 from document_intelligence.storage import copy_object, download_bytes
+from document_intelligence.timeutil import utc_now_naive
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ async def process_document_version(
             WHERE id = $1
             """,
             processing_run_id,
-            datetime.now(timezone.utc),
+            utc_now_naive(),
             "Job payload did not match database records",
         )
         return {"status": "dead_lettered"}
@@ -134,7 +134,7 @@ async def process_document_version(
         )
         return {"status": "already_succeeded"}
 
-    now = datetime.now(timezone.utc)
+    now = utc_now_naive()
     await db.execute(
         """
         UPDATE document_processing_run
@@ -217,7 +217,7 @@ async def process_document_version(
         "malware.scan_completed",
         json.dumps({"status": scan.status, "scanner": scan.scanner_name}),
         correlation_id,
-        datetime.now(timezone.utc),
+        utc_now_naive(),
     )
 
     if scan.status != "CLEAN":
@@ -236,7 +236,7 @@ async def process_document_version(
             UPDATE source_document SET status = 'REJECTED', "updatedAt" = $2 WHERE id = $1
             """,
             version["sourceDocumentId"],
-            datetime.now(timezone.utc),
+            utc_now_naive(),
         )
         await db.execute(
             """
@@ -246,7 +246,7 @@ async def process_document_version(
             WHERE id = $1
             """,
             processing_run_id,
-            datetime.now(timezone.utc),
+            utc_now_naive(),
             f"MALWARE_{scan.status}",
             scan.detail_safe,
         )
@@ -319,7 +319,7 @@ async def process_document_version(
         WHERE id = $1
         """,
         document_version_id,
-        datetime.now(timezone.utc),
+        utc_now_naive(),
         storage_key,
     )
 
@@ -350,7 +350,7 @@ async def process_document_version(
         len(text_bytes),
         settings.processor_name,
         settings.processor_version,
-        datetime.now(timezone.utc),
+        utc_now_naive(),
     )
 
     meta_id = str(uuid4())
@@ -380,7 +380,7 @@ async def process_document_version(
         len(meta_json.encode("utf-8")),
         settings.processor_name,
         settings.processor_version,
-        datetime.now(timezone.utc),
+        utc_now_naive(),
     )
 
     for segment in extraction.segments:
@@ -406,7 +406,7 @@ async def process_document_version(
             _sha256(text.encode("utf-8")) if text else None,
             json.dumps(segment.locator),
             segment.language,
-            datetime.now(timezone.utc),
+            utc_now_naive(),
         )
 
     run_status = extraction.status
@@ -437,7 +437,7 @@ async def process_document_version(
         """,
         processing_run_id,
         run_status,
-        datetime.now(timezone.utc),
+        utc_now_naive(),
         None if run_status != "FAILED" else "EXTRACTION_FAILED",
         None if run_status != "FAILED" else ";".join(extraction.warnings)[:500],
     )
@@ -454,7 +454,7 @@ async def process_document_version(
         """,
         version["sourceDocumentId"],
         doc_status,
-        datetime.now(timezone.utc),
+        utc_now_naive(),
     )
     await db.execute(
         """
@@ -477,7 +477,7 @@ async def process_document_version(
             }
         ),
         correlation_id,
-        datetime.now(timezone.utc),
+        utc_now_naive(),
     )
 
     _safe_stage(
@@ -526,7 +526,7 @@ async def _fail_run(
         """,
         processing_run_id,
         status,
-        datetime.now(timezone.utc),
+        utc_now_naive(),
         code,
         message,
     )
@@ -542,7 +542,7 @@ async def _fail_run(
         UPDATE source_document SET status = 'FAILED', "updatedAt" = $2 WHERE id = $1
         """,
         version["sourceDocumentId"],
-        datetime.now(timezone.utc),
+        utc_now_naive(),
     )
     logger.warning(
         "processing_failed",

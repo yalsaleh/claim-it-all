@@ -233,9 +233,10 @@ jobs:
 
       - name: Health-gated service wait
         run: |
-          chmod +x scripts/ci/wait-for-live-services.sh scripts/ci/check-arq-worker-ready.sh
+          chmod +x scripts/ci/wait-for-live-services.sh scripts/ci/check-arq-worker-ready.sh scripts/ci/check-outbox-dispatcher-ready.sh
           bash scripts/ci/wait-for-live-services.sh
           bash scripts/ci/check-arq-worker-ready.sh
+          bash scripts/ci/check-outbox-dispatcher-ready.sh
 
       - name: Refuse FakeScanner in live workflow
         working-directory: services/document-intelligence

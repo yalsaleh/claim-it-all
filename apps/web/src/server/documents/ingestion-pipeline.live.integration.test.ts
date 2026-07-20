@@ -454,10 +454,47 @@ describe('live ingestion pipeline (authoritative)', () => {
       processingRunId: ctx.processingRunId,
     });
 
+    // Immediate contract: outbox row must exist and be claimable before waiting on dispatcher.
+    const pendingContract = await prisma!.$transaction(async (tx) => {
+      await setRlsContext(tx, { bypass: true });
+      return tx.outboxEvent.findFirst({
+        where: {
+          aggregateId: ctx.processingRunId!,
+          eventType: 'process_document_version',
+        },
+        select: {
+          id: true,
+          status: true,
+          eventType: true,
+          availableAt: true,
+          attempts: true,
+          payload: true,
+          correlationId: true,
+        },
+      });
+    });
+    expect(pendingContract).toBeTruthy();
+    expect(pendingContract!.eventType).toBe('process_document_version');
+    expect(['PENDING', 'DISPATCHING', 'DISPATCHED']).toContain(pendingContract!.status);
+    expect(pendingContract!.attempts).toBeGreaterThanOrEqual(0);
+    expect(pendingContract!.availableAt.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
+    const payload = pendingContract!.payload as Record<string, unknown>;
+    expect(payload.processingRunId).toBe(ctx.processingRunId);
+    expect(payload.documentVersionId).toBe(ctx.documentVersionId);
+    expect(payload.correlationId).toBeTruthy();
+    liveDiagnostic('outbox-pending-contract', {
+      outboxId: pendingContract!.id,
+      status: pendingContract!.status,
+      attempts: pendingContract!.attempts,
+      eventType: pendingContract!.eventType,
+    });
+    ctx.outboxId = pendingContract!.id;
+    ctx.stages.mark('outbox-pending', { outboxStatus: pendingContract!.status });
+
     const outbox = await pollUntil({
       scenario: 'outbox-dispatch-path',
       expected: 'outbox PENDING/DISPATCHING/DISPATCHED',
-      timeoutMs: 20_000,
+      timeoutMs: 15_000,
       observe: async () => {
         const state = await inspectPipelineState({
           uploadSessionId: initiated.uploadSessionId,
@@ -476,7 +513,7 @@ describe('live ingestion pipeline (authoritative)', () => {
     const dispatched = await pollUntil({
       scenario: 'outbox-dispatch-path',
       expected: 'outbox DISPATCHED',
-      timeoutMs: 30_000,
+      timeoutMs: 20_000,
       observe: async () => {
         const state = await inspectPipelineState({
           uploadSessionId: initiated.uploadSessionId,
@@ -490,8 +527,82 @@ describe('live ingestion pipeline (authoritative)', () => {
       },
     });
     expect(dispatched.outboxStatus).toBe('DISPATCHED');
+    expect(dispatched.correlationId).toBeTruthy();
     ctx.stages.mark('outbox-dispatched', { outboxId: dispatched.outboxId });
-  }, 90_000);
+  }, 60_000);
+
+  it('invalid media signature: rejects completion and creates no processing job', async ({
+    skip,
+  }) => {
+    if (!enabled || !prisma || !fixtureA) skip();
+    const f = fixtureA!;
+    asFixture(f);
+    const ctx = beginScenario('invalid-media', f);
+    const bogus = Buffer.from('<html>not a pdf</html>');
+
+    const initiated = await atStage('upload-session-created', () =>
+      initiateDocumentUpload({
+        projectId: f.projectId,
+        title: 'Invalid media',
+        documentType: 'LETTER',
+        filename: 'spoof.pdf',
+        declaredMediaType: 'application/pdf',
+        declaredSizeBytes: bogus.length,
+      }),
+    );
+    ctx.uploadSessionId = initiated.uploadSessionId;
+    ctx.stages.mark('upload-session-created');
+
+    await atStage('invalid-object-uploaded', async () => {
+      const put = await fetch(initiated.uploadUrl, {
+        method: 'PUT',
+        headers: initiated.uploadHeaders as Record<string, string>,
+        body: bogus,
+      });
+      expect(put.ok).toBe(true);
+    });
+
+    let rejected: unknown;
+    try {
+      await completeDocumentUpload({
+        uploadSessionId: initiated.uploadSessionId,
+        clientSha256: createHash('sha256').update(bogus).digest('hex'),
+      });
+    } catch (error) {
+      rejected = error;
+    }
+    expect(rejected).toBeInstanceOf(AppError);
+    expect((rejected as AppError).code).toBe('VALIDATION_ERROR');
+    expect(JSON.stringify((rejected as AppError).details ?? {})).toMatch(/SIGNATURE_/);
+    ctx.stages.mark('completion-rejected', {
+      code: (rejected as AppError).code,
+      details: (rejected as AppError).details,
+    });
+
+    // Documented model: rejected spoof uploads leave no DocumentVersion / run / outbox.
+    // UploadSession remains REJECTED after the validation transaction commits.
+    const session = await prisma!.$transaction(async (tx) => {
+      await setRlsContext(tx, { bypass: true });
+      return tx.uploadSession.findUnique({
+        where: { id: initiated.uploadSessionId },
+        select: { status: true, failureCode: true, documentVersionId: true },
+      });
+    });
+    expect(session?.status).toBe('REJECTED');
+    expect(session?.failureCode).toMatch(/SIGNATURE_/);
+    expect(session?.documentVersionId).toBeNull();
+
+    const state = await inspectPipelineState({
+      uploadSessionId: initiated.uploadSessionId,
+    });
+    expect(state.uploadSessionStatus).toBe('REJECTED');
+    expect(state.versionUploadStatus === 'ACCEPTED' ? 1 : 0).toBe(0);
+    ctx.stages.mark('no-version-confirmed');
+    expect(state.processingRunId).toBeNull();
+    ctx.stages.mark('no-run-confirmed');
+    expect(state.outboxId).toBeNull();
+    ctx.stages.mark('no-outbox-confirmed');
+  }, 60_000);
 
   it('clean PDF: upload → outbox → clamav → promote → READY → signed download', async ({
     skip,
@@ -731,66 +842,6 @@ describe('live ingestion pipeline (authoritative)', () => {
       events.some((e) => e.eventType.includes('malware') || e.eventType.includes('scan')),
     ).toBe(true);
   }, 240_000);
-
-  it('invalid media signature: rejects completion and creates no processing job', async ({
-    skip,
-  }) => {
-    if (!enabled || !prisma || !fixtureA) skip();
-    const f = fixtureA!;
-    asFixture(f);
-    const ctx = beginScenario('invalid-media', f);
-    const bogus = Buffer.from('<html>not a pdf</html>');
-
-    const initiated = await atStage('upload-session-created', () =>
-      initiateDocumentUpload({
-        projectId: f.projectId,
-        title: 'Invalid media',
-        documentType: 'LETTER',
-        filename: 'spoof.pdf',
-        declaredMediaType: 'application/pdf',
-        declaredSizeBytes: bogus.length,
-      }),
-    );
-    ctx.uploadSessionId = initiated.uploadSessionId;
-    ctx.stages.mark('upload-session-created');
-
-    await atStage('invalid-object-uploaded', async () => {
-      const put = await fetch(initiated.uploadUrl, {
-        method: 'PUT',
-        headers: initiated.uploadHeaders as Record<string, string>,
-        body: bogus,
-      });
-      expect(put.ok).toBe(true);
-    });
-
-    let rejected: unknown;
-    try {
-      await completeDocumentUpload({
-        uploadSessionId: initiated.uploadSessionId,
-        clientSha256: createHash('sha256').update(bogus).digest('hex'),
-      });
-    } catch (error) {
-      rejected = error;
-    }
-    expect(rejected).toBeInstanceOf(AppError);
-    expect((rejected as AppError).code).toBe('VALIDATION_ERROR');
-    expect(JSON.stringify((rejected as AppError).details ?? {})).toMatch(/SIGNATURE_/);
-    ctx.stages.mark('completion-rejected', {
-      code: (rejected as AppError).code,
-      details: (rejected as AppError).details,
-    });
-
-    const state = await inspectPipelineState({
-      uploadSessionId: initiated.uploadSessionId,
-    });
-    expect(state.uploadSessionStatus).toBe('REJECTED');
-    expect(state.versionUploadStatus === 'ACCEPTED' ? 1 : 0).toBe(0);
-    ctx.stages.mark('no-version-confirmed');
-    expect(state.processingRunId).toBeNull();
-    ctx.stages.mark('no-run-confirmed');
-    expect(state.outboxId).toBeNull();
-    ctx.stages.mark('no-outbox-confirmed');
-  }, 120_000);
 
   it('cross-tenant: cannot complete, query, or download another tenant upload', async ({
     skip,

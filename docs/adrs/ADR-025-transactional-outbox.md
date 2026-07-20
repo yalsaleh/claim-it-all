@@ -17,10 +17,19 @@ Use a **transactional outbox** for `process_document_version` delivery:
 
 FORCE RLS applies to `outbox_event`. Dispatcher uses the constrained worker DB role with controlled bypass, same model as the ARQ worker.
 
+## Privilege / RLS trust boundary
+- Runtime DB role: `contractradar_app` (`NOSUPERUSER`, `NOBYPASSRLS`). Never the PostgreSQL superuser.
+- Dispatcher and ARQ worker set **transaction-local** `app.bypass_rls=on` via `set_config(..., true)` inside each DB transaction (`db.py`). This is the only supported infrastructure bypass path.
+- Browser/API request code must not set `app.bypass_rls`; product paths use tenant GUC (`app.current_tenant_id`) under FORCE RLS.
+- Dispatcher readiness is **not** PID liveness: CI must prove a successful outbox query + timestamp bind + Redis ping + heartbeat write before live E2E scenarios.
+
+## Timestamp binding
+Prisma `DateTime` maps to PostgreSQL `TIMESTAMP(3)` **without time zone**. Python/asyncpg must bind **naive UTC** datetimes (`utc_now_naive`). Timezone-aware values raise `asyncpg.DataError` / SQLSTATE `22000` and stall the dispatcher loop.
+
 ## Delivery guarantee
 **At-least-once** enqueue to Redis/ARQ with idempotent consumers. Not exactly-once across Postgres+Redis.
 
 ## Consequences
 - Lost-job window after accept is eliminated when the dispatcher is running.
-- Operators must run the dispatcher alongside the ARQ worker.
+- Operators must run the dispatcher alongside the ARQ worker and a readiness probe.
 - Legacy `POST /internal/jobs/process-document` remains for admin/emergency use only (see ADR-022 / service auth notes).
