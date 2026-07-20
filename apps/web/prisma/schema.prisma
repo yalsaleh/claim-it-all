@@ -63,24 +63,34 @@ model User {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  sessions              Session[]
-  accounts              Account[]
-  tenantMemberships     TenantMembership[]
-  projectMemberships    ProjectMembership[]
-  auditLogs             AuditLog[]             @relation("AuditActor")
-  sourceDocumentsCreated SourceDocument[]      @relation("SourceDocumentCreator")
-  documentVersionsUploaded DocumentVersion[]   @relation("DocumentVersionUploader")
-  uploadSessionsInitiated UploadSession[]      @relation("UploadSessionInitiator")
+  sessions                        Session[]
+  accounts                        Account[]
+  tenantMemberships               TenantMembership[]
+  projectMemberships              ProjectMembership[]
+  auditLogs                       AuditLog[]                      @relation("AuditActor")
+  sourceDocumentsCreated          SourceDocument[]                @relation("SourceDocumentCreator")
+  documentVersionsUploaded        DocumentVersion[]               @relation("DocumentVersionUploader")
+  uploadSessionsInitiated         UploadSession[]                 @relation("UploadSessionInitiator")
+  contractPackagesCreated         ContractPackage[]               @relation("ContractPackageCreator")
+  precedenceRulesApproved         ContractPrecedenceRule[]        @relation("PrecedenceRuleApprover")
+  clauseTextRevisionsCreated      ClauseTextRevision[]            @relation("ClauseTextRevisionCreator")
+  clauseTextRevisionsApproved     ClauseTextRevision[]            @relation("ClauseTextRevisionApprover")
+  configurationRevisionsCreated   ContractConfigurationRevision[] @relation("ConfigurationRevisionCreator")
+  configurationRevisionsSubmitted ContractConfigurationRevision[] @relation("ConfigurationRevisionSubmitter")
+  configurationRevisionsApproved  ContractConfigurationRevision[] @relation("ConfigurationRevisionApprover")
+  configurationIssuesAssigned     ContractConfigurationIssue[]    @relation("ConfigurationIssueAssignee")
+  configurationIssuesResolved     ContractConfigurationIssue[]    @relation("ConfigurationIssueResolver")
+  reviewDecisions                 ReviewDecision[]                @relation("ReviewDecisionActor")
 
   @@map("user")
 }
 
 model Session {
-  id                   String   @id @default(cuid())
-  expiresAt            DateTime
-  token                String   @unique
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   ipAddress String?
   userAgent String?
   userId    String
@@ -127,19 +137,43 @@ model Tenant {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  memberships           TenantMembership[]
-  projects              Project[]
-  projectMemberships    ProjectMembership[]
-  auditLogs             AuditLog[]
-  sourceDocuments       SourceDocument[]
-  documentVersions      DocumentVersion[]
-  uploadSessions        UploadSession[]
-  processingRuns        DocumentProcessingRun[]
-  extractedArtifacts    ExtractedArtifact[]
-  evidenceSegments      EvidenceSegment[]
-  documentRelationships DocumentRelationship[]
-  ingestionEvents       IngestionEvent[]
-  outboxEvents          OutboxEvent[]
+  memberships                    TenantMembership[]
+  projects                       Project[]
+  projectMemberships             ProjectMembership[]
+  auditLogs                      AuditLog[]
+  sourceDocuments                SourceDocument[]
+  documentVersions               DocumentVersion[]
+  uploadSessions                 UploadSession[]
+  processingRuns                 DocumentProcessingRun[]
+  extractedArtifacts             ExtractedArtifact[]
+  evidenceSegments               EvidenceSegment[]
+  documentRelationships          DocumentRelationship[]
+  ingestionEvents                IngestionEvent[]
+  outboxEvents                   OutboxEvent[]
+  contractPackages               ContractPackage[]
+  contractDocuments              ContractDocument[]
+  contractDocumentRelationships  ContractDocumentRelationship[]
+  contractPrecedenceRules        ContractPrecedenceRule[]
+  contractClauses                ContractClause[]
+  clauseTextRevisions            ClauseTextRevision[]
+  clauseRelationships            ClauseRelationship[]
+  definedTerms                   DefinedTerm[]
+  clauseTermReferences           ClauseTermReference[]
+  crossReferences                CrossReference[]
+  contractParties                ContractParty[]
+  contractRoles                  ContractRole[]
+  contactPoints                  ContactPoint[]
+  contractObligations            ContractObligation[]
+  obligationTriggers             ObligationTrigger[]
+  obligationRecipients           ObligationRecipient[]
+  obligationEvidenceRequirements ObligationEvidenceRequirement[]
+  noticeRules                    NoticeRule[]
+  calendarRules                  CalendarRule[]
+  contractConfigurationRevisions ContractConfigurationRevision[]
+  contractConfigurationIssues    ContractConfigurationIssue[]
+  reviewDecisions                ReviewDecision[]
+  contractAnalysisRuns           ContractAnalysisRun[]
+  contractExtractionSuggestions  ContractExtractionSuggestion[]
 
   @@map("tenant")
 }
@@ -174,18 +208,42 @@ model Project {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  memberships        ProjectMembership[]
-  auditLogs          AuditLog[]
-  sourceDocuments    SourceDocument[]
-  documentVersions   DocumentVersion[]
-  uploadSessions     UploadSession[]
-  processingRuns     DocumentProcessingRun[]
-  extractedArtifacts ExtractedArtifact[]
-  evidenceSegments   EvidenceSegment[]
-  documentRelationships DocumentRelationship[]
-  ingestionEvents    IngestionEvent[]
-  outboxEvents       OutboxEvent[]
+  tenant                         Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberships                    ProjectMembership[]
+  auditLogs                      AuditLog[]
+  sourceDocuments                SourceDocument[]
+  documentVersions               DocumentVersion[]
+  uploadSessions                 UploadSession[]
+  processingRuns                 DocumentProcessingRun[]
+  extractedArtifacts             ExtractedArtifact[]
+  evidenceSegments               EvidenceSegment[]
+  documentRelationships          DocumentRelationship[]
+  ingestionEvents                IngestionEvent[]
+  outboxEvents                   OutboxEvent[]
+  contractPackages               ContractPackage[]
+  contractDocuments              ContractDocument[]
+  contractDocumentRelationships  ContractDocumentRelationship[]
+  contractPrecedenceRules        ContractPrecedenceRule[]
+  contractClauses                ContractClause[]
+  clauseTextRevisions            ClauseTextRevision[]
+  clauseRelationships            ClauseRelationship[]
+  definedTerms                   DefinedTerm[]
+  clauseTermReferences           ClauseTermReference[]
+  crossReferences                CrossReference[]
+  contractParties                ContractParty[]
+  contractRoles                  ContractRole[]
+  contactPoints                  ContactPoint[]
+  contractObligations            ContractObligation[]
+  obligationTriggers             ObligationTrigger[]
+  obligationRecipients           ObligationRecipient[]
+  obligationEvidenceRequirements ObligationEvidenceRequirement[]
+  noticeRules                    NoticeRule[]
+  calendarRules                  CalendarRule[]
+  contractConfigurationRevisions ContractConfigurationRevision[]
+  contractConfigurationIssues    ContractConfigurationIssue[]
+  reviewDecisions                ReviewDecision[]
+  contractAnalysisRuns           ContractAnalysisRun[]
+  contractExtractionSuggestions  ContractExtractionSuggestion[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -394,14 +452,14 @@ enum DocumentRelationshipType {
 
 /// Logical project record (contract, letter, RFI, …). Bytes live on DocumentVersion.
 model SourceDocument {
-  id                 String                   @id @default(uuid())
+  id                 String                  @id @default(uuid())
   tenantId           String
   projectId          String
   documentNumber     String?
   title              String
   documentType       DocumentType
   description        String?
-  origin             DocumentOrigin           @default(MANUAL_UPLOAD)
+  origin             DocumentOrigin          @default(MANUAL_UPLOAD)
   sourceSystem       String?
   sourceReference    String?
   correspondenceDate DateTime?
@@ -410,23 +468,24 @@ model SourceDocument {
   senderName         String?
   senderOrganization String?
   recipientSummary   String?
-  language           DocumentLanguage         @default(UNKNOWN)
-  confidentiality    DocumentConfidentiality  @default(STANDARD)
-  status             SourceDocumentStatus     @default(UPLOADING)
-  currentVersionId   String?                  @unique
+  language           DocumentLanguage        @default(UNKNOWN)
+  confidentiality    DocumentConfidentiality @default(STANDARD)
+  status             SourceDocumentStatus    @default(UPLOADING)
+  currentVersionId   String?                 @unique
   createdByUserId    String
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
-  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy      User              @relation("SourceDocumentCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  currentVersion DocumentVersion?  @relation("CurrentDocumentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
-  versions       DocumentVersion[] @relation("DocumentVersions")
-  uploadSessions UploadSession[]
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project           Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy         User                   @relation("SourceDocumentCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  currentVersion    DocumentVersion?       @relation("CurrentDocumentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions          DocumentVersion[]      @relation("DocumentVersions")
+  uploadSessions    UploadSession[]
   relationshipsFrom DocumentRelationship[] @relation("RelationshipFrom")
   relationshipsTo   DocumentRelationship[] @relation("RelationshipTo")
   ingestionEvents   IngestionEvent[]
+  contractDocuments ContractDocument[]
 
   @@index([tenantId, projectId, status])
   @@index([tenantId, projectId, documentType])
@@ -461,18 +520,20 @@ model DocumentVersion {
   supersedesVersionId String?
   createdAt           DateTime                @default(now())
 
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  sourceDocument SourceDocument  @relation("DocumentVersions", fields: [sourceDocumentId], references: [id], onDelete: Cascade)
-  uploadedBy     User            @relation("DocumentVersionUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
-  supersedes     DocumentVersion?  @relation("VersionSupersedes", fields: [supersedesVersionId], references: [id], onDelete: SetNull)
-  supersededBy   DocumentVersion[] @relation("VersionSupersedes")
-  asCurrentFor   SourceDocument? @relation("CurrentDocumentVersion")
-  uploadSessions UploadSession[]
-  processingRuns DocumentProcessingRun[]
-  artifacts      ExtractedArtifact[]
-  segments       EvidenceSegment[]
-  ingestionEvents IngestionEvent[]
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project           Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceDocument    SourceDocument          @relation("DocumentVersions", fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  uploadedBy        User                    @relation("DocumentVersionUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  supersedes        DocumentVersion?        @relation("VersionSupersedes", fields: [supersedesVersionId], references: [id], onDelete: SetNull)
+  supersededBy      DocumentVersion[]       @relation("VersionSupersedes")
+  asCurrentFor      SourceDocument?         @relation("CurrentDocumentVersion")
+  uploadSessions    UploadSession[]
+  processingRuns    DocumentProcessingRun[]
+  artifacts         ExtractedArtifact[]
+  segments          EvidenceSegment[]
+  ingestionEvents   IngestionEvent[]
+  contractDocuments ContractDocument[]
+  contractClauses   ContractClause[]
 
   @@unique([sourceDocumentId, versionNumber])
   @@unique([tenantId, storageKey])
@@ -483,32 +544,32 @@ model DocumentVersion {
 
 /// Controlled lifecycle for one upload attempt (temporary object → acceptance).
 model UploadSession {
-  id                 String              @id @default(uuid())
-  tenantId           String
-  projectId          String
-  initiatedByUserId  String
-  sourceDocumentId   String?
-  documentVersionId  String?
-  intendedFilename   String
-  declaredMediaType  String
-  declaredSizeBytes  BigInt
-  expectedSha256     String?
-  storageKey         String
-  storageBucket      String
-  status             UploadSessionStatus @default(INITIATED)
-  expiresAt          DateTime
-  completedAt        DateTime?
-  failureCode        String?
-  failureDetailSafe  String?
-  idempotencyKey     String?
-  correlationId      String?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id                String              @id @default(uuid())
+  tenantId          String
+  projectId         String
+  initiatedByUserId String
+  sourceDocumentId  String?
+  documentVersionId String?
+  intendedFilename  String
+  declaredMediaType String
+  declaredSizeBytes BigInt
+  expectedSha256    String?
+  storageKey        String
+  storageBucket     String
+  status            UploadSessionStatus @default(INITIATED)
+  expiresAt         DateTime
+  completedAt       DateTime?
+  failureCode       String?
+  failureDetailSafe String?
+  idempotencyKey    String?
+  correlationId     String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  initiatedBy    User            @relation("UploadSessionInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
-  sourceDocument SourceDocument? @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  initiatedBy     User             @relation("UploadSessionInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  sourceDocument  SourceDocument?  @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
   documentVersion DocumentVersion? @relation(fields: [documentVersionId], references: [id], onDelete: SetNull)
   ingestionEvents IngestionEvent[]
 
@@ -538,9 +599,9 @@ model DocumentProcessingRun {
   correlationId      String
   createdAt          DateTime            @default(now())
 
-  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  documentVersion DocumentVersion    @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentVersion DocumentVersion     @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
   artifacts       ExtractedArtifact[]
   segments        EvidenceSegment[]
   ingestionEvents IngestionEvent[]
@@ -582,27 +643,27 @@ model ExtractedArtifact {
 
 /// Machine-resolvable evidence location (page, paragraph, email part, sheet, …).
 model EvidenceSegment {
-  id                String             @id @default(uuid())
+  id                String              @id @default(uuid())
   tenantId          String
   projectId         String
   documentVersionId String
   processingRunId   String
   artifactId        String?
   kind              EvidenceSegmentKind
-  ordinal           Int                @default(0)
+  ordinal           Int                 @default(0)
   label             String?
-  textContent       String?            @db.Text
+  textContent       String?             @db.Text
   textSha256        String?
   locator           Json
   ocrConfidence     Float?
   language          DocumentLanguage?
-  createdAt         DateTime           @default(now())
+  createdAt         DateTime            @default(now())
 
-  tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  project         Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  documentVersion DocumentVersion        @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
-  processingRun   DocumentProcessingRun  @relation(fields: [processingRunId], references: [id], onDelete: Cascade)
-  artifact        ExtractedArtifact?     @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentVersion DocumentVersion       @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  processingRun   DocumentProcessingRun @relation(fields: [processingRunId], references: [id], onDelete: Cascade)
+  artifact        ExtractedArtifact?    @relation(fields: [artifactId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, projectId, documentVersionId])
   @@index([processingRunId, kind, ordinal])
@@ -667,22 +728,22 @@ enum OutboxStatus {
 
 /// Durable job delivery (at-least-once). Dispatcher enqueues ARQ; worker is idempotent.
 model OutboxEvent {
-  id                String       @id @default(uuid())
-  tenantId          String
-  projectId         String
-  eventType         String
-  aggregateType     String
-  aggregateId       String
-  payload           Json
-  status            OutboxStatus @default(PENDING)
-  attempts          Int          @default(0)
-  availableAt       DateTime     @default(now())
-  dispatchedAt      DateTime?
-  lastErrorSafe     String?
-  correlationId     String?
-  idempotencyKey    String       @unique
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  id             String       @id @default(uuid())
+  tenantId       String
+  projectId      String
+  eventType      String
+  aggregateType  String
+  aggregateId    String
+  payload        Json
+  status         OutboxStatus @default(PENDING)
+  attempts       Int          @default(0)
+  availableAt    DateTime     @default(now())
+  dispatchedAt   DateTime?
+  lastErrorSafe  String?
+  correlationId  String?
+  idempotencyKey String       @unique
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -690,4 +751,1218 @@ model OutboxEvent {
   @@index([status, availableAt])
   @@index([tenantId, projectId, createdAt])
   @@map("outbox_event")
+}
+
+// ---------------------------------------------------------------------------
+// Slice 3 — Contract structure, obligations, notice rules, human-verified config
+// Evidence refs: evidenceSegmentId + evidenceLocator (no EvidenceReference table).
+// ---------------------------------------------------------------------------
+
+enum ContractPackageStatus {
+  DRAFT
+  INGESTING
+  STRUCTURING
+  REVIEW_REQUIRED
+  PARTIALLY_APPROVED
+  APPROVED
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum ContractDocumentType {
+  AGREEMENT
+  LETTER_OF_ACCEPTANCE
+  CONDITIONS_OF_CONTRACT
+  GENERAL_CONDITIONS
+  PARTICULAR_CONDITIONS
+  CONTRACT_DATA
+  APPENDIX_TO_TENDER
+  EMPLOYERS_REQUIREMENTS
+  SPECIFICATIONS
+  BILL_OF_QUANTITIES
+  DRAWINGS
+  SCHEDULES
+  ADDENDUM
+  AMENDMENT
+  SUPPLEMENTAL_AGREEMENT
+  CLARIFICATION
+  TENDER_SUBMISSION
+  OTHER
+}
+
+enum ContractDocumentStatus {
+  DRAFT
+  REVIEW_REQUIRED
+  ACTIVE
+  SUPERSEDED
+  ARCHIVED
+  REJECTED
+}
+
+enum ContractDocumentRelationshipType {
+  AMENDS
+  REPLACES
+  SUPPLEMENTS
+  INCORPORATES
+  OVERRIDES
+  CLARIFIES
+  FORMS_PART_OF
+  PRECEDES
+  SAME_INSTRUMENT_AS
+}
+
+enum ContractConfirmationStatus {
+  MACHINE_SUGGESTED
+  REVIEW_REQUIRED
+  HUMAN_CONFIRMED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ContractPrecedenceScope {
+  GLOBAL
+  CLAUSE_SPECIFIC
+  SUBJECT_SPECIFIC
+  LANGUAGE_VERSION
+  CONDITIONAL
+}
+
+enum ClauseReviewStatus {
+  MACHINE_SUGGESTED
+  REVIEW_REQUIRED
+  VERIFIED
+  CORRECTED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ClauseExtractionMethod {
+  DETERMINISTIC
+  AI_ASSISTED
+  HUMAN_ENTERED
+  IMPORTED
+}
+
+enum ClauseTextRevisionKind {
+  NORMALIZATION
+  HUMAN_CORRECTION
+  BILINGUAL_ALIGNMENT
+  OTHER
+}
+
+enum ClauseTextRevisionStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ClauseRelationshipType {
+  AMENDED_BY
+  REPLACED_BY
+  SUPPLEMENTED_BY
+  OVERRIDES
+  REFERENCES
+  DEFINES
+  DEPENDS_ON
+  EXCEPTION_TO
+  PROCEDURE_FOR
+  CONDITION_PRECEDENT_TO
+  BILINGUAL_EQUIVALENT_OF
+}
+
+enum ClauseRelationshipOrigin {
+  EXPLICIT_IN_CONTRACT
+  MACHINE_SUGGESTED
+  HUMAN_CONFIRMED
+}
+
+enum DefinedTermStatus {
+  MACHINE_SUGGESTED
+  REVIEW_REQUIRED
+  VERIFIED
+  REJECTED
+  SUPERSEDED
+}
+
+enum CrossReferenceResolutionStatus {
+  UNRESOLVED
+  RESOLVED
+  AMBIGUOUS
+  NOT_APPLICABLE
+  REJECTED
+}
+
+enum ContractPartyType {
+  EMPLOYER
+  CONTRACTOR
+  SUBCONTRACTOR
+  ENGINEER
+  CONSULTANT
+  PROJECT_MANAGER
+  EMPLOYERS_REPRESENTATIVE
+  CONTRACTORS_REPRESENTATIVE
+  SUPPLIER
+  AUTHORITY
+  OTHER
+}
+
+enum ContractPartyStatus {
+  MACHINE_SUGGESTED
+  REVIEW_REQUIRED
+  VERIFIED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ContractRoleType {
+  ENGINEER
+  EMPLOYERS_REPRESENTATIVE
+  CONTRACT_ADMINISTRATOR
+  CONTRACTORS_REPRESENTATIVE
+  DISPUTE_ADJUDICATION_BOARD
+  NOMINATED_NOTICE_RECIPIENT
+  OTHER
+}
+
+enum ContactDeliveryMethod {
+  EMAIL
+  PHYSICAL_DELIVERY
+  HAND_DELIVERY
+  COURIER
+  EDMS
+  PORTAL
+  FAX
+  OTHER
+}
+
+enum ContactPointStatus {
+  MACHINE_SUGGESTED
+  REVIEW_REQUIRED
+  VERIFIED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ObligationType {
+  NOTICE
+  SUBMISSION
+  RESPONSE
+  APPROVAL
+  PAYMENT
+  CERTIFICATION
+  RECORD_KEEPING
+  ACCESS_PROVISION
+  INFORMATION_PROVISION
+  INSTRUCTION
+  CONSULTATION
+  MITIGATION
+  CLAIM_PARTICULARS
+  PROGRAMME_UPDATE
+  OTHER
+}
+
+enum ObligationReviewStatus {
+  MACHINE_SUGGESTED
+  REVIEW_REQUIRED
+  VERIFIED
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ObligationTriggerCategory {
+  AWARENESS_OF_EVENT
+  OCCURRENCE_OF_EVENT
+  INSTRUCTION_RECEIVED
+  ACCESS_DENIED
+  DRAWING_DUE_DATE_MISSED
+  PAYMENT_CERTIFICATE_ISSUED
+  PAYMENT_DUE_DATE_REACHED
+  PHYSICAL_CONDITION_ENCOUNTERED
+  ENGINEER_DETERMINATION_RECEIVED
+  REJECTION_RECEIVED
+  WORK_SUSPENDED
+  VARIATION_INSTRUCTED
+  OTHER
+}
+
+enum ObligationTriggerStatus {
+  MACHINE_SUGGESTED
+  REVIEW_REQUIRED
+  VERIFIED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ObligationRecipientKind {
+  REQUIRED
+  COPIED
+  ROLE_BASED
+  ADDRESS_SPECIFIC
+}
+
+enum ObligationEvidenceRequirementKind {
+  EXPRESSLY_REQUIRED
+  RECOMMENDED
+  INTERNAL_POLICY
+}
+
+enum NoticeDurationUnit {
+  CALENDAR_DAY
+  BUSINESS_DAY
+  WEEK
+  MONTH
+  IMMEDIATE
+  PROMPT
+  REASONABLE_TIME
+  CUSTOM
+}
+
+enum NoticeCalendarBasis {
+  CALENDAR_DAYS
+  BUSINESS_DAYS
+  CONTRACT_WORKING_DAYS
+  CUSTOM
+}
+
+enum NoticeCountingConvention {
+  INCLUSIVE
+  EXCLUSIVE
+  UNSPECIFIED
+}
+
+enum TimeBarClassification {
+  EXPRESS_CONDITION_PRECEDENT
+  EXPRESS_TIME_BAR
+  PROCEDURAL_DEADLINE
+  RECOMMENDED_INTERNAL_DEADLINE
+  UNCERTAIN
+  NOT_A_TIME_BAR
+}
+
+enum NoticeRuleReviewStatus {
+  MACHINE_SUGGESTED
+  REVIEW_REQUIRED
+  VERIFIED
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+enum NoticeAmbiguityStatus {
+  CLEAR
+  PARTIALLY_AMBIGUOUS
+  AMBIGUOUS
+  UNRESOLVED
+}
+
+enum CalendarRuleStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum ConfigurationRevisionStatus {
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  SUPERSEDED
+  WITHDRAWN
+}
+
+enum ConfigurationIssueSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  BLOCKING
+}
+
+enum ConfigurationIssueCategory {
+  MISSING_CONTRACT_DOCUMENT
+  UNREADABLE_CLAUSE
+  CONFLICTING_AMENDMENT
+  UNCLEAR_DEADLINE
+  AMBIGUOUS_RECIPIENT
+  MISSING_ADDRESS
+  BILINGUAL_CONFLICT
+  UNRESOLVED_CROSS_REFERENCE
+  UNCERTAIN_TIME_BAR
+  MISSING_EXECUTION_DATE
+  MISSING_CONTRACT_DATA
+  REVIEWER_QUESTION
+  OTHER
+}
+
+enum ConfigurationIssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  WAIVED
+  DEFERRED
+}
+
+enum ReviewDecisionType {
+  ACCEPTED_SUGGESTION
+  CORRECTED_EXTRACTION
+  REJECTED_INTERPRETATION
+  APPROVED_RULE
+  CHANGED_ROLE
+  RESOLVED_AMBIGUITY
+  MARKED_NON_APPLICABLE
+  REQUESTED_CHANGES
+  OTHER
+}
+
+enum ContractAnalysisRunStatus {
+  QUEUED
+  RUNNING
+  PARTIALLY_SUCCEEDED
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  DEAD_LETTERED
+}
+
+enum ContractExtractionSuggestionType {
+  CLAUSE
+  DEFINED_TERM
+  PARTY
+  ROLE
+  CROSS_REFERENCE
+  OBLIGATION
+  NOTICE_RULE
+  PRECEDENCE
+  AMENDMENT_RELATIONSHIP
+  ISSUE
+  OTHER
+}
+
+enum ContractExtractionSuggestionStatus {
+  PENDING_REVIEW
+  ACCEPTED
+  ACCEPTED_WITH_CHANGES
+  REJECTED
+  DUPLICATE
+  SUPERSEDED
+}
+
+/// Governing contractual framework for a project (main contract, subcontract, …).
+model ContractPackage {
+  id                             String                @id @default(uuid())
+  tenantId                       String
+  projectId                      String
+  name                           String
+  description                    String?
+  contractReference              String?
+  contractFormFamily             String?
+  contractFormEdition            String?
+  governingLaw                   String?
+  jurisdiction                   String?
+  governingLanguage              DocumentLanguage?
+  secondaryLanguage              DocumentLanguage?
+  effectiveDate                  DateTime?
+  commencementDate               DateTime?
+  status                         ContractPackageStatus @default(DRAFT)
+  currentConfigurationRevisionId String?               @unique
+  createdByUserId                String
+  createdAt                      DateTime              @default(now())
+  updatedAt                      DateTime              @updatedAt
+
+  tenant                       Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project                      Project                         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy                    User                            @relation("ContractPackageCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  currentConfigurationRevision ContractConfigurationRevision?  @relation("CurrentConfigurationRevision", fields: [currentConfigurationRevisionId], references: [id], onDelete: SetNull)
+  documents                    ContractDocument[]
+  documentRelationships        ContractDocumentRelationship[]
+  precedenceRules              ContractPrecedenceRule[]
+  clauses                      ContractClause[]
+  clauseRelationships          ClauseRelationship[]
+  definedTerms                 DefinedTerm[]
+  clauseTermReferences         ClauseTermReference[]
+  crossReferences              CrossReference[]
+  parties                      ContractParty[]
+  roles                        ContractRole[]
+  contactPoints                ContactPoint[]
+  obligations                  ContractObligation[]
+  noticeRules                  NoticeRule[]
+  calendarRules                CalendarRule[]
+  configurationRevisions       ContractConfigurationRevision[] @relation("PackageConfigurationRevisions")
+  configurationIssues          ContractConfigurationIssue[]
+  reviewDecisions              ReviewDecision[]
+  analysisRuns                 ContractAnalysisRun[]
+  extractionSuggestions        ContractExtractionSuggestion[]
+
+  @@index([tenantId, projectId, status])
+  @@index([tenantId, projectId, createdAt])
+  @@map("contract_package")
+}
+
+model ContractDocument {
+  id                   String                 @id @default(uuid())
+  tenantId             String
+  projectId            String
+  contractPackageId    String
+  sourceDocumentId     String
+  documentVersionId    String
+  contractDocumentType ContractDocumentType
+  title                String
+  reference            String?
+  executionDate        DateTime?
+  effectiveDate        DateTime?
+  language             DocumentLanguage       @default(UNKNOWN)
+  precedenceRank       Int?
+  isExecuted           Boolean                @default(false)
+  isCurrent            Boolean                @default(true)
+  status               ContractDocumentStatus @default(DRAFT)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  tenant                Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project                        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage       ContractPackage                @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  sourceDocument        SourceDocument                 @relation(fields: [sourceDocumentId], references: [id], onDelete: Restrict)
+  documentVersion       DocumentVersion                @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  clauses               ContractClause[]
+  relationshipsFrom     ContractDocumentRelationship[] @relation("ContractDocRelFrom")
+  relationshipsTo       ContractDocumentRelationship[] @relation("ContractDocRelTo")
+  precedenceRules       ContractPrecedenceRule[]
+  definedTermsEffective DefinedTerm[]                  @relation("DefinedTermEffectiveDocument")
+
+  @@unique([contractPackageId, sourceDocumentId, documentVersionId])
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([sourceDocumentId])
+  @@index([documentVersionId])
+  @@map("contract_document")
+}
+
+model ContractDocumentRelationship {
+  id                     String                           @id @default(uuid())
+  tenantId               String
+  projectId              String
+  contractPackageId      String
+  fromContractDocumentId String
+  toContractDocumentId   String
+  relationshipType       ContractDocumentRelationshipType
+  effectiveDate          DateTime?
+  scopeDescription       String?
+  evidenceSegmentId      String?
+  evidenceLocator        Json?
+  confirmationStatus     ContractConfirmationStatus       @default(MACHINE_SUGGESTED)
+  createdAt              DateTime                         @default(now())
+  updatedAt              DateTime                         @updatedAt
+
+  tenant               Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project              Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage      ContractPackage  @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  fromContractDocument ContractDocument @relation("ContractDocRelFrom", fields: [fromContractDocumentId], references: [id], onDelete: Cascade)
+  toContractDocument   ContractDocument @relation("ContractDocRelTo", fields: [toContractDocumentId], references: [id], onDelete: Cascade)
+
+  @@unique([contractPackageId, fromContractDocumentId, toContractDocumentId, relationshipType])
+  @@index([tenantId, projectId, contractPackageId])
+  @@map("contract_document_relationship")
+}
+
+model ContractPrecedenceRule {
+  id                      String                     @id @default(uuid())
+  tenantId                String
+  projectId               String
+  contractPackageId       String
+  configurationRevisionId String?
+  rank                    Int
+  contractDocumentId      String?
+  contractDocumentType    ContractDocumentType?
+  scope                   ContractPrecedenceScope    @default(GLOBAL)
+  scopeDescription        String?
+  sourceClauseId          String?
+  evidenceSegmentId       String?
+  evidenceLocator         Json?
+  status                  ContractConfirmationStatus @default(MACHINE_SUGGESTED)
+  approvedByUserId        String?
+  approvedAt              DateTime?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+
+  tenant                Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project                        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage       ContractPackage                @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  configurationRevision ContractConfigurationRevision? @relation(fields: [configurationRevisionId], references: [id], onDelete: SetNull)
+  contractDocument      ContractDocument?              @relation(fields: [contractDocumentId], references: [id], onDelete: SetNull)
+  sourceClause          ContractClause?                @relation(fields: [sourceClauseId], references: [id], onDelete: SetNull)
+  approvedBy            User?                          @relation("PrecedenceRuleApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([contractPackageId, rank])
+  @@index([configurationRevisionId])
+  @@map("contract_precedence_rule")
+}
+
+/// Logical clause/provision. sourceText is immutable once written; corrections use ClauseTextRevision.
+model ContractClause {
+  id                     String                 @id @default(uuid())
+  tenantId               String
+  projectId              String
+  contractPackageId      String
+  contractDocumentId     String
+  documentVersionId      String
+  parentClauseId         String?
+  clauseNumber           String?
+  normalizedClauseNumber String?
+  heading                String?
+  level                  Int                    @default(0)
+  sequence               Int                    @default(0)
+  language               DocumentLanguage       @default(UNKNOWN)
+  sourceText             String                 @db.Text
+  normalizedText         String?                @db.Text
+  textChecksum           String
+  pageStart              Int?
+  pageEnd                Int?
+  evidenceSegmentId      String?
+  evidenceLocator        Json?
+  extractionMethod       ClauseExtractionMethod @default(DETERMINISTIC)
+  extractionConfidence   Float?
+  reviewStatus           ClauseReviewStatus     @default(MACHINE_SUGGESTED)
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  tenant              Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project             Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage     ContractPackage          @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  contractDocument    ContractDocument         @relation(fields: [contractDocumentId], references: [id], onDelete: Cascade)
+  documentVersion     DocumentVersion          @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  parentClause        ContractClause?          @relation("ClauseHierarchy", fields: [parentClauseId], references: [id], onDelete: SetNull)
+  childClauses        ContractClause[]         @relation("ClauseHierarchy")
+  textRevisions       ClauseTextRevision[]
+  relationshipsFrom   ClauseRelationship[]     @relation("ClauseRelFrom")
+  relationshipsTo     ClauseRelationship[]     @relation("ClauseRelTo")
+  definedTerms        DefinedTerm[]
+  termReferences      ClauseTermReference[]
+  crossReferencesFrom CrossReference[]         @relation("CrossRefSourceClause")
+  precedenceRules     ContractPrecedenceRule[]
+  parties             ContractParty[]
+  roles               ContractRole[]
+  contactPoints       ContactPoint[]
+  obligations         ContractObligation[]
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([contractDocumentId, sequence])
+  @@index([parentClauseId])
+  @@index([documentVersionId])
+  @@map("contract_clause")
+}
+
+model ClauseTextRevision {
+  id               String                   @id @default(uuid())
+  tenantId         String
+  projectId        String
+  contractClauseId String
+  revisionNumber   Int
+  revisedText      String                   @db.Text
+  revisionReason   String?
+  revisionKind     ClauseTextRevisionKind
+  status           ClauseTextRevisionStatus @default(DRAFT)
+  createdByUserId  String
+  approvedByUserId String?
+  createdAt        DateTime                 @default(now())
+  approvedAt       DateTime?
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractClause ContractClause @relation(fields: [contractClauseId], references: [id], onDelete: Cascade)
+  createdBy      User           @relation("ClauseTextRevisionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  approvedBy     User?          @relation("ClauseTextRevisionApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([contractClauseId, revisionNumber])
+  @@index([tenantId, projectId, contractClauseId])
+  @@map("clause_text_revision")
+}
+
+model ClauseRelationship {
+  id                 String                     @id @default(uuid())
+  tenantId           String
+  projectId          String
+  contractPackageId  String
+  fromClauseId       String
+  toClauseId         String
+  relationshipType   ClauseRelationshipType
+  origin             ClauseRelationshipOrigin   @default(MACHINE_SUGGESTED)
+  confirmationStatus ContractConfirmationStatus @default(MACHINE_SUGGESTED)
+  notes              String?
+  evidenceSegmentId  String?
+  evidenceLocator    Json?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage ContractPackage @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  fromClause      ContractClause  @relation("ClauseRelFrom", fields: [fromClauseId], references: [id], onDelete: Cascade)
+  toClause        ContractClause  @relation("ClauseRelTo", fields: [toClauseId], references: [id], onDelete: Cascade)
+
+  @@unique([contractPackageId, fromClauseId, toClauseId, relationshipType])
+  @@index([tenantId, projectId, contractPackageId])
+  @@map("clause_relationship")
+}
+
+model DefinedTerm {
+  id                          String            @id @default(uuid())
+  tenantId                    String
+  projectId                   String
+  contractPackageId           String
+  term                        String
+  normalizedTerm              String
+  definitionText              String            @db.Text
+  sourceClauseId              String?
+  evidenceSegmentId           String?
+  evidenceLocator             Json?
+  language                    DocumentLanguage  @default(UNKNOWN)
+  scopeDescription            String?
+  effectiveContractDocumentId String?
+  status                      DefinedTermStatus @default(MACHINE_SUGGESTED)
+  configurationRevisionId     String?
+  createdAt                   DateTime          @default(now())
+  updatedAt                   DateTime          @updatedAt
+
+  tenant                    Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project                   Project                        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage           ContractPackage                @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  sourceClause              ContractClause?                @relation(fields: [sourceClauseId], references: [id], onDelete: SetNull)
+  effectiveContractDocument ContractDocument?              @relation("DefinedTermEffectiveDocument", fields: [effectiveContractDocumentId], references: [id], onDelete: SetNull)
+  configurationRevision     ContractConfigurationRevision? @relation(fields: [configurationRevisionId], references: [id], onDelete: SetNull)
+  termReferences            ClauseTermReference[]
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([contractPackageId, normalizedTerm])
+  @@map("defined_term")
+}
+
+model ClauseTermReference {
+  id                 String                     @id @default(uuid())
+  tenantId           String
+  projectId          String
+  contractPackageId  String
+  contractClauseId   String
+  definedTermId      String?
+  exactText          String
+  normalizedTerm     String
+  charStart          Int?
+  charEnd            Int?
+  evidenceSegmentId  String?
+  evidenceLocator    Json?
+  confirmationStatus ContractConfirmationStatus @default(MACHINE_SUGGESTED)
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage ContractPackage @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  contractClause  ContractClause  @relation(fields: [contractClauseId], references: [id], onDelete: Cascade)
+  definedTerm     DefinedTerm?    @relation(fields: [definedTermId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([contractClauseId])
+  @@index([definedTermId])
+  @@map("clause_term_reference")
+}
+
+model CrossReference {
+  id                 String                         @id @default(uuid())
+  tenantId           String
+  projectId          String
+  contractPackageId  String
+  sourceClauseId     String
+  rawReferenceText   String
+  normalizedTargetId String?
+  resolvedTargetType String?
+  resolvedTargetId   String?
+  resolutionStatus   CrossReferenceResolutionStatus @default(UNRESOLVED)
+  ambiguityReason    String?
+  confirmationStatus ContractConfirmationStatus     @default(MACHINE_SUGGESTED)
+  evidenceSegmentId  String?
+  evidenceLocator    Json?
+  createdAt          DateTime                       @default(now())
+  updatedAt          DateTime                       @updatedAt
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage ContractPackage @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  sourceClause    ContractClause  @relation("CrossRefSourceClause", fields: [sourceClauseId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([sourceClauseId])
+  @@map("cross_reference")
+}
+
+model ContractParty {
+  id                String              @id @default(uuid())
+  tenantId          String
+  projectId         String
+  contractPackageId String
+  legalName         String
+  displayName       String?
+  partyType         ContractPartyType
+  registrationId    String?
+  address           String?
+  nameEn            String?
+  nameAr            String?
+  status            ContractPartyStatus @default(MACHINE_SUGGESTED)
+  evidenceSegmentId String?
+  evidenceLocator   Json?
+  sourceClauseId    String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  tenant                 Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project                Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage        ContractPackage      @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  sourceClause           ContractClause?      @relation(fields: [sourceClauseId], references: [id], onDelete: SetNull)
+  roles                  ContractRole[]
+  contactPoints          ContactPoint[]
+  obligatedObligations   ContractObligation[] @relation("ObligationObligatedParty")
+  beneficiaryObligations ContractObligation[] @relation("ObligationBeneficiaryParty")
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@map("contract_party")
+}
+
+model ContractRole {
+  id                String             @id @default(uuid())
+  tenantId          String
+  projectId         String
+  contractPackageId String
+  roleName          String
+  roleType          ContractRoleType
+  assignedPartyId   String?
+  scopeDescription  String?
+  effectiveFrom     DateTime?
+  effectiveTo       DateTime?
+  sourceClauseId    String?
+  evidenceSegmentId String?
+  evidenceLocator   Json?
+  reviewStatus      ClauseReviewStatus @default(MACHINE_SUGGESTED)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  tenant                 Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project                Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage        ContractPackage       @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  assignedParty          ContractParty?        @relation(fields: [assignedPartyId], references: [id], onDelete: SetNull)
+  sourceClause           ContractClause?       @relation(fields: [sourceClauseId], references: [id], onDelete: SetNull)
+  contactPoints          ContactPoint[]
+  obligatedObligations   ContractObligation[]  @relation("ObligationObligatedRole")
+  beneficiaryObligations ContractObligation[]  @relation("ObligationBeneficiaryRole")
+  obligationRecipients   ObligationRecipient[]
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([assignedPartyId])
+  @@map("contract_role")
+}
+
+/// Notice recipient / contact point — never used for automatic outbound send.
+model ContactPoint {
+  id                      String                 @id @default(uuid())
+  tenantId                String
+  projectId               String
+  contractPackageId       String
+  contractPartyId         String?
+  contractRoleId          String?
+  namedPerson             String?
+  organization            String?
+  physicalAddress         String?
+  emailAddress            String?
+  platformAddress         String?
+  attentionLine           String?
+  permittedDeliveryMethod ContactDeliveryMethod?
+  effectiveFrom           DateTime?
+  effectiveTo             DateTime?
+  sourceClauseId          String?
+  evidenceSegmentId       String?
+  evidenceLocator         Json?
+  status                  ContactPointStatus     @default(MACHINE_SUGGESTED)
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project              Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage      ContractPackage       @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  contractParty        ContractParty?        @relation(fields: [contractPartyId], references: [id], onDelete: SetNull)
+  contractRole         ContractRole?         @relation(fields: [contractRoleId], references: [id], onDelete: SetNull)
+  sourceClause         ContractClause?       @relation(fields: [sourceClauseId], references: [id], onDelete: SetNull)
+  obligationRecipients ObligationRecipient[]
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@map("contact_point")
+}
+
+model ContractObligation {
+  id                            String                 @id @default(uuid())
+  tenantId                      String
+  projectId                     String
+  contractPackageId             String
+  sourceClauseId                String
+  obligationType                ObligationType
+  obligatedPartyId              String?
+  obligatedRoleId               String?
+  beneficiaryPartyId            String?
+  beneficiaryRoleId             String?
+  actionDescription             String                 @db.Text
+  triggerDescription            String?                @db.Text
+  conditionDescription          String?                @db.Text
+  timingExpression              String?
+  requiredForm                  String?
+  requiredContent               String?                @db.Text
+  requiredDeliveryMethod        ContactDeliveryMethod?
+  consequenceOfNonCompliance    String?                @db.Text
+  isTimeBarredCandidate         Boolean                @default(false)
+  isConditionPrecedentCandidate Boolean                @default(false)
+  machineInterpretation         String?                @db.Text
+  humanApprovedInterpretation   String?                @db.Text
+  confidence                    Float?
+  reviewStatus                  ObligationReviewStatus @default(MACHINE_SUGGESTED)
+  configurationRevisionId       String?
+  evidenceSegmentId             String?
+  evidenceLocator               Json?
+  createdAt                     DateTime               @default(now())
+  updatedAt                     DateTime               @updatedAt
+
+  tenant                Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project                         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage       ContractPackage                 @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  sourceClause          ContractClause                  @relation(fields: [sourceClauseId], references: [id], onDelete: Restrict)
+  obligatedParty        ContractParty?                  @relation("ObligationObligatedParty", fields: [obligatedPartyId], references: [id], onDelete: SetNull)
+  obligatedRole         ContractRole?                   @relation("ObligationObligatedRole", fields: [obligatedRoleId], references: [id], onDelete: SetNull)
+  beneficiaryParty      ContractParty?                  @relation("ObligationBeneficiaryParty", fields: [beneficiaryPartyId], references: [id], onDelete: SetNull)
+  beneficiaryRole       ContractRole?                   @relation("ObligationBeneficiaryRole", fields: [beneficiaryRoleId], references: [id], onDelete: SetNull)
+  configurationRevision ContractConfigurationRevision?  @relation(fields: [configurationRevisionId], references: [id], onDelete: SetNull)
+  triggers              ObligationTrigger[]
+  recipients            ObligationRecipient[]
+  evidenceRequirements  ObligationEvidenceRequirement[]
+  noticeRules           NoticeRule[]
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([sourceClauseId])
+  @@index([configurationRevisionId])
+  @@map("contract_obligation")
+}
+
+model ObligationTrigger {
+  id                String                    @id @default(uuid())
+  tenantId          String
+  projectId         String
+  obligationId      String
+  triggerCategory   ObligationTriggerCategory
+  sourceText        String?                   @db.Text
+  normalizedTrigger String?
+  triggeringActor   String?
+  triggerDateBasis  String?
+  ambiguityNotes    String?
+  evidenceSegmentId String?
+  evidenceLocator   Json?
+  status            ObligationTriggerStatus   @default(MACHINE_SUGGESTED)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  obligation ContractObligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId, obligationId])
+  @@map("obligation_trigger")
+}
+
+model ObligationRecipient {
+  id               String                  @id @default(uuid())
+  tenantId         String
+  projectId        String
+  obligationId     String
+  recipientKind    ObligationRecipientKind
+  contractRoleId   String?
+  contactPointId   String?
+  deliveryPlatform String?
+  deliverySequence Int?
+  notes            String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project      Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  obligation   ContractObligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+  contractRole ContractRole?      @relation(fields: [contractRoleId], references: [id], onDelete: SetNull)
+  contactPoint ContactPoint?      @relation(fields: [contactPointId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, obligationId])
+  @@map("obligation_recipient")
+}
+
+model ObligationEvidenceRequirement {
+  id           String                            @id @default(uuid())
+  tenantId     String
+  projectId    String
+  obligationId String
+  code         String?
+  description  String                            @db.Text
+  kind         ObligationEvidenceRequirementKind @default(EXPRESSLY_REQUIRED)
+  required     Boolean                           @default(true)
+  createdAt    DateTime                          @default(now())
+  updatedAt    DateTime                          @updatedAt
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  obligation ContractObligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId, obligationId])
+  @@map("obligation_evidence_requirement")
+}
+
+model NoticeRule {
+  id                            String                   @id @default(uuid())
+  tenantId                      String
+  projectId                     String
+  contractPackageId             String
+  obligationId                  String
+  noticeCategory                String?
+  triggerBasis                  String?
+  durationValue                 Decimal?                 @db.Decimal(12, 4)
+  durationUnit                  NoticeDurationUnit?
+  calendarBasis                 NoticeCalendarBasis?
+  countingConvention            NoticeCountingConvention @default(UNSPECIFIED)
+  startDateRule                 String?
+  endDateRule                   String?
+  businessDayAdjustment         String?
+  holidayCalendarRuleId         String?
+  deliveryVersusPreparation     String?
+  continuingEventTreatment      String?
+  recurringNoticeRequirement    String?
+  interimParticularsRequirement String?
+  finalParticularsRequirement   String?
+  recipientRequirements         String?                  @db.Text
+  deliveryMethodRequirements    String?                  @db.Text
+  contentRequirements           String?                  @db.Text
+  consequenceText               String?                  @db.Text
+  timeBarClassification         TimeBarClassification    @default(UNCERTAIN)
+  ambiguityStatus               NoticeAmbiguityStatus    @default(UNRESOLVED)
+  evidenceSegmentId             String?
+  evidenceLocator               Json?
+  reviewStatus                  NoticeRuleReviewStatus   @default(MACHINE_SUGGESTED)
+  configurationRevisionId       String?
+  createdAt                     DateTime                 @default(now())
+  updatedAt                     DateTime                 @updatedAt
+
+  tenant                Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project                        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage       ContractPackage                @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  obligation            ContractObligation             @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+  holidayCalendarRule   CalendarRule?                  @relation(fields: [holidayCalendarRuleId], references: [id], onDelete: SetNull)
+  configurationRevision ContractConfigurationRevision? @relation(fields: [configurationRevisionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([obligationId])
+  @@index([configurationRevisionId])
+  @@map("notice_rule")
+}
+
+model CalendarRule {
+  id                      String             @id @default(uuid())
+  tenantId                String
+  projectId               String
+  contractPackageId       String
+  name                    String
+  timezone                String
+  workingWeekMask         String?
+  weekendDays             Json?
+  publicHolidays          Json?
+  contractBusinessDays    Json?
+  exceptionalHolidays     Json?
+  jurisdictionCode        String?
+  status                  CalendarRuleStatus @default(DRAFT)
+  configurationRevisionId String?
+  supersedesRuleId        String?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  tenant                Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project                        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage       ContractPackage                @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  configurationRevision ContractConfigurationRevision? @relation(fields: [configurationRevisionId], references: [id], onDelete: SetNull)
+  supersedes            CalendarRule?                  @relation("CalendarRuleSupersedes", fields: [supersedesRuleId], references: [id], onDelete: SetNull)
+  supersededBy          CalendarRule[]                 @relation("CalendarRuleSupersedes")
+  noticeRules           NoticeRule[]
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@map("calendar_rule")
+}
+
+/// Versioned snapshot of structured contract interpretation. APPROVED rows are immutable.
+model ContractConfigurationRevision {
+  id                      String                      @id @default(uuid())
+  tenantId                String
+  projectId               String
+  contractPackageId       String
+  revisionNumber          Int
+  status                  ConfigurationRevisionStatus @default(DRAFT)
+  summary                 String?
+  basedOnDocumentVersions Json?
+  isActiveApproved        Boolean                     @default(false)
+  createdByUserId         String
+  submittedByUserId       String?
+  approvedByUserId        String?
+  submittedAt             DateTime?
+  approvedAt              DateTime?
+  supersedesRevisionId    String?
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
+
+  tenant          Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project                         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage ContractPackage                 @relation("PackageConfigurationRevisions", fields: [contractPackageId], references: [id], onDelete: Cascade)
+  createdBy       User                            @relation("ConfigurationRevisionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  submittedBy     User?                           @relation("ConfigurationRevisionSubmitter", fields: [submittedByUserId], references: [id], onDelete: SetNull)
+  approvedBy      User?                           @relation("ConfigurationRevisionApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  supersedes      ContractConfigurationRevision?  @relation("ConfigurationRevisionSupersedes", fields: [supersedesRevisionId], references: [id], onDelete: SetNull)
+  supersededBy    ContractConfigurationRevision[] @relation("ConfigurationRevisionSupersedes")
+  asCurrentFor    ContractPackage?                @relation("CurrentConfigurationRevision")
+  precedenceRules ContractPrecedenceRule[]
+  definedTerms    DefinedTerm[]
+  obligations     ContractObligation[]
+  noticeRules     NoticeRule[]
+  calendarRules   CalendarRule[]
+  issues          ContractConfigurationIssue[]
+  reviewDecisions ReviewDecision[]
+  analysisRuns    ContractAnalysisRun[]
+
+  @@unique([contractPackageId, revisionNumber])
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([contractPackageId, status])
+  @@map("contract_configuration_revision")
+}
+
+model ContractConfigurationIssue {
+  id                      String                     @id @default(uuid())
+  tenantId                String
+  projectId               String
+  contractPackageId       String
+  configurationRevisionId String?
+  severity                ConfigurationIssueSeverity @default(MEDIUM)
+  category                ConfigurationIssueCategory
+  sourceEntityType        String?
+  sourceEntityId          String?
+  description             String                     @db.Text
+  suggestedResolution     String?                    @db.Text
+  assigneeUserId          String?
+  status                  ConfigurationIssueStatus   @default(OPEN)
+  resolution              String?                    @db.Text
+  resolvedByUserId        String?
+  resolvedAt              DateTime?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+
+  tenant                Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project                        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage       ContractPackage                @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  configurationRevision ContractConfigurationRevision? @relation(fields: [configurationRevisionId], references: [id], onDelete: SetNull)
+  assignee              User?                          @relation("ConfigurationIssueAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
+  resolvedBy            User?                          @relation("ConfigurationIssueResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([configurationRevisionId, status])
+  @@map("contract_configuration_issue")
+}
+
+model ReviewDecision {
+  id                      String             @id @default(uuid())
+  tenantId                String
+  projectId               String
+  contractPackageId       String
+  configurationRevisionId String?
+  decisionType            ReviewDecisionType
+  actorUserId             String
+  entityType              String
+  entityId                String
+  beforeState             Json?
+  afterState              Json?
+  rationale               String?            @db.Text
+  evidenceSegmentId       String?
+  evidenceLocator         Json?
+  createdAt               DateTime           @default(now())
+
+  tenant                Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project                        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage       ContractPackage                @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  configurationRevision ContractConfigurationRevision? @relation(fields: [configurationRevisionId], references: [id], onDelete: SetNull)
+  actor                 User                           @relation("ReviewDecisionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, projectId, contractPackageId, createdAt])
+  @@index([entityType, entityId])
+  @@index([configurationRevisionId])
+  @@map("review_decision")
+}
+
+model ContractAnalysisRun {
+  id                      String                    @id @default(uuid())
+  tenantId                String
+  projectId               String
+  contractPackageId       String
+  configurationRevisionId String?
+  analysisProfile         String                    @default("structure_v1")
+  status                  ContractAnalysisRunStatus @default(QUEUED)
+  processorName           String
+  processorVersion        String
+  promptSchemaVersion     String?
+  sourceDocumentVersions  Json?
+  attemptNumber           Int                       @default(1)
+  queuedAt                DateTime                  @default(now())
+  startedAt               DateTime?
+  completedAt             DateTime?
+  failureCode             String?
+  failureMessageSafe      String?
+  correlationId           String
+  suggestionCount         Int                       @default(0)
+  createdAt               DateTime                  @default(now())
+
+  tenant                Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project                        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage       ContractPackage                @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  configurationRevision ContractConfigurationRevision? @relation(fields: [configurationRevisionId], references: [id], onDelete: SetNull)
+  suggestions           ContractExtractionSuggestion[]
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([tenantId, status, queuedAt])
+  @@index([correlationId])
+  @@map("contract_analysis_run")
+}
+
+model ContractExtractionSuggestion {
+  id                 String                             @id @default(uuid())
+  tenantId           String
+  projectId          String
+  contractPackageId  String
+  analysisRunId      String
+  suggestionType     ContractExtractionSuggestionType
+  proposedData       Json
+  evidenceSegmentId  String?
+  evidenceLocator    Json?
+  confidence         Float?
+  extractionMethod   ClauseExtractionMethod             @default(DETERMINISTIC)
+  modelProvider      String?
+  modelName          String?
+  modelMetadata      Json?
+  status             ContractExtractionSuggestionStatus @default(PENDING_REVIEW)
+  reviewerDecisionId String?
+  linkedEntityType   String?
+  linkedEntityId     String?
+  createdAt          DateTime                           @default(now())
+  updatedAt          DateTime                           @updatedAt
+
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage ContractPackage     @relation(fields: [contractPackageId], references: [id], onDelete: Cascade)
+  analysisRun     ContractAnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId, contractPackageId])
+  @@index([analysisRunId, status])
+  @@index([status])
+  @@map("contract_extraction_suggestion")
 }

@@ -13,7 +13,8 @@ This document defines the primary business entities, their meaning, and relation
 | **Document** | An ingested project record (contract, letter, RFI, etc.) |
 | **Contract package** | Governing agreement set for a project (base + amendments) |
 | **Clause** | A contractual provision with identity and text |
-| **Obligation rule** | Machine-evaluable requirement derived from clauses (e.g., notice period) |
+| **Contract configuration revision** | Versioned, human-approved snapshot of structured interpretation |
+| **Obligation / notice rule** | Structured duty and notice-timing fields derived from clauses (deadline engines later) |
 | **Entitlement event** | A detected project occurrence that may give rise to entitlement / notice duties |
 | **Evidence** | Source material supporting an event or notice |
 | **Deadline** | A calculated date for contractual or internal action |
@@ -32,7 +33,8 @@ Tenant
   ├── Project
   │     ├── ProjectMembership (User ↔ Project Role)
   │     ├── Document → DocumentVersion → DocumentExtraction
-  │     ├── ContractPackage → Amendment → ContractClause → ObligationRule
+  │     ├── ContractPackage → ContractDocument → ContractClause → ContractObligation → NoticeRule
+  │     │                         └── ContractConfigurationRevision (human-approved snapshot)
   │     ├── EntitlementEvent
   │     │     ├── EventClassification
   │     │     ├── EventClauseLink
@@ -129,36 +131,51 @@ Elevated tenant roles may read all tenant projects; `REVIEWER` / `VIEWER` tenant
 
 ## 6. Contract intelligence
 
+Aligned with Prisma models under Slice 3. **EntitlementEvent detection and project-event deadline engines remain later slices** (ADR-036); this section describes structure, review, and approved configuration only.
+
 ### ContractPackage
 
-- Links a project to its governing contract set.
-- `base_form` (e.g., `fidic_red_1999`, `fidic_yellow_2017`, `bespoke`, `unknown`)
-- `governing_law`, `contract_language`, `signed_date`, `commencement_date`
-- Status: `draft_register` | `human_confirmed`
+- Project-scoped container for the governing agreement set.
+- Metadata: `contractFormFamily` / `contractFormEdition`, `governingLaw`, `jurisdiction`, `governingLanguage` / `secondaryLanguage`, `effectiveDate`, `commencementDate`.
+- Status: `DRAFT` | `INGESTING` | `STRUCTURING` | `REVIEW_REQUIRED` | `PARTIALLY_APPROVED` | `APPROVED` | `SUPERSEDED` | `ARCHIVED`.
+- Optional pointer `currentConfigurationRevisionId` to the working or active configuration revision.
 
-### Amendment
+### ContractDocument
 
-- `contract_package_id`, `document_id`, `effective_date`, `summary`
-- Ordered overlay affecting clause interpretation.
+- Binds an ingested `SourceDocument` + `DocumentVersion` into a package.
+- Typed role (`AGREEMENT`, `GENERAL_CONDITIONS`, `PARTICULAR_CONDITIONS`, `AMENDMENT`, …), language, precedence rank hint, executed/current flags.
+- Status: `DRAFT` | `REVIEW_REQUIRED` | `ACTIVE` | `SUPERSEDED` | `ARCHIVED` | `REJECTED`.
+- Relationships (`ContractDocumentRelationship`) and ranked `ContractPrecedenceRule` rows model amendments and overlays (replaces earlier standalone `Amendment` sketch).
 
 ### ContractClause
 
-- `contract_package_id`, `clause_ref` (e.g., `20.1`), `title`
-- `text_en`, `text_ar` (either may be null if not available)
-- `source_document_version_id`, `confirmation_status`
-- Parent/child for sub-clauses if needed.
+- Logical provision under a `ContractDocument` / `DocumentVersion`.
+- Immutable `sourceText` (+ checksum); optional `normalizedText`; corrections via `ClauseTextRevision`.
+- Numbering, heading, hierarchy (`parentClauseId`), language, evidence locator, extraction method, `reviewStatus`.
+- Supporting graph: `ClauseRelationship`, `DefinedTerm`, `ClauseTermReference`, `CrossReference`.
 
-### ObligationRule
+### ContractObligation
 
-- Derived, structured rule used by engines:
-  - `trigger_type` (e.g., `notice_of_claim`)
-  - `period_value`, `period_unit` (days/weeks)
-  - `calendar_type` (calendar_days, working_days)
-  - `awareness_basis` (event_date, became_aware_date)
-  - `form_requirements`, `notify_parties`
-  - `source_clause_id`, `rule_version`, `human_confirmed`
+- Structured duty derived from a source clause (replaces earlier `ObligationRule` sketch name).
+- Parties/roles, action/trigger/condition text, timing expression, form/content/delivery requirements, consequence text.
+- Candidate flags for time-bar / condition precedent; separate machine vs human-approved interpretation; `reviewStatus`.
+- Children: `ObligationTrigger`, `ObligationRecipient`, `ObligationEvidenceRequirement`.
 
-Deterministic deadline calculation consumes `ObligationRule`, never free-text clause prose alone.
+### NoticeRule
+
+- Structured notice-timing representation attached to an obligation.
+- Duration, calendar basis, counting convention, start/end rules, holiday calendar link, recipient/content/delivery requirements.
+- `timeBarClassification` (default `UNCERTAIN`), `ambiguityStatus`, `reviewStatus`.
+- Slice 3 stores and validates structure; **does not** compute project-event deadlines.
+
+### ContractConfigurationRevision
+
+- Versioned snapshot of structured interpretation (`DRAFT` → `IN_REVIEW` → `APPROVED` / `CHANGES_REQUESTED` / `WITHDRAWN` / `SUPERSEDED`).
+- Approved revisions are immutable; at most one `isActiveApproved` per package.
+- Related: `ContractConfigurationIssue`, `CalendarRule`, `ReviewDecision`.
+- AI path: `ContractAnalysisRun` → `ContractExtractionSuggestion` (pending review only; ADR-034).
+
+Downstream deadline engines (when built) consume **human-approved** notice/obligation structure from an active approved revision — never free-text clause prose alone.
 
 ---
 
@@ -192,7 +209,7 @@ Future categories extend the enum without rewriting the event entity.
 
 ### EventClauseLink
 
-- Join between event and `ContractClause` / `ObligationRule`
+- Join between event and `ContractClause` / `ContractObligation` / `NoticeRule`
 - `relevance_rationale`, `link_status` (`proposed` | `confirmed` | `rejected`)
 
 ---
@@ -213,7 +230,7 @@ Future categories extend the enum without rewriting the event entity.
   - inputs (event_date, awareness_date, period, calendar_id)
   - formula identifier / version
   - intermediate steps
-  - `obligation_rule_id` + `rule_version`
+  - `notice_rule_id` + configuration revision id (when engines exist)
   - actor (`system` or user override with reason)
 
 **Invariant:** A displayed deadline must reference a `DeadlineCalculation`. Overrides are audited and marked as human assumptions/approvals.
@@ -367,7 +384,7 @@ Applied to dates, clause links, category labels, commercial ranges, and awarenes
 
 1. Every project-owned entity has `tenant_id` and `project_id` consistent with the project.
 2. Document bytes are immutable per `DocumentVersion`.
-3. Contractual deadlines require a human-confirmed `ObligationRule` or an explicitly labeled assumption.
+3. Contractual deadlines require a human-confirmed `NoticeRule` / obligation on an active approved configuration revision, or an explicitly labeled assumption.
 4. Notice drafts cannot be marked dispatched without an `approved` status and a human `NoticeDispatchRecord`.
 5. AI outputs persist as `interpretation` until review.
 6. Cross-tenant references are impossible via application APIs.

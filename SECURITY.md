@@ -122,6 +122,7 @@ Optional later: PostgreSQL Row Level Security as defense-in-depth; dedicated DB/
 - Contractual + technical controls: no provider training on customer data where the vendor API allows.
 - Store model run metadata; avoid logging full prompt bodies with sensitive clauses at info level in production.
 - Tenant allowlists for which providers/models may be used.
+- Contract intelligence (Slice 3): schema-validate model output before persist; never auto-approve clauses/obligations/notice rules; default `MACHINE_SUGGESTED` / `PENDING_REVIEW`; fake/fixture providers are test-only and rejected when `APP_ENV` is `production` or `staging` (ADR-034). See [docs/threat-models/contract-intelligence.md](./docs/threat-models/contract-intelligence.md).
 
 ---
 
@@ -208,3 +209,13 @@ Alert on: repeated auth failures, cross-tenant denial spikes, malware detections
 - [x] Seed refuses production / remote hosts without explicit override
 - [x] Integration tests fail when PostgreSQL is unavailable (no silent skips)
 - [x] CI provisions Postgres + Redis and runs security integration suite
+
+## 17. Slice 3 — Contract intelligence controls
+
+- [x] FORCE RLS on contract package / clause / obligation / notice-rule / revision tables
+- [x] Machine suggestions never auto-activate as approved configuration
+- [x] Approved configuration revisions immutable (DB trigger)
+- [x] Segregation of duties for configuration approval (configurable)
+- [x] Audit + ReviewDecision trails for review/approval mutations (entity IDs, not full clause text)
+- [x] Fake AI provider rejected in production-like environments
+- [ ] Project-event deadline engine (deferred — next slice)

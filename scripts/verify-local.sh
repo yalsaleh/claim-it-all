@@ -42,6 +42,7 @@ run "${PNPM[@]}" --filter @contractradar/authz lint
 run "${PNPM[@]}" --filter @contractradar/web lint
 run "${PNPM[@]}" --filter @contractradar/shared typecheck
 run "${PNPM[@]}" --filter @contractradar/authz typecheck
+run "${PNPM[@]}" --filter @contractradar/contract-rules typecheck
 run "${PNPM[@]}" --filter @contractradar/web typecheck
 run "${PNPM[@]}" test:unit
 run "${PNPM[@]}" test:integration:embedded

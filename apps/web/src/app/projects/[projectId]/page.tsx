@@ -55,13 +55,21 @@ export default async function ProjectDetailPage({
         title={ctx.project.name}
         subtitle="Project workspace — upload immutable evidence and inspect processing provenance."
       />
-      <div className="mb-6">
+      <div className="mb-6 flex flex-wrap gap-3">
         <Link
           className="rounded-md bg-accent-700 px-4 py-2 text-sm font-medium text-white"
           href={`/projects/${projectId}/documents` as Route}
         >
           Project documents
         </Link>
+        {hasCapability(ctx.capabilities, 'contract_package.read') ? (
+          <Link
+            className="rounded-md border border-ink-300 px-4 py-2 text-sm font-medium text-ink-900"
+            href={`/projects/${projectId}/contracts` as Route}
+          >
+            Contract packages
+          </Link>
+        ) : null}
       </div>
       <ContextBanner
         organization={tenant?.name ?? ctx.tenantId}

@@ -5,12 +5,29 @@ const DOCUMENT_READ: Capability[] = [
   'document.read',
   'document.download',
   'document.processing.view',
+  'contract_package.read',
 ];
 
 const DOCUMENT_CONTRIBUTE: Capability[] = [
   ...DOCUMENT_READ,
   'document.create',
   'document.add_version',
+  'contract_document.attach',
+];
+
+const CONTRACT_REVIEW: Capability[] = ['contract_structure.review', 'contract_issue.manage'];
+
+const CONTRACT_MANAGE: Capability[] = [
+  'contract_package.create',
+  'contract_package.update',
+  'contract_structure.run',
+  'contract_configuration.submit',
+  ...CONTRACT_REVIEW,
+];
+
+const CONTRACT_APPROVE: Capability[] = [
+  'contract_configuration.approve',
+  'contract_configuration.supersede',
 ];
 
 const DOCUMENT_MANAGE: Capability[] = [
@@ -18,6 +35,7 @@ const DOCUMENT_MANAGE: Capability[] = [
   'document.update_metadata',
   'document.archive',
   'document.processing.retry',
+  ...CONTRACT_MANAGE,
 ];
 
 const DOCUMENT_QUARANTINE: Capability[] = [
@@ -41,6 +59,7 @@ const TENANT_ROLE_CAPABILITIES: Record<TenantRole, readonly Capability[]> = {
     'audit.read',
     ...DOCUMENT_MANAGE,
     ...DOCUMENT_QUARANTINE,
+    ...CONTRACT_APPROVE,
   ],
   TENANT_ADMIN: [
     'tenant.read',
@@ -56,6 +75,7 @@ const TENANT_ROLE_CAPABILITIES: Record<TenantRole, readonly Capability[]> = {
     'audit.read',
     ...DOCUMENT_MANAGE,
     ...DOCUMENT_QUARANTINE,
+    ...CONTRACT_APPROVE,
   ],
   COMMERCIAL_MANAGER: [
     'tenant.read',
@@ -66,6 +86,7 @@ const TENANT_ROLE_CAPABILITIES: Record<TenantRole, readonly Capability[]> = {
     'project.members.read',
     'audit.read',
     ...DOCUMENT_MANAGE,
+    ...CONTRACT_APPROVE,
   ],
   CONTRACTS_MANAGER: [
     'tenant.read',
@@ -76,6 +97,7 @@ const TENANT_ROLE_CAPABILITIES: Record<TenantRole, readonly Capability[]> = {
     'project.members.read',
     'audit.read',
     ...DOCUMENT_MANAGE,
+    ...CONTRACT_APPROVE,
   ],
   PROJECT_MANAGER: [
     'tenant.read',
@@ -87,8 +109,20 @@ const TENANT_ROLE_CAPABILITIES: Record<TenantRole, readonly Capability[]> = {
     'project.members.manage',
     ...DOCUMENT_MANAGE,
   ],
-  REVIEWER: ['tenant.read', 'project.read', 'project.members.read', ...DOCUMENT_READ],
-  VIEWER: ['tenant.read', 'project.read', 'document.read', 'document.download'],
+  REVIEWER: [
+    'tenant.read',
+    'project.read',
+    'project.members.read',
+    ...DOCUMENT_READ,
+    ...CONTRACT_REVIEW,
+  ],
+  VIEWER: [
+    'tenant.read',
+    'project.read',
+    'document.read',
+    'document.download',
+    'contract_package.read',
+  ],
 };
 
 const PROJECT_ROLE_CAPABILITIES: Record<ProjectRole, readonly Capability[]> = {
@@ -100,9 +134,22 @@ const PROJECT_ROLE_CAPABILITIES: Record<ProjectRole, readonly Capability[]> = {
     'project.members.manage',
     ...DOCUMENT_MANAGE,
     ...DOCUMENT_QUARANTINE,
+    ...CONTRACT_APPROVE,
   ],
-  COMMERCIAL_LEAD: ['project.read', 'project.update', 'project.members.read', ...DOCUMENT_MANAGE],
-  CONTRACTS_LEAD: ['project.read', 'project.update', 'project.members.read', ...DOCUMENT_MANAGE],
+  COMMERCIAL_LEAD: [
+    'project.read',
+    'project.update',
+    'project.members.read',
+    ...DOCUMENT_MANAGE,
+    ...CONTRACT_APPROVE,
+  ],
+  CONTRACTS_LEAD: [
+    'project.read',
+    'project.update',
+    'project.members.read',
+    ...DOCUMENT_MANAGE,
+    ...CONTRACT_APPROVE,
+  ],
   PROJECT_MANAGER: [
     'project.read',
     'project.update',
@@ -110,9 +157,9 @@ const PROJECT_ROLE_CAPABILITIES: Record<ProjectRole, readonly Capability[]> = {
     'project.members.manage',
     ...DOCUMENT_MANAGE,
   ],
-  REVIEWER: ['project.read', 'project.members.read', ...DOCUMENT_READ],
+  REVIEWER: ['project.read', 'project.members.read', ...DOCUMENT_READ, ...CONTRACT_REVIEW],
   CONTRIBUTOR: ['project.read', 'project.members.read', ...DOCUMENT_CONTRIBUTE],
-  VIEWER: ['project.read', 'document.read', 'document.download'],
+  VIEWER: ['project.read', 'document.read', 'document.download', 'contract_package.read'],
 };
 
 const MUTATING_PROJECT_CAPABILITIES = new Set<Capability>([
@@ -126,6 +173,15 @@ const MUTATING_PROJECT_CAPABILITIES = new Set<Capability>([
   'document.processing.retry',
   'document.quarantine.manage',
   'project.storage.manage',
+  'contract_package.create',
+  'contract_package.update',
+  'contract_document.attach',
+  'contract_structure.run',
+  'contract_structure.review',
+  'contract_configuration.submit',
+  'contract_configuration.approve',
+  'contract_configuration.supersede',
+  'contract_issue.manage',
 ]);
 
 export function capabilitiesForTenantRole(role: TenantRole): ReadonlySet<Capability> {

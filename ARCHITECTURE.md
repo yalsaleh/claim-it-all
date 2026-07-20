@@ -123,7 +123,7 @@ ContractRadar uses a **modular monolith for the web/API domain** plus a **separa
 
 - `packages/shared`: TypeScript types for API payloads and domain enums.
 - OpenAPI / JSON Schema exported from Python for cross-language validation where needed.
-- `packages/contract-rules`: deterministic helpers for calendar math and clause rule evaluation (pure functions, heavily tested).
+- `packages/contract-rules`: Slice 3 validation/normalization for human-approved contract configuration (duration units, time-bar classifications, clause-number digit normalization). Pure functions only — **does not** calculate project-event deadlines (ADR-036).
 
 ---
 
@@ -241,17 +241,25 @@ Orchestrator
 
 ## 9. Contract analysis
 
+Slice 3 establishes the human-verified contract configuration chain: ContractPackage → documents/amendments → precedence → source-linked clauses → terms/parties/roles → obligations → notice-rule candidates → configuration revisions. Assisted extraction produces **suggestions only** (`MACHINE_SUGGESTED` / `PENDING_REVIEW`); nothing becomes `APPROVED` without human review (ADR-027–036, DOMAIN_MODEL §6).
+
 **Goal:** Represent the project’s governing contract as machine-usable obligations without hardcoding a single FIDIC book as the only form.
 
 **Components**
 
 1. **Contract package** — base form (e.g., FIDIC Red/Yellow/Silver family or bespoke), governing law, language, currency, calendar rules.
-2. **Clause register** — clause number, title, text (ar/en), obligation type, notice period, condition precedents.
-3. **Amendment overlay** — amendments supersede or modify base clauses with effective dates.
-4. **Obligation rules** — structured rules derived from clauses (notice within N days of awareness, particular forms, copy-to parties).
-5. **Assisted extraction** — AI proposes clause structures; humans confirm for production use on a project.
+2. **Clause register** — clause number, title, text (ar/en), obligation type, notice period, condition precedents; source text immutable, normalized/corrected text versioned.
+3. **Amendment overlay** — amendments supersede or modify base clauses with effective dates; effects are reviewable, never silently inferred.
+4. **Obligation / notice-rule candidates** — structured rules derived from clauses (notice within N days of awareness, particular forms, copy-to parties); vague timing stays non-numeric.
+5. **Assisted extraction** — deterministic first; optional AI proposes structures; humans confirm before production use.
 
-Phase 1 accepts **human-confirmed clause registers** with optional assisted extraction. Full automated FIDIC amendment reasoning is a later depth investment.
+Uploads remain immutable (Slice 2). Clause extraction must not invent clause numbers or fabricate wording. FIDIC form profiles may guide candidate detection but never substitute for uploaded evidence.
+
+AI providers are optional, adapter-based, and disabled by default (`CONTRACT_AI_PROVIDER`). Fake/test providers are rejected in production-like environments (ADR-034).
+
+Threat model: [docs/threat-models/contract-intelligence.md](./docs/threat-models/contract-intelligence.md).
+
+Phase 1 Slice 3 delivers human-confirmed configuration revisions. Full automated FIDIC amendment reasoning and project-event deadline execution are later slices.
 
 ---
 
@@ -291,6 +299,8 @@ Phase 1 accepts **human-confirmed clause registers** with optional assisted extr
 ## 11. Deadline calculation
 
 Deadlines are computed by **deterministic services**, not free-form LLM arithmetic.
+
+**Slice 3 boundary:** `@contractradar/contract-rules` validates and normalizes approved rule inputs only. Calculating contractual deadlines against live project events is explicitly deferred to the next slice (ADR-036).
 
 **Inputs**
 

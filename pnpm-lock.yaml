@@ -26,6 +26,9 @@ importers:
       '@contractradar/authz':
         specifier: workspace:*
         version: link:../../packages/authz
+      '@contractradar/contract-rules':
+        specifier: workspace:*
+        version: link:../../packages/contract-rules
       '@contractradar/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -101,6 +104,25 @@ importers:
         version: 2.1.8(@types/node@22.10.2)
 
   packages/authz:
+    devDependencies:
+      '@contractradar/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 22.10.2
+        version: 22.10.2
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@22.10.2)
+
+  packages/contract-rules:
+    dependencies:
+      zod:
+        specifier: 3.24.1
+        version: 3.24.1
     devDependencies:
       '@contractradar/typescript-config':
         specifier: workspace:*

@@ -27,6 +27,15 @@ describe('tenant role capabilities', () => {
     expect(hasCapability(caps, 'project.update')).toBe(false);
     expect(hasCapability(caps, 'project.archive')).toBe(false);
     expect(hasCapability(caps, 'project.members.manage')).toBe(false);
+    expect(hasCapability(caps, 'contract_package.read')).toBe(true);
+    expect(hasCapability(caps, 'contract_configuration.approve')).toBe(false);
+  });
+
+  it('grants contracts managers package and approval capabilities', () => {
+    const caps = capabilitiesForTenantRole('CONTRACTS_MANAGER');
+    expect(hasCapability(caps, 'contract_package.create')).toBe(true);
+    expect(hasCapability(caps, 'contract_structure.review')).toBe(true);
+    expect(hasCapability(caps, 'contract_configuration.approve')).toBe(true);
   });
 
   it('blocks project managers from managing tenant owners', () => {

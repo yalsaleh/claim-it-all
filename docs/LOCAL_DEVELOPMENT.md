@@ -20,12 +20,14 @@ See also [docs/CI.md](./CI.md).
 Supports:
 
 - Next.js app development (`pnpm dev:web`)
-- TypeScript unit tests
-- Embedded PostgreSQL integration / security tests
+- TypeScript unit tests (including `@contractradar/contract-rules`)
+- Embedded PostgreSQL integration / security tests (including Slice 3 contract isolation)
 - Python parser and worker **unit** tests (`pytest -k "not live"`)
 - Prisma validate/generate
 - Static checks + production build
 - Deterministic DI tests with `MALWARE_SCANNER=fake_test` (test-only)
+
+Slice 3 local work covers contract structure APIs, human review, and `packages/contract-rules` validation. It does **not** run a project-event deadline engine and does not require a live commercial LLM.
 
 ### Install (no Docker)
 

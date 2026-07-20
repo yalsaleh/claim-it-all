@@ -363,3 +363,20 @@ Statuses: **Proposed** · **Accepted** · **Superseded** · **Rejected**
 | Details | [docs/adrs/ADR-026-service-to-service-auth.md](./docs/adrs/ADR-026-service-to-service-auth.md) |
 
 **Decision:** Internal token + HMAC timestamp for HTTP DI routes; prefer outbox/ARQ without browser sessions.
+
+---
+
+## Slice 3 — Contract intelligence (ADR-027–036)
+
+| ADR | Title | Decision (brief) |
+|-----|-------|------------------|
+| [ADR-027](./docs/adrs/ADR-027-contract-package-model.md) | Contract package model | `ContractPackage` + typed `ContractDocument` container; statuses through human-approved configuration |
+| [ADR-028](./docs/adrs/ADR-028-clause-source-vs-normalized-text.md) | Clause source vs normalized text | Immutable `sourceText`; corrections via `ClauseTextRevision` |
+| [ADR-029](./docs/adrs/ADR-029-amendment-and-precedence.md) | Amendment and precedence | Document relationships + ranked, reviewable `ContractPrecedenceRule` |
+| [ADR-030](./docs/adrs/ADR-030-obligation-model.md) | Obligation model | Structured `ContractObligation` (+ triggers/recipients/evidence); time-bar flags are candidates |
+| [ADR-031](./docs/adrs/ADR-031-notice-rule-structured-representation.md) | Notice rule structure | Structured `NoticeRule`; default `UNCERTAIN` time-bar classification |
+| [ADR-032](./docs/adrs/ADR-032-contract-configuration-revisions.md) | Configuration revisions | Versioned snapshots; approved rows immutable; one active approved pointer |
+| [ADR-033](./docs/adrs/ADR-033-human-review-and-approval.md) | Human review and approval | `ReviewDecision` audit; no auto-approve of suggestions or rules |
+| [ADR-034](./docs/adrs/ADR-034-ai-assisted-extraction-boundary.md) | AI extraction boundary | Provider-neutral adapters; fake provider test-only; schema-validated suggestions; smallest evidence segments |
+| [ADR-035](./docs/adrs/ADR-035-bilingual-contract-handling.md) | Bilingual handling | Language fields + `BILINGUAL_CONFLICT` issues; no silent language preference |
+| [ADR-036](./docs/adrs/ADR-036-contract-rules-package-boundary.md) | Contract-rules package boundary | Slice 3 = validation/normalization only; no project-event deadline calc |

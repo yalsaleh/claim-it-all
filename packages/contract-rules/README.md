@@ -1,16 +1,11 @@
-# `packages/contract-rules`
+# @contractradar/contract-rules
 
-Deterministic helpers for obligation-rule evaluation and deadline calculation.
+Pure deterministic helpers for contract-rule **validation and normalization**.
 
-## Status
+This package does **not**:
+- calculate project-event deadlines
+- call LLMs
+- access databases
+- mutate approved configuration
 
-Placeholder until Phase 1 (Epic D). This package must be heavily unit-tested — binding date math does not belong in LLM prompts.
-
-## Planned contents
-
-- Calendar-day / working-day calculators
-- Jurisdiction calendar interfaces (pluggable holiday sets)
-- Pure functions: `(rule, eventDates, calendar) → DeadlineCalculation`
-- Explicit `incomplete_inputs` results when awareness/event dates are missing
-
-No I/O, no Prisma, no AI SDKs.
+Inputs must already be human-approved structured rules before any future deadline engine uses them.

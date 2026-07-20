@@ -4,7 +4,7 @@
 
 > We continuously monitor construction project records and warn contractors before they miss a contractual entitlement, evidence requirement, or notice deadline.
 
-Phase 1 through **Slice 2B**: secure multi-tenant platform + immutable document ingestion. Contract clause extraction and entitlement detection are not implemented yet.
+Phase 1: secure multi-tenant platform + immutable document ingestion (Slice 2B). **Slice 3 in progress** — contract packages, clauses, obligations, and human-approved configuration. Live ingestion verification remains Mode B. Entitlement detection is not implemented yet.
 
 ---
 
@@ -34,9 +34,9 @@ Trigger Mode B: GitHub → **Actions** → **Live ingestion** → **Run workflow
 
 Implemented: auth/tenancy/RLS, document upload custody, transactional outbox, ClamAV-ready worker, scanner safety (`fake_test` refused outside tests), readiness, reconcile command, Mode A local verify, Mode B CI workflow.
 
-**Slice 2B is ready for CI verification.** It is **not** fully operationally verified until the Live ingestion workflow completes successfully on the target branch.
+**Slice 2B** live ingestion remains Mode B (not claimed verified here). **Slice 3** is in progress — contract packages/clauses/obligations/human-approved configuration; not claimed verified.
 
-Not implemented: contract packages/clauses, entitlement events, deadlines, notice drafts.
+Not implemented: entitlement events, project-event deadline engine, notice drafts.
 
 ---
 

@@ -7,12 +7,12 @@ ContractRadar supports two verification modes. Ordinary local development **does
 Runs on a developer Mac without Docker:
 
 - format, lint, typecheck
-- TypeScript unit tests
-- embedded PostgreSQL integration / security tests
+- TypeScript unit tests (including `@contractradar/contract-rules`)
+- embedded PostgreSQL integration / security tests (tenant isolation, Slice 3 contract revision immutability)
 - Python Ruff, mypy, non-live pytest (parsers + scanner contract tests)
 - production web build
 
-This mode **must not** be described as live MinIO/Redis/ClamAV/ARQ verification.
+This mode **must not** be described as live MinIO/Redis/ClamAV/ARQ verification. It also does **not** replace Mode B after contract-intelligence changes that touch `apps/web` migrations or shared authz — those still trigger Live ingestion regression via path filters.
 
 ## Mode B — GitHub Actions live ingestion (`.github/workflows/live-ingestion.yml`)
 

@@ -21,6 +21,16 @@ export const CAPABILITIES = [
   'document.quarantine.view',
   'document.quarantine.manage',
   'project.storage.manage',
+  'contract_package.create',
+  'contract_package.read',
+  'contract_package.update',
+  'contract_document.attach',
+  'contract_structure.run',
+  'contract_structure.review',
+  'contract_configuration.submit',
+  'contract_configuration.approve',
+  'contract_configuration.supersede',
+  'contract_issue.manage',
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];

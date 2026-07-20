@@ -34,8 +34,35 @@ describe('outbox transactional write (embedded/CI Postgres)', () => {
   beforeEach(async () => {
     await withBypass(async (tx) => {
       await tx.$executeRaw`SELECT set_config('app.allow_audit_purge', 'on', true)`;
+      await tx.$executeRaw`SELECT set_config('app.allow_contract_revision_purge', 'on', true)`;
+      await tx.contractPackage.updateMany({ data: { currentConfigurationRevisionId: null } });
+      await tx.reviewDecision.deleteMany();
+      await tx.contractExtractionSuggestion.deleteMany();
+      await tx.contractAnalysisRun.deleteMany();
+      await tx.contractConfigurationIssue.deleteMany();
+      await tx.noticeRule.deleteMany();
+      await tx.obligationEvidenceRequirement.deleteMany();
+      await tx.obligationRecipient.deleteMany();
+      await tx.obligationTrigger.deleteMany();
+      await tx.contractObligation.deleteMany();
+      await tx.contactPoint.deleteMany();
+      await tx.contractRole.deleteMany();
+      await tx.contractParty.deleteMany();
+      await tx.crossReference.deleteMany();
+      await tx.clauseTermReference.deleteMany();
+      await tx.definedTerm.deleteMany();
+      await tx.clauseRelationship.deleteMany();
+      await tx.clauseTextRevision.deleteMany();
+      await tx.contractClause.deleteMany();
+      await tx.contractPrecedenceRule.deleteMany();
+      await tx.contractDocumentRelationship.deleteMany();
+      await tx.contractDocument.deleteMany();
+      await tx.calendarRule.deleteMany();
+      await tx.contractConfigurationRevision.deleteMany();
+      await tx.contractPackage.deleteMany();
       await tx.outboxEvent.deleteMany();
       await tx.ingestionEvent.deleteMany();
+      await tx.auditLog.deleteMany();
       await tx.projectMembership.deleteMany();
       await tx.project.deleteMany();
       await tx.tenantMembership.deleteMany();
