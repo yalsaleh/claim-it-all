@@ -98,6 +98,9 @@ model User {
   deadlineWarningPoliciesCreated  DeadlineWarningPolicy[]         @relation("WarningPolicyCreator")
   deadlineWarningPoliciesApproved DeadlineWarningPolicy[]         @relation("WarningPolicyApprover")
   notificationIntentsRecipient    NotificationIntent[]            @relation("NotificationIntentRecipient")
+  detectionRunsStarted            ProjectEventDetectionRun[]      @relation("DetectionRunStarter")
+  eventSuggestionsReviewed        ProjectEventSuggestion[]        @relation("EventSuggestionReviewer")
+  detectionFeedbackAuthors        DetectionReviewerFeedback[]     @relation("DetectionFeedbackAuthor")
 
   @@map("user")
 }
@@ -206,6 +209,15 @@ model Tenant {
   projectDeadlines               ProjectDeadline[]
   deadlineStatusHistory          DeadlineStatusHistory[]
   notificationIntents            NotificationIntent[]
+  projectEventDetectionRuns      ProjectEventDetectionRun[]
+  detectionContextGroups         DetectionContextGroup[]
+  projectEventSuggestions        ProjectEventSuggestion[]
+  projectEventSuggestionEvidence ProjectEventSuggestionEvidence[]
+  projectEventDateSuggestions    ProjectEventDateSuggestion[]
+  detectionEvidenceGaps          DetectionEvidenceGap[]
+  suggestionRuleCandidates       SuggestionRuleCandidate[]
+  suggestionPartyCandidates      SuggestionPartyCandidate[]
+  detectionReviewerFeedback      DetectionReviewerFeedback[]
 
   @@map("tenant")
 }
@@ -291,6 +303,15 @@ model Project {
   projectDeadlines               ProjectDeadline[]
   deadlineStatusHistory          DeadlineStatusHistory[]
   notificationIntents            NotificationIntent[]
+  projectEventDetectionRuns      ProjectEventDetectionRun[]
+  detectionContextGroups         DetectionContextGroup[]
+  projectEventSuggestions        ProjectEventSuggestion[]
+  projectEventSuggestionEvidence ProjectEventSuggestionEvidence[]
+  projectEventDateSuggestions    ProjectEventDateSuggestion[]
+  detectionEvidenceGaps          DetectionEvidenceGap[]
+  suggestionRuleCandidates       SuggestionRuleCandidate[]
+  suggestionPartyCandidates      SuggestionPartyCandidate[]
+  detectionReviewerFeedback      DetectionReviewerFeedback[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -534,6 +555,7 @@ model SourceDocument {
   ingestionEvents     IngestionEvent[]
   contractDocuments   ContractDocument[]
   projectEventEvidence ProjectEventEvidence[]
+  suggestionEvidence   ProjectEventSuggestionEvidence[]
 
   @@index([tenantId, projectId, status])
   @@index([tenantId, projectId, documentType])
@@ -583,6 +605,7 @@ model DocumentVersion {
   contractDocuments    ContractDocument[]
   contractClauses      ContractClause[]
   projectEventEvidence ProjectEventEvidence[]
+  suggestionEvidence   ProjectEventSuggestionEvidence[]
 
   @@unique([sourceDocumentId, versionNumber])
   @@unique([tenantId, storageKey])
@@ -714,6 +737,8 @@ model EvidenceSegment {
   processingRun   DocumentProcessingRun @relation(fields: [processingRunId], references: [id], onDelete: Cascade)
   artifact             ExtractedArtifact?     @relation(fields: [artifactId], references: [id], onDelete: SetNull)
   projectEventEvidence ProjectEventEvidence[]
+  suggestionEvidence   ProjectEventSuggestionEvidence[]
+  dateSuggestions      ProjectEventDateSuggestion[]
 
   @@index([tenantId, projectId, documentVersionId])
   @@index([processingRunId, kind, ordinal])
@@ -2073,6 +2098,7 @@ enum ProjectEventSource {
   MANUAL
   IMPORTED
   HUMAN_CONFIRMED_RECORD
+  DETECTION_ACCEPTED
 }
 
 enum ProjectEventDateType {
@@ -2277,6 +2303,7 @@ model ApprovedNoticeRuleSnapshot {
   reviewDecision        ReviewDecision?               @relation(fields: [reviewDecisionId], references: [id], onDelete: SetNull)
   eventRuleAssessments  EventRuleAssessment[]
   deadlineCalculations  DeadlineCalculation[]
+  suggestionRuleCandidates SuggestionRuleCandidate[]
 
   @@index([tenantId, projectId, contractPackageId])
   @@index([configurationRevisionId])
@@ -2323,6 +2350,8 @@ model ProjectEvent {
   eventRuleAssessments EventRuleAssessment[]
   deadlineCalculations DeadlineCalculation[]
   projectDeadlines     ProjectDeadline[]
+  acceptedFromSuggestions ProjectEventSuggestion[] @relation("SuggestionAcceptedEvent")
+  duplicateOfSuggestions  ProjectEventSuggestion[] @relation("SuggestionDuplicateEvent")
 
   @@index([tenantId, projectId, eventStatus])
   @@index([tenantId, projectId, confirmationStatus])
@@ -2745,4 +2774,369 @@ model NotificationIntent {
   @@index([tenantId, projectId, status, scheduledAt])
   @@index([projectDeadlineId])
   @@map("notification_intent")
+}
+
+// ---------------------------------------------------------------------------
+// Slice 5 — Evidence-backed project-event detection (suggestions only)
+// ---------------------------------------------------------------------------
+
+enum DetectionRunStatus {
+  QUEUED
+  RUNNING
+  PARTIALLY_SUCCEEDED
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  DEAD_LETTERED
+}
+
+enum DetectionRunType {
+  MANUAL_HISTORICAL_SCAN
+  DOCUMENT_RESCAN
+  PROJECT_INCREMENTAL_SCAN
+  FUTURE_LIVE_MONITORING
+}
+
+enum DetectionAnalysisProfile {
+  DETERMINISTIC_ONLY
+  HYBRID_STANDARD
+  HYBRID_ARABIC_ENGLISH
+  PAYMENT_FOCUSED
+  ACCESS_DELAY_FOCUSED
+  CHANGE_FOCUSED
+}
+
+enum ProjectEventSuggestionStatus {
+  PENDING_REVIEW
+  NEEDS_MORE_EVIDENCE
+  ACCEPTED
+  ACCEPTED_WITH_CHANGES
+  REJECTED
+  DUPLICATE
+  MERGED
+  SUPERSEDED
+}
+
+enum DetectionConfidenceBand {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum SuggestionEvidenceRole {
+  PRIMARY_SUPPORT
+  SUPPORTING
+  DATE_SUPPORT
+  PARTY_SUPPORT
+  IMPACT_SUPPORT
+  CONTRADICTING
+  CONTEXT
+  DUPLICATE_SIGNAL
+  MISSING_EXPECTED_EVIDENCE
+}
+
+enum DateSuggestionStatus {
+  PENDING_REVIEW
+  ACCEPTED
+  REJECTED
+  SUPERSEDED
+}
+
+enum DetectionGapStatus {
+  OPEN
+  RESOLVED
+  WAIVED
+  SUPERSEDED
+}
+
+enum SuggestionRuleCandidateStatus {
+  CANDIDATE
+  REVIEWED
+  SELECTED
+  REJECTED
+  UNCERTAIN
+}
+
+enum DetectionContextType {
+  EMAIL_THREAD
+  RFI_THREAD
+  INSTRUCTION_RESPONSE
+  FOLLOW_UP_SEQUENCE
+  MEETING_SEQUENCE
+  DAILY_REPORT_SEQUENCE
+  PAYMENT_SEQUENCE
+  DRAWING_REVISION_CHAIN
+  VARIATION_CHAIN
+  OTHER
+}
+
+model ProjectEventDetectionRun {
+  id                       String                    @id @default(uuid())
+  tenantId                 String
+  projectId                String
+  analysisProfile          DetectionAnalysisProfile  @default(DETERMINISTIC_ONLY)
+  status                   DetectionRunStatus        @default(QUEUED)
+  runType                  DetectionRunType
+  sourceScope              Json?
+  sourceDocumentVersionIds Json?
+  startedByUserId          String
+  processorName            String
+  processorVersion         String
+  rulesetVersion           String
+  promptVersion            String?
+  modelProvider            String?
+  modelName                String?
+  queuedAt                 DateTime                  @default(now())
+  startedAt                DateTime?
+  completedAt              DateTime?
+  failureCode              String?
+  failureMessageSafe       String?
+  correlationId            String
+  documentsConsidered      Int                       @default(0)
+  segmentsConsidered       Int                       @default(0)
+  suggestionsCreated       Int                       @default(0)
+  warnings                 Json?
+  createdAt                DateTime                  @default(now())
+
+  tenant        Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project       Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  startedBy     User                      @relation("DetectionRunStarter", fields: [startedByUserId], references: [id], onDelete: Restrict)
+  suggestions   ProjectEventSuggestion[]
+  contextGroups DetectionContextGroup[]
+
+  @@index([tenantId, projectId, status, queuedAt])
+  @@index([correlationId])
+  @@map("project_event_detection_run")
+}
+
+model DetectionContextGroup {
+  id                 String                   @id @default(uuid())
+  tenantId           String
+  projectId          String
+  detectionRunId     String?
+  contextType        DetectionContextType
+  documentVersionIds Json?
+  evidenceSegmentIds Json?
+  dateRangeStart     DateTime?
+  dateRangeEnd       DateTime?
+  participants       Json?
+  groupingMethod     String
+  confidenceBand     DetectionConfidenceBand  @default(LOW)
+  createdAt          DateTime                 @default(now())
+
+  tenant       Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project      Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  detectionRun ProjectEventDetectionRun? @relation(fields: [detectionRunId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, contextType])
+  @@map("detection_context_group")
+}
+
+model ProjectEventSuggestion {
+  id                        String                       @id @default(uuid())
+  tenantId                  String
+  projectId                 String
+  detectionRunId            String
+  eventCategory             String
+  eventSubcategory          String?
+  suggestedTitle            String
+  suggestedDescription      String?                      @db.Text
+  suggestedStatus           String?
+  suggestedOccurredAt       DateTime?
+  suggestedAwarenessAt      DateTime?
+  suggestedReceivedAt       DateTime?
+  suggestedInstructionDate  DateTime?
+  datePrecision             String?
+  dateBasis                 String?                      @db.Text
+  confidenceBand            DetectionConfidenceBand      @default(LOW)
+  confidenceScore           Float?
+  confidenceExplanation     String?                      @db.Text
+  interpretationSummary     String?                      @db.Text
+  factsSummary              String?                      @db.Text
+  assumptions               Json?
+  ambiguities               Json?
+  missingEvidenceSummary    Json?
+  contradictions            Json?
+  status                    ProjectEventSuggestionStatus @default(PENDING_REVIEW)
+  reviewedByUserId          String?
+  reviewedAt                DateTime?
+  acceptedProjectEventId    String?
+  duplicateOfSuggestionId   String?
+  duplicateOfProjectEventId String?
+  detectorSource            String                       @default("DETERMINISTIC")
+  createdAt                 DateTime                     @default(now())
+  updatedAt                 DateTime                     @updatedAt
+
+  tenant                  Tenant                           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project                 Project                          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  detectionRun            ProjectEventDetectionRun         @relation(fields: [detectionRunId], references: [id], onDelete: Cascade)
+  reviewedBy              User?                            @relation("EventSuggestionReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  acceptedProjectEvent    ProjectEvent?                    @relation("SuggestionAcceptedEvent", fields: [acceptedProjectEventId], references: [id], onDelete: SetNull)
+  duplicateOfProjectEvent ProjectEvent?                    @relation("SuggestionDuplicateEvent", fields: [duplicateOfProjectEventId], references: [id], onDelete: SetNull)
+  duplicateOfSuggestion   ProjectEventSuggestion?          @relation("SuggestionDuplicates", fields: [duplicateOfSuggestionId], references: [id], onDelete: SetNull)
+  duplicateSuggestions    ProjectEventSuggestion[]         @relation("SuggestionDuplicates")
+  evidenceLinks           ProjectEventSuggestionEvidence[]
+  dateSuggestions         ProjectEventDateSuggestion[]
+  evidenceGaps            DetectionEvidenceGap[]
+  ruleCandidates          SuggestionRuleCandidate[]
+  partyCandidates         SuggestionPartyCandidate[]
+  reviewerFeedback        DetectionReviewerFeedback[]
+
+  @@index([tenantId, projectId, status])
+  @@index([detectionRunId])
+  @@index([acceptedProjectEventId])
+  @@map("project_event_suggestion")
+}
+
+model ProjectEventSuggestionEvidence {
+  id                   String                  @id @default(uuid())
+  tenantId             String
+  projectId            String
+  suggestionId         String
+  sourceDocumentId     String
+  documentVersionId    String
+  evidenceSegmentId    String
+  evidenceRole         SuggestionEvidenceRole
+  relevanceExplanation String?                 @db.Text
+  selectedQuote        String                  @db.Text
+  quoteChecksum        String
+  extractionMethod     String
+  confidenceBand       DetectionConfidenceBand @default(LOW)
+  sequence             Int                     @default(0)
+  createdAt            DateTime                @default(now())
+
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  suggestion      ProjectEventSuggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  sourceDocument  SourceDocument         @relation(fields: [sourceDocumentId], references: [id], onDelete: Restrict)
+  documentVersion DocumentVersion        @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  evidenceSegment EvidenceSegment        @relation(fields: [evidenceSegmentId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, projectId, suggestionId])
+  @@index([evidenceSegmentId])
+  @@map("project_event_suggestion_evidence")
+}
+
+model ProjectEventDateSuggestion {
+  id                String                     @id @default(uuid())
+  tenantId          String
+  projectId         String
+  suggestionId      String
+  dateType          ProjectEventDateType
+  suggestedValue    DateTime?
+  timezone          String?
+  precision         ProjectEventDatePrecision
+  evidenceSegmentId String?
+  extractionText    String?
+  basis             String?                    @db.Text
+  ambiguity         String?                    @db.Text
+  alternatives      Json?
+  status            DateSuggestionStatus       @default(PENDING_REVIEW)
+  reviewerDecision  String?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  suggestion      ProjectEventSuggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  evidenceSegment EvidenceSegment?       @relation(fields: [evidenceSegmentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, suggestionId])
+  @@map("project_event_date_suggestion")
+}
+
+model DetectionEvidenceGap {
+  id                  String             @id @default(uuid())
+  tenantId            String
+  projectId           String
+  suggestionId        String
+  gapCode             String
+  description         String             @db.Text
+  whyItMatters        String?            @db.Text
+  suggestedSourceType String?
+  priority            String             @default("MEDIUM")
+  status              DetectionGapStatus @default(OPEN)
+  reviewerResolution  String?
+  linkedEvidenceNote  String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  tenant     Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project    Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  suggestion ProjectEventSuggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId, suggestionId])
+  @@map("detection_evidence_gap")
+}
+
+model SuggestionRuleCandidate {
+  id                     String                        @id @default(uuid())
+  tenantId               String
+  projectId              String
+  suggestionId           String
+  approvedRuleSnapshotId String
+  matchReason            String?                       @db.Text
+  matchedCategory        String?
+  matchedTriggerType     String?
+  partyRoleAlignment     String?
+  sourceClauseId         String?
+  confidenceBand         DetectionConfidenceBand       @default(LOW)
+  blockingIssues         Json?
+  status                 SuggestionRuleCandidateStatus @default(CANDIDATE)
+  reviewerDecision       String?
+  createdAt              DateTime                      @default(now())
+  updatedAt              DateTime                      @updatedAt
+
+  tenant               Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project              Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  suggestion           ProjectEventSuggestion     @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  approvedRuleSnapshot ApprovedNoticeRuleSnapshot @relation(fields: [approvedRuleSnapshotId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, projectId, suggestionId])
+  @@index([approvedRuleSnapshotId])
+  @@map("suggestion_rule_candidate")
+}
+
+model SuggestionPartyCandidate {
+  id              String                  @id @default(uuid())
+  tenantId        String
+  projectId       String
+  suggestionId    String
+  roleType        String
+  suggestedName   String?
+  contractPartyId String?
+  contractRoleId  String?
+  confidenceBand  DetectionConfidenceBand @default(LOW)
+  notes           String?
+  createdAt       DateTime                @default(now())
+
+  tenant     Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project    Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  suggestion ProjectEventSuggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId, suggestionId])
+  @@map("suggestion_party_candidate")
+}
+
+model DetectionReviewerFeedback {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  projectId           String
+  suggestionId        String
+  authorUserId        String
+  decision            String
+  falsePositiveReason String?
+  correctedCategory   String?
+  notes               String?  @db.Text
+  payload             Json?
+  createdAt           DateTime @default(now())
+
+  tenant     Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project    Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  suggestion ProjectEventSuggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  author     User                   @relation("DetectionFeedbackAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, projectId, suggestionId])
+  @@index([suggestionId, createdAt])
+  @@map("detection_reviewer_feedback")
 }

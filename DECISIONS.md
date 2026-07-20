@@ -398,3 +398,21 @@ Statuses: **Proposed** · **Accepted** · **Superseded** · **Rejected**
 | [ADR-045](./docs/adrs/ADR-045-recalculation-supersession.md) | Recalculation | New result + supersession; mandatory reason |
 | [ADR-046](./docs/adrs/ADR-046-internal-warning-policy.md) | Internal warnings | Separate from contractual deadlines; no send |
 | [ADR-047](./docs/adrs/ADR-047-deadline-status-updater.md) | Status updater | Idempotent status only; no messaging |
+
+---
+
+## Slice 5 — Evidence-backed event detection (ADR-048–058)
+
+| ADR | Title | Decision (brief) |
+|-----|-------|------------------|
+| [ADR-048](./docs/adrs/ADR-048-event-detection-suggestion-model.md) | Suggestion model | `ProjectEventSuggestion` never fact/entitlement/deadline; `PENDING_REVIEW` until human accept |
+| [ADR-049](./docs/adrs/ADR-049-deterministic-detector-architecture.md) | Detector architecture | Pure versioned detectors in `@contractradar/event-detection`; no DB/AI |
+| [ADR-050](./docs/adrs/ADR-050-hybrid-ai-detection-boundary.md) | Hybrid AI boundary | AI optional; structured output; fake test-only; no confirmed events/dates/rules/deadlines |
+| [ADR-051](./docs/adrs/ADR-051-detection-context-grouping.md) | Context grouping | Bounded `DetectionContextGroup`; no cross-tenant/project |
+| [ADR-052](./docs/adrs/ADR-052-date-candidate-extraction.md) | Date candidates | `ProjectEventDateSuggestion` unverified; relative dates need reliable source timestamp |
+| [ADR-053](./docs/adrs/ADR-053-duplicate-merge-semantics.md) | Duplicate merge | Advisory duplicates; human merge; preserve evidence |
+| [ADR-054](./docs/adrs/ADR-054-suggestion-acceptance-workflow.md) | Acceptance workflow | Accept creates `ProjectEvent` transactionally; does not confirm applicability or activate deadline |
+| [ADR-055](./docs/adrs/ADR-055-detection-feedback-evaluation.md) | Feedback / evaluation | Append-only `ReviewerFeedback`; synthetic benchmarks ≠ legal accuracy |
+| [ADR-056](./docs/adrs/ADR-056-incremental-detection-scanning.md) | Incremental scanning | Incremental by document version; never overwrite historical suggestions |
+| [ADR-057](./docs/adrs/ADR-057-detection-prompt-injection-controls.md) | Prompt injection | Document text is data, never instructions |
+| [ADR-058](./docs/adrs/ADR-058-suggestion-rule-candidate-matching.md) | Rule candidates | Only active `ApprovedNoticeRuleSnapshot`; advisory until HUMAN_CONFIRMED applicability |

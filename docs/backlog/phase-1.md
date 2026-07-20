@@ -49,7 +49,8 @@ Legend: `P0` blocker · `P1` required for MVP · `P2` strong follow-on within Ph
 | C11 | P0 | Local non-Docker verification | `pnpm verify:local` (Mode A) | Done |
 
 **Slice 3 (done):** Epic D structure + human-approved configuration revisions.  
-**Slice 4 (done):** Deterministic deadline engine + human-confirmed project events (D3–D4, I2).
+**Slice 4 (done):** Deterministic deadline engine + human-confirmed project events (D3–D4, I2).  
+**Slice 5 (done):** Evidence-backed event detection with mandatory human confirmation (Epic E; ADR-048–058).
 
 ---
 
@@ -67,15 +68,15 @@ Legend: `P0` blocker · `P1` required for MVP · `P2` strong follow-on within Ph
 
 ## Epic E — Event detection (five categories)
 
-| ID | Priority | Item | Acceptance criteria |
-|----|----------|------|---------------------|
-| E1 | P0 | `EntitlementEvent` schema + category enum | Five initial categories only in Phase 1 UI |
-| E2 | P0 | Detection pipeline entrypoint (historical scan job) | Runnable per project; idempotent enough to re-run safely |
-| E3 | P1 | Rule-based detectors for each category (v1 heuristics) | Produce candidates with evidence links to source docs |
-| E4 | P1 | Optional AI classifier proposals behind adapter | Outputs validated; labeled `interpretation` |
-| E5 | P1 | Deduplicate obvious duplicates | Same category + overlapping dates/docs merge or link |
-| E6 | P1 | Epistemic labeling in API responses | Client can render fact vs interpretation vs missing |
-| E7 | P2 | Confidence calibration display guidance | UI copy states confidence ≠ legal certainty |
+| ID | Priority | Item | Acceptance criteria | Status |
+|----|----------|------|---------------------|--------|
+| E1 | P0 | `ProjectEventSuggestion` (+ category) schema; keep entitlement product labels separate from confirmed facts | Suggestions `PENDING_REVIEW` only; never fact/deadline (ADR-048) | In progress — Slice 5 |
+| E2 | P0 | Detection pipeline entrypoint (historical / incremental scan) | Per project; incremental by `DocumentVersion`; no overwrite of historical suggestions (ADR-056) | In progress — Slice 5 |
+| E3 | P1 | Rule-based detectors in `@contractradar/event-detection` | Pure versioned detectors; candidates with evidence links; no DB/AI in package (ADR-049) | In progress — Slice 5 |
+| E4 | P1 | Optional AI classifier proposals behind adapter | Schema-validated; fake test-only; no confirmed events/dates/rules/deadlines (ADR-050) | In progress — Slice 5 |
+| E5 | P1 | Deduplicate obvious duplicates | Advisory matches; human merge; preserve evidence (ADR-053) | In progress — Slice 5 |
+| E6 | P1 | Epistemic labeling in API responses | Client can render fact vs interpretation vs missing | In progress — Slice 5 |
+| E7 | P2 | Confidence calibration display guidance | UI copy states confidence ≠ legal certainty; benchmarks ≠ legal accuracy (ADR-055) | In progress — Slice 5 |
 
 ---
 
@@ -145,8 +146,8 @@ D1–D2 (expanded), D5 adapter/fixtures. **Done** on `e8348ab`.
 ### Slice 4 — Deterministic deadlines + human-confirmed events
 D3–D4, I2. Approved rule snapshots, project events/dates, calendars, calculation traces, tracked deadlines. No AI event detection. **Done**.
 
-### Slice 5 — Evidence-backed event detection (next)
-Human-confirmed detection from correspondence/project records before deadline activation. Do not auto-activate deadlines from AI suggestions.
+### Slice 5 — Evidence-backed event detection
+E1–E7 (and related). `ProjectEventSuggestion` / date suggestions from deterministic detectors in `@contractradar/event-detection` plus optional AI (fake test-only). Bounded `DetectionContextGroup`; incremental by document version; advisory duplicates/rule matches; human accept creates `ProjectEvent` but does **not** confirm applicability or activate deadlines (ADR-048–058). Threat model: [docs/threat-models/project-event-detection.md](../threat-models/project-event-detection.md).
 
 ---
 

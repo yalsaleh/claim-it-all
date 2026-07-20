@@ -27,7 +27,7 @@ Supports:
 - Static checks + production build
 - Deterministic DI tests with `MALWARE_SCANNER=fake_test` (test-only)
 
-Slice 4 local work covers human-confirmed project events, approved calendars, and deterministic deadline calculation via `packages/contract-rules`. It does **not** detect events from correspondence and does not require a live commercial LLM.
+Slice 4 local work covers human-confirmed project events, approved calendars, and deterministic deadline calculation via `packages/contract-rules`. Slice 5 detection work uses pure detectors in `packages/event-detection` and **fake/fixture AI only in tests** — live commercial LLM detection is not required for Mode A and is not claimed verified locally.
 
 ### Install (no Docker)
 

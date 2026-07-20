@@ -81,6 +81,16 @@ describe('contract package integration', () => {
       await tx.$executeRaw`SELECT set_config('app.allow_audit_purge', 'on', true)`;
       await tx.$executeRaw`SELECT set_config('app.allow_contract_revision_purge', 'on', true)`;
       await tx.$executeRaw`SELECT set_config('app.allow_deadline_purge', 'on', true)`;
+      await tx.$executeRaw`SELECT set_config('app.allow_detection_purge', 'on', true)`;
+      await tx.detectionReviewerFeedback.deleteMany();
+      await tx.suggestionPartyCandidate.deleteMany();
+      await tx.suggestionRuleCandidate.deleteMany();
+      await tx.detectionEvidenceGap.deleteMany();
+      await tx.projectEventDateSuggestion.deleteMany();
+      await tx.projectEventSuggestionEvidence.deleteMany();
+      await tx.projectEventSuggestion.deleteMany();
+      await tx.detectionContextGroup.deleteMany();
+      await tx.projectEventDetectionRun.deleteMany();
       await tx.notificationIntent.deleteMany();
       await tx.deadlineStatusHistory.deleteMany();
       await tx.projectDeadline.deleteMany();

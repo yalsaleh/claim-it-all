@@ -47,6 +47,18 @@ export const CAPABILITIES = [
   'project_calendar.manage',
   'project_calendar.approve',
   'warning_policy.manage',
+  'detection_run.create',
+  'detection_run.read',
+  'detection_run.cancel',
+  'event_suggestion.read',
+  'event_suggestion.review',
+  'event_suggestion.accept',
+  'event_suggestion.reject',
+  'event_suggestion.merge',
+  'event_suggestion.request_evidence',
+  'detection_rules.manage',
+  'detection_evaluation.read',
+  'reviewer_feedback.read',
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];

@@ -31,7 +31,8 @@ Phases are sequential for dependency reasons, but engineering spikes may overlap
 - Document upload to S3-compatible storage; immutable versions
 - Ingestion pipeline skeleton with real status transitions
 - Contract package + human-confirmed clause/obligation register — **Slice 3 done**
-- Deterministic deadline engine + human-confirmed project events — **Slice 4 done** (ADR-037–047); AI detection deferred
+- Deterministic deadline engine + human-confirmed project events — **Slice 4 done** (ADR-037–047)
+- Evidence-backed event detection with mandatory human confirmation — **Slice 5 done (Mode A)** (ADR-048–058); suggestions never auto-activate deadlines
 - Historical detection for:
   1. Late drawings or approvals
   2. Suspension or restricted site access

@@ -123,6 +123,7 @@ Optional later: PostgreSQL Row Level Security as defense-in-depth; dedicated DB/
 - Store model run metadata; avoid logging full prompt bodies with sensitive clauses at info level in production.
 - Tenant allowlists for which providers/models may be used.
 - Contract intelligence (Slice 3): schema-validate model output before persist; never auto-approve clauses/obligations/notice rules; default `MACHINE_SUGGESTED` / `PENDING_REVIEW`; fake/fixture providers are test-only and rejected when `APP_ENV` is `production` or `staging` (ADR-034). See [docs/threat-models/contract-intelligence.md](./docs/threat-models/contract-intelligence.md).
+- Event detection (Slice 5): document text is data never instructions (ADR-057); suggestions stay `PENDING_REVIEW`; fake AI test-only (ADR-050); accept ≠ deadline activation (ADR-054). See [docs/threat-models/project-event-detection.md](./docs/threat-models/project-event-detection.md).
 
 ---
 
@@ -227,4 +228,20 @@ Alert on: repeated auth failures, cross-tenant denial spikes, malware detections
 - [x] FORCE RLS on project-event / calendar / deadline tables
 - [x] Contractual vs internal deadlines labeled separately
 - [x] Threat model: [docs/threat-models/deadline-engine.md](./docs/threat-models/deadline-engine.md)
-- [ ] AI event detection from correspondence (deferred — next slice)
+- [x] AI event detection deferred from Slice 4 (moved to Slice 5)
+
+## 19. Slice 5 — Event detection controls
+
+- [x] `ProjectEventSuggestion` never treated as fact / entitlement / deadline (ADR-048)
+- [x] Pure detectors in `@contractradar/event-detection` — no DB/AI inside package (ADR-049)
+- [x] Optional AI: schema-validated suggestions only; fake provider test-only (ADR-050)
+- [x] Bounded `DetectionContextGroup`; no cross-tenant/project grouping (ADR-051)
+- [x] Date suggestions unverified; relative dates need reliable source timestamp (ADR-052)
+- [x] Duplicate merge advisory + human-only; evidence preserved (ADR-053)
+- [x] Accept creates `ProjectEvent` only — no applicability confirm / deadline activation (ADR-054)
+- [x] Append-only reviewer feedback; benchmarks ≠ legal accuracy (ADR-055)
+- [x] Incremental by document version; never overwrite historical suggestions (ADR-056)
+- [x] Document text treated as data, never instructions (ADR-057)
+- [x] Rule candidates only from active `ApprovedNoticeRuleSnapshot`; applicability human-confirmed (ADR-058)
+- [x] Threat model: [docs/threat-models/project-event-detection.md](./docs/threat-models/project-event-detection.md)
+- [ ] Notice drafting / evidence-completion workflows (deferred — next slice)

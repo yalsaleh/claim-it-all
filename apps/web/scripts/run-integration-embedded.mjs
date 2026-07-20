@@ -126,6 +126,7 @@ async function main() {
     'src/server/documents/ingestion.integration.test.ts',
     'src/server/queue/outbox.integration.test.ts',
     'src/server/contracts/contracts.integration.test.ts',
+    'src/server/detections/detections.integration.test.ts',
     'src/server/deadlines/deadlines.integration.test.ts',
   ];
   const suites = vitestArgs.length > 0 ? vitestArgs : defaultSuites;

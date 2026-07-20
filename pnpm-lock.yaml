@@ -29,6 +29,9 @@ importers:
       '@contractradar/contract-rules':
         specifier: workspace:*
         version: link:../../packages/contract-rules
+      '@contractradar/event-detection':
+        specifier: workspace:*
+        version: link:../../packages/event-detection
       '@contractradar/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -133,6 +136,25 @@ importers:
       '@types/luxon':
         specifier: 3.4.2
         version: 3.4.2
+      '@types/node':
+        specifier: 22.10.2
+        version: 22.10.2
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@22.10.2)
+
+  packages/event-detection:
+    dependencies:
+      zod:
+        specifier: 3.24.1
+        version: 3.24.1
+    devDependencies:
+      '@contractradar/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
       '@types/node':
         specifier: 22.10.2
         version: 22.10.2

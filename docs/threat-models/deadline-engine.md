@@ -20,4 +20,4 @@
 | Unauthorized verification | Capabilities + configurable SoD |
 
 ## Out of scope (deferred)
-AI event detection, notice drafting/sending, claim-value risk.
+Notice drafting/sending, claim-value risk. AI event detection is covered separately in [project-event-detection.md](./project-event-detection.md) (Slice 5).

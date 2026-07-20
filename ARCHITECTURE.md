@@ -124,6 +124,7 @@ ContractRadar uses a **modular monolith for the web/API domain** plus a **separa
 - `packages/shared`: TypeScript types for API payloads and domain enums.
 - OpenAPI / JSON Schema exported from Python for cross-language validation where needed.
 - `packages/contract-rules`: validation/normalization (Slice 3) plus pure Luxon-based `calculateDeadline` against serializable approved-rule + calendar inputs (Slice 4). No DB/AI/authz inside the package.
+- `packages/event-detection`: pure versioned detectors for Slice 5 suggestion candidates. No DB/AI/authz inside the package (ADR-049); optional AI enrichment is adapter-only outside the package (ADR-050).
 
 ---
 
@@ -259,11 +260,13 @@ AI providers are optional, adapter-based, and disabled by default (`CONTRACT_AI_
 
 Threat model: [docs/threat-models/contract-intelligence.md](./docs/threat-models/contract-intelligence.md).
 
-Phase 1 Slice 4 delivers human-confirmed project events and deterministic deadline calculation against approved rule snapshots. AI event detection from correspondence remains a later slice.
+Phase 1 Slice 4 delivers human-confirmed project events and deterministic deadline calculation against approved rule snapshots. Slice 5 adds evidence-backed detection suggestions with mandatory human confirmation before any `ProjectEvent` exists — suggestions never auto-activate deadlines.
 
 ---
 
 ## 10. Event detection
+
+**Slice 5 (done — Mode A):** Correspondence and project records feed a detection pipeline that emits `ProjectEventSuggestion` candidates (ADR-048–058). Pure deterministic detectors live in `@contractradar/event-detection`; optional AI adapters may propose structured suggestions only (fake/fixture providers are test-only). Bounded `DetectionContextGroup`s keep scans project-scoped. Human accept may create a `ProjectEvent` transactionally but does **not** confirm rule applicability or activate deadlines — those remain Slice 4 gates. Threat model: [docs/threat-models/project-event-detection.md](./docs/threat-models/project-event-detection.md).
 
 **Initial categories**
 
@@ -276,11 +279,11 @@ Phase 1 Slice 4 delivers human-confirmed project events and deterministic deadli
 **Pipeline**
 
 1. Feature extraction from documents (dates, actors, directives, payment refs, access language).
-2. Rule + model hybrid classifiers emit `EntitlementEvent` candidates.
-3. Deduplicate / merge near-duplicates across documents.
-4. Attach provisional clause links from obligation rules.
-5. Create evidence requirements checklist per category.
-6. Enter review queue with urgency scoring.
+2. Versioned deterministic detectors (and optional AI) emit `ProjectEventSuggestion` candidates with evidence links — never confirmed facts.
+3. Deduplicate / merge proposals are advisory; humans consolidate and preserve evidence.
+4. Attach provisional rule-candidate links only from active `ApprovedNoticeRuleSnapshot` rows (advisory until HUMAN_CONFIRMED applicability).
+5. Create evidence requirements checklist per category (post-accept / review).
+6. Enter review queue; accept creates `ProjectEvent` without deadline activation.
 
 **Future categories** (architecture must not block): acceleration, out-of-sequence work, verbal instructions, late handover, utility conflicts, design revisions, material approval delays, consultant non-response, exceptional weather, concurrent delay.
 
@@ -300,7 +303,7 @@ Phase 1 Slice 4 delivers human-confirmed project events and deterministic deadli
 
 Deadlines are computed by **deterministic services**, not free-form LLM arithmetic.
 
-**Slice 4:** `@contractradar/contract-rules` provides pure Luxon-based `calculateDeadline` against approved rule snapshots + calendar revisions (ADR-037–047). Still no DB/AI/authz inside the package. Project events are human-confirmed only — no AI event detection.
+**Slice 4:** `@contractradar/contract-rules` provides pure Luxon-based `calculateDeadline` against approved rule snapshots + calendar revisions (ADR-037–047). Still no DB/AI/authz inside the package. Project events used for calculation remain human-confirmed; Slice 5 suggestions are not calculation inputs until accepted and further gated (verified dates + HUMAN_CONFIRMED applicability).
 
 **Inputs**
 

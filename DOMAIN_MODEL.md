@@ -131,7 +131,7 @@ Elevated tenant roles may read all tenant projects; `REVIEWER` / `VIEWER` tenant
 
 ## 6. Contract intelligence
 
-Aligned with Prisma models under Slice 3–4. **AI entitlement-event detection remains a later slice**; Slice 4 requires human-confirmed project events before deadline calculation (ADR-037–047).
+Aligned with Prisma models under Slice 3–4. **Slice 5 (in progress)** adds `ProjectEventSuggestion` detection from correspondence; suggestions are never confirmed events, entitlements, or deadlines until human accept (ADR-048–058). Slice 4 still requires human-confirmed project events before deadline calculation (ADR-037–047).
 
 ### ContractPackage
 
@@ -175,11 +175,22 @@ Aligned with Prisma models under Slice 3–4. **AI entitlement-event detection r
 - Related: `ContractConfigurationIssue`, `CalendarRule`, `ReviewDecision`.
 - AI path: `ContractAnalysisRun` → `ContractExtractionSuggestion` (pending review only; ADR-034).
 
-Downstream deadline engines (when built) consume **human-approved** notice/obligation structure from an active approved revision — never free-text clause prose alone.
+Downstream deadline engines consume **human-approved** notice/obligation structure from an active approved revision — never free-text clause prose alone. Detection suggestions (Slice 5) are not deadline inputs until human accept + Slice 4 gates.
 
 ---
 
 ## 7. Entitlement events
+
+### Suggestion vs confirmed event (Slice 5)
+
+| Entity | Role |
+|--------|------|
+| `ProjectEventSuggestion` | Detection candidate (`PENDING_REVIEW`); interpretation only; never a fact, entitlement, or deadline (ADR-048) |
+| `ProjectEventDateSuggestion` | Unverified date candidate; relative dates only with a reliable source timestamp (ADR-052) |
+| `ProjectEvent` | Human-confirmed (or manually created) factual record for Slice 4 confirmation / calculation gates (ADR-038) |
+| `ProjectEventDate` | Verified trigger-relevant dates after human verification (ADR-039) |
+
+Accepting a suggestion may create a `ProjectEvent` transactionally; it does **not** confirm rule applicability or activate a deadline (ADR-054). Rule-candidate matches reference only active `ApprovedNoticeRuleSnapshot` rows and stay advisory until HUMAN_CONFIRMED (ADR-058).
 
 ### EntitlementEvent
 
@@ -191,6 +202,8 @@ Downstream deadline engines (when built) consume **human-approved** notice/oblig
 - `detection_source`: `historical_scan` | `live_monitor` | `manual`
 - `confidence` (model/rule score — never shown as legal certainty)
 - `created_at`, `updated_at`
+
+Product “entitlement event” language in UI may map onto confirmed `ProjectEvent` workflows after review; detection outputs remain suggestions until accept.
 
 ### Initial categories
 

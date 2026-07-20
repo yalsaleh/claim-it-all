@@ -18,6 +18,18 @@ const EVENT_DEADLINE: Capability[] = [
   'project_calendar.manage',
   'project_calendar.approve',
   'warning_policy.manage',
+  'detection_run.create',
+  'detection_run.read',
+  'detection_run.cancel',
+  'event_suggestion.read',
+  'event_suggestion.review',
+  'event_suggestion.accept',
+  'event_suggestion.reject',
+  'event_suggestion.merge',
+  'event_suggestion.request_evidence',
+  'detection_rules.manage',
+  'detection_evaluation.read',
+  'reviewer_feedback.read',
 ];
 
 const DOCUMENT_READ: Capability[] = [
@@ -26,6 +38,8 @@ const DOCUMENT_READ: Capability[] = [
   'document.processing.view',
   'contract_package.read',
   'project_event.read',
+  'detection_run.read',
+  'event_suggestion.read',
 ];
 
 const DOCUMENT_CONTRIBUTE: Capability[] = [
@@ -143,6 +157,10 @@ const TENANT_ROLE_CAPABILITIES: Record<TenantRole, readonly Capability[]> = {
     'document.read',
     'document.download',
     'contract_package.read',
+    'detection_run.read',
+    'event_suggestion.read',
+    'detection_evaluation.read',
+    'reviewer_feedback.read',
   ],
 };
 
@@ -180,7 +198,16 @@ const PROJECT_ROLE_CAPABILITIES: Record<ProjectRole, readonly Capability[]> = {
   ],
   REVIEWER: ['project.read', 'project.members.read', ...DOCUMENT_READ, ...CONTRACT_REVIEW],
   CONTRIBUTOR: ['project.read', 'project.members.read', ...DOCUMENT_CONTRIBUTE],
-  VIEWER: ['project.read', 'document.read', 'document.download', 'contract_package.read'],
+  VIEWER: [
+    'project.read',
+    'document.read',
+    'document.download',
+    'contract_package.read',
+    'detection_run.read',
+    'event_suggestion.read',
+    'detection_evaluation.read',
+    'reviewer_feedback.read',
+  ],
 };
 
 const MUTATING_PROJECT_CAPABILITIES = new Set<Capability>([
@@ -218,6 +245,14 @@ const MUTATING_PROJECT_CAPABILITIES = new Set<Capability>([
   'project_calendar.manage',
   'project_calendar.approve',
   'warning_policy.manage',
+  'detection_run.create',
+  'detection_run.cancel',
+  'event_suggestion.review',
+  'event_suggestion.accept',
+  'event_suggestion.reject',
+  'event_suggestion.merge',
+  'event_suggestion.request_evidence',
+  'detection_rules.manage',
 ]);
 
 export function capabilitiesForTenantRole(role: TenantRole): ReadonlySet<Capability> {
