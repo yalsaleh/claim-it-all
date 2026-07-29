@@ -142,6 +142,9 @@ jobs:
           echo "$OUTPUT" | grep -E 'Test Files|Tests '
 
       - name: Reset + remigrate + reseed (reproducibility)
+        env:
+          # migrate reset must use the bootstrap role (see DATABASE_MIGRATE_URL).
+          DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
         run: |
           pnpm db:reset
           pnpm db:migrate:deploy

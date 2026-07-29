@@ -3,9 +3,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertSafeDatabaseUrl } from '../src/lib/db-url-guard';
 
-const databaseUrl = process.env.DATABASE_URL;
+// Prefer the migration/bootstrap role. Runtime DATABASE_URL uses contractradar_app
+// (FORCE RLS) and cannot drop/recreate schema objects owned by the migrator.
+const databaseUrl = process.env.DATABASE_MIGRATE_URL || process.env.DATABASE_URL;
 if (!databaseUrl) {
-  console.error('DATABASE_URL is required');
+  console.error('DATABASE_MIGRATE_URL or DATABASE_URL is required for db reset');
   process.exit(1);
 }
 
@@ -20,7 +22,10 @@ const result = spawnSync('pnpm', ['exec', 'prisma', 'migrate', 'reset', '--force
   cwd: webRoot,
   stdio: 'inherit',
   shell: process.platform === 'win32',
-  env: process.env,
+  env: {
+    ...process.env,
+    DATABASE_URL: databaseUrl,
+  },
 });
 
 process.exit(result.status ?? 1);
