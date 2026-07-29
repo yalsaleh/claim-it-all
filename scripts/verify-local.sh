@@ -44,6 +44,7 @@ run "${PNPM[@]}" --filter @contractradar/shared typecheck
 run "${PNPM[@]}" --filter @contractradar/authz typecheck
 run "${PNPM[@]}" --filter @contractradar/contract-rules typecheck
 run "${PNPM[@]}" --filter @contractradar/event-detection typecheck
+run "${PNPM[@]}" --filter @contractradar/notice-drafting typecheck
 run "${PNPM[@]}" --filter @contractradar/web typecheck
 run "${PNPM[@]}" test:unit
 run "${PNPM[@]}" test:integration:embedded

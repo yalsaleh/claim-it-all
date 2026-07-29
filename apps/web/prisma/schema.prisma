@@ -102,6 +102,27 @@ model User {
   eventSuggestionsReviewed        ProjectEventSuggestion[]        @relation("EventSuggestionReviewer")
   detectionFeedbackAuthors        DetectionReviewerFeedback[]     @relation("DetectionFeedbackAuthor")
 
+  noticePackagesCreated             NoticePackage[]                 @relation("NoticePackageCreator")
+  noticePackagesOwned               NoticePackage[]                 @relation("NoticePackageOwner")
+  noticePackagesReviewLead          NoticePackage[]                 @relation("NoticePackageReviewLead")
+  noticePackagesApprover            NoticePackage[]                 @relation("NoticePackageApprover")
+  noticeEvidenceReviewed            NoticeEvidenceRequirement[]     @relation("NoticeEvidenceReviewer")
+  noticeQuestionsRaised             NoticeReviewQuestion[]          @relation("NoticeQuestionRaiser")
+  noticeQuestionsAnswered           NoticeReviewQuestion[]          @relation("NoticeQuestionAnswerer")
+  noticeQuestionsReviewed           NoticeReviewQuestion[]          @relation("NoticeQuestionReviewer")
+  noticeFactsApproved               NoticeFact[]                    @relation("NoticeFactApprover")
+  noticeDraftsCreated               NoticeDraftRevision[]           @relation("NoticeDraftCreator")
+  noticeCommentsRaised              NoticeReviewComment[]           @relation("NoticeCommentRaiser")
+  noticeCommentsResolved            NoticeReviewComment[]           @relation("NoticeCommentResolver")
+  noticeApprovalsDecided            NoticeApprovalDecision[]        @relation("NoticeApprovalActor")
+  noticeExceptionsApproved          NoticeControlledException[]     @relation("NoticeExceptionApprover")
+  noticeAttachmentsAdded            NoticeAttachment[]              @relation("NoticeAttachmentAdder")
+  noticeAttachmentsReviewed         NoticeAttachment[]              @relation("NoticeAttachmentReviewer")
+  noticeExportsGenerated            NoticeExportBundle[]            @relation("NoticeExportGenerator")
+  noticeTemplatesCreated            NoticeTemplate[]                @relation("NoticeTemplateCreator")
+  noticeTemplatesApproved           NoticeTemplate[]                @relation("NoticeTemplateApprover")
+  noticeAssessmentsAssessed         EvidenceCompletenessAssessment[] @relation("NoticeAssessmentAssessor")
+
   @@map("user")
 }
 
@@ -219,6 +240,24 @@ model Tenant {
   suggestionPartyCandidates      SuggestionPartyCandidate[]
   detectionReviewerFeedback      DetectionReviewerFeedback[]
 
+  noticePackages                     NoticePackage[]
+  noticeRequirementSnapshots         NoticeRequirementSnapshot[]
+  noticeEvidenceRequirements         NoticeEvidenceRequirement[]
+  noticeEvidenceLinks                NoticeEvidenceLink[]
+  evidenceCompletenessAssessments    EvidenceCompletenessAssessment[]
+  noticeReviewQuestions              NoticeReviewQuestion[]
+  noticeFacts                        NoticeFact[]
+  noticeTemplates                    NoticeTemplate[]
+  noticeTemplateSections             NoticeTemplateSection[]
+  noticeDraftRevisions               NoticeDraftRevision[]
+  noticeDraftSections                NoticeDraftSection[]
+  noticeDeliveryPreparations         NoticeDeliveryPreparation[]
+  noticeAttachments                  NoticeAttachment[]
+  noticeExportBundles                NoticeExportBundle[]
+  noticeReviewComments               NoticeReviewComment[]
+  noticeApprovalDecisions            NoticeApprovalDecision[]
+  noticeControlledExceptions         NoticeControlledException[]
+
   @@map("tenant")
 }
 
@@ -312,6 +351,22 @@ model Project {
   suggestionRuleCandidates       SuggestionRuleCandidate[]
   suggestionPartyCandidates      SuggestionPartyCandidate[]
   detectionReviewerFeedback      DetectionReviewerFeedback[]
+
+  noticePackages                     NoticePackage[]
+  noticeRequirementSnapshots         NoticeRequirementSnapshot[]
+  noticeEvidenceRequirements         NoticeEvidenceRequirement[]
+  noticeEvidenceLinks                NoticeEvidenceLink[]
+  evidenceCompletenessAssessments    EvidenceCompletenessAssessment[]
+  noticeReviewQuestions              NoticeReviewQuestion[]
+  noticeFacts                        NoticeFact[]
+  noticeDraftRevisions               NoticeDraftRevision[]
+  noticeDraftSections                NoticeDraftSection[]
+  noticeDeliveryPreparations         NoticeDeliveryPreparation[]
+  noticeAttachments                  NoticeAttachment[]
+  noticeExportBundles                NoticeExportBundle[]
+  noticeReviewComments               NoticeReviewComment[]
+  noticeApprovalDecisions            NoticeApprovalDecision[]
+  noticeControlledExceptions         NoticeControlledException[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -1276,6 +1331,8 @@ model ContractPackage {
   deadlineCalculations         DeadlineCalculation[]
   projectDeadlines             ProjectDeadline[]
 
+  noticePackages                 NoticePackage[]
+
   @@index([tenantId, projectId, status])
   @@index([tenantId, projectId, createdAt])
   @@map("contract_package")
@@ -1923,6 +1980,8 @@ model ContractConfigurationRevision {
   eventRuleAssessments        EventRuleAssessment[]
   deadlineCalculations        DeadlineCalculation[]
 
+  noticePackages                 NoticePackage[]
+
   @@unique([contractPackageId, revisionNumber])
   @@index([tenantId, projectId, contractPackageId])
   @@index([contractPackageId, status])
@@ -2304,6 +2363,9 @@ model ApprovedNoticeRuleSnapshot {
   eventRuleAssessments  EventRuleAssessment[]
   deadlineCalculations  DeadlineCalculation[]
   suggestionRuleCandidates SuggestionRuleCandidate[]
+  noticePackages           NoticePackage[]
+  noticeRequirementSnapshots NoticeRequirementSnapshot[]
+  noticeEvidenceRequirements NoticeEvidenceRequirement[]
 
   @@index([tenantId, projectId, contractPackageId])
   @@index([configurationRevisionId])
@@ -2352,6 +2414,7 @@ model ProjectEvent {
   projectDeadlines     ProjectDeadline[]
   acceptedFromSuggestions ProjectEventSuggestion[] @relation("SuggestionAcceptedEvent")
   duplicateOfSuggestions  ProjectEventSuggestion[] @relation("SuggestionDuplicateEvent")
+  noticePackages          NoticePackage[]
 
   @@index([tenantId, projectId, eventStatus])
   @@index([tenantId, projectId, confirmationStatus])
@@ -2470,6 +2533,7 @@ model EventRuleAssessment {
   approvedRuleSnapshot  ApprovedNoticeRuleSnapshot @relation(fields: [approvedRuleSnapshotId], references: [id], onDelete: Restrict)
   reviewer              User?                      @relation("EventRuleAssessor", fields: [reviewerUserId], references: [id], onDelete: SetNull)
   deadlineCalculations  DeadlineCalculation[]
+  noticePackages        NoticePackage[]
 
   @@index([tenantId, projectId, projectEventId])
   @@index([projectEventId, applicabilityStatus])
@@ -2621,6 +2685,7 @@ model DeadlineCalculation {
   supersededBy          DeadlineCalculation[]      @relation("CalculationSupersedes")
   milestones            DeadlineMilestone[]
   projectDeadlines      ProjectDeadline[]
+  noticePackages        NoticePackage[]
 
   @@index([tenantId, projectId, projectEventId])
   @@index([projectEventId, calculationStatus])
@@ -2719,6 +2784,7 @@ model ProjectDeadline {
   supersedes          ProjectDeadline?    @relation("DeadlineSupersedes")
   statusHistory       DeadlineStatusHistory[]
   notificationIntents NotificationIntent[]
+  noticePackages      NoticePackage[]
 
   @@index([tenantId, projectId, status])
   @@index([projectEventId])
@@ -3139,4 +3205,871 @@ model DetectionReviewerFeedback {
   @@index([tenantId, projectId, suggestionId])
   @@index([suggestionId, createdAt])
   @@map("detection_reviewer_feedback")
+}
+
+
+// ---------------------------------------------------------------------------
+// Slice 6 — Notice drafting (stop before delivery)
+// ---------------------------------------------------------------------------
+
+enum NoticePackageStatus {
+  DRAFT
+  EVIDENCE_INCOMPLETE
+  READY_FOR_DRAFT
+  DRAFTING
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  SUPERSEDED
+  WITHDRAWN
+  EXPORTED
+  ARCHIVED
+  /// Reserved — no operational transition in Slice 6
+  SENT
+}
+
+enum NoticeType {
+  INITIAL_NOTICE
+  NOTICE_OF_CLAIM
+  NOTICE_OF_DELAY
+  NOTICE_OF_VARIATION
+  NOTICE_OF_ADDITIONAL_COST
+  NOTICE_OF_RESTRICTED_ACCESS
+  NOTICE_OF_SUSPENSION
+  NOTICE_OF_LATE_INFORMATION
+  NOTICE_OF_DELAYED_PAYMENT
+  NOTICE_OF_UNFORESEEN_CONDITION
+  INTERIM_PARTICULARS
+  FINAL_PARTICULARS
+  RESERVATION_OF_RIGHTS
+  RESPONSE
+  OTHER
+}
+
+enum NoticePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum NoticeEvidenceRequirementCategory {
+  EVENT_OCCURRENCE
+  TRIGGER_DATE
+  AWARENESS_DATE
+  INSTRUCTION
+  RECEIPT
+  CONTRACTUAL_BASIS
+  RECIPIENT
+  DELIVERY_ADDRESS
+  DELIVERY_METHOD
+  AFFECTED_WORK
+  CAUSE
+  EFFECT
+  DELAY_IMPACT
+  COST_IMPACT
+  CONTEMPORARY_RECORDS
+  MITIGATION
+  QUANTUM_SUPPORT
+  PROGRAMME_SUPPORT
+  PHOTOGRAPHS
+  DAILY_REPORTS
+  CORRESPONDENCE
+  PAYMENT_RECORD
+  CERTIFICATE
+  INVOICE
+  SITE_RECORD
+  OTHER
+}
+
+enum NoticeEvidenceMandatoryStatus {
+  CONTRACTUALLY_REQUIRED
+  INTERNALLY_REQUIRED
+  RECOMMENDED
+  OPTIONAL
+}
+
+enum NoticeEvidenceSatisfactionStatus {
+  MISSING
+  PARTIAL
+  SATISFIED
+  NOT_APPLICABLE
+  WAIVED_BY_REVIEWER
+  DISPUTED
+}
+
+enum NoticeEvidenceLinkRole {
+  PRIMARY
+  SUPPORTING
+  DATE_PROOF
+  RECIPIENT_PROOF
+  DELIVERY_PROOF
+  IMPACT_PROOF
+  COST_PROOF
+  CONTRADICTING
+  CONTEXT
+  ATTACHMENT_CANDIDATE
+}
+
+enum EvidenceCompletenessStatus {
+  NOT_ASSESSED
+  INCOMPLETE
+  CONDITIONALLY_READY
+  READY
+  BLOCKED
+}
+
+enum NoticeQuestionCategory {
+  FACT
+  DATE
+  RECIPIENT
+  CONTRACT_BASIS
+  AFFECTED_WORK
+  CAUSATION
+  IMPACT
+  COST
+  MITIGATION
+  DELIVERY_METHOD
+  ATTACHMENT
+  LANGUAGE
+  APPROVAL
+  OTHER
+}
+
+enum NoticeQuestionStatus {
+  OPEN
+  ANSWERED
+  RESOLVED
+  DISPUTED
+  NOT_APPLICABLE
+  WITHDRAWN
+}
+
+enum NoticeQuestionAnswerType {
+  FREE_TEXT
+  DATE
+  DATETIME
+  YES_NO
+  PERSON
+  PARTY
+  ROLE
+  DOCUMENT
+  EVIDENCE_REFERENCE
+  NUMBER
+  CURRENCY
+  ENUM
+  MULTI_SELECT
+}
+
+enum NoticeQuestionPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum NoticeFactType {
+  EVENT_DATE
+  AWARENESS_DATE
+  INSTRUCTION_DATE
+  RECEIPT_DATE
+  PARTY_NAME
+  ROLE_NAME
+  PROJECT_NAME
+  CONTRACT_REFERENCE
+  NOTICE_REFERENCE
+  AFFECTED_LOCATION
+  AFFECTED_ACTIVITY
+  DESCRIPTION_OF_EVENT
+  DESCRIPTION_OF_EFFECT
+  DELAY_PERIOD
+  COST_AMOUNT
+  PAYMENT_AMOUNT
+  CERTIFICATE_NUMBER
+  INVOICE_NUMBER
+  DRAWING_REFERENCE
+  RFI_REFERENCE
+  INSTRUCTION_REFERENCE
+  REQUESTED_ACTION
+  RESPONSE_DEADLINE
+  OTHER
+}
+
+enum NoticeFactVerificationStatus {
+  UNVERIFIED
+  EVIDENCE_BACKED
+  HUMAN_CONFIRMED
+  DISPUTED
+  SUPERSEDED
+}
+
+enum NoticeFactSourceType {
+  PROJECT_EVENT
+  PROJECT_EVENT_DATE
+  PROJECT_EVENT_EVIDENCE
+  SOURCE_DOCUMENT
+  EVIDENCE_SEGMENT
+  REVIEWER_ENTERED
+  QUESTION_RESPONSE
+  REQUIREMENT_SNAPSHOT
+  OTHER
+}
+
+enum NoticeTemplateStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  RETIRED
+}
+
+enum NoticeDraftRevisionStatus {
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  SUPERSEDED
+  WITHDRAWN
+}
+
+enum NoticeDraftSectionType {
+  SENDER
+  RECIPIENT
+  PROJECT_CONTRACT_REFERENCE
+  NOTICE_TITLE
+  CONTRACTUAL_BASIS
+  FACTUAL_BACKGROUND
+  EVENT_DESCRIPTION
+  TRIGGER_DATE
+  DEADLINE_STATEMENT
+  IMPACT_STATEMENT
+  RESERVATION_OF_RIGHTS
+  REQUESTED_ACTION
+  RECORDS_EVIDENCE
+  CONTINUING_EVENT
+  ATTACHMENTS
+  CLOSING
+}
+
+enum NoticeDraftSectionReviewStatus {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+enum NoticeDeliveryVerificationStatus {
+  UNVERIFIED
+  VERIFIED
+  DISPUTED
+  MISSING
+  SUPERSEDED
+}
+
+enum NoticeAttachmentCategory {
+  CORRESPONDENCE
+  INSTRUCTION
+  DRAWING
+  RFI
+  DAILY_REPORT
+  PHOTOGRAPH
+  PAYMENT_RECORD
+  CERTIFICATE
+  INVOICE
+  PROGRAMME_EXTRACT
+  COST_RECORD
+  SITE_RECORD
+  OTHER
+}
+
+enum NoticeAttachmentInclusionStatus {
+  PROPOSED
+  INCLUDED
+  EXCLUDED
+  MISSING
+  SUPERSEDED
+}
+
+enum NoticeReviewCommentType {
+  FACTUAL
+  CONTRACTUAL
+  LEGAL
+  COMMERCIAL
+  LANGUAGE
+  FORMATTING
+  EVIDENCE
+  RECIPIENT
+  DEADLINE
+  OTHER
+}
+
+enum NoticeReviewCommentStatus {
+  OPEN
+  RESOLVED
+  WITHDRAWN
+}
+
+enum NoticeApprovalDecisionType {
+  SUBMITTED
+  CHANGES_REQUESTED
+  RECOMMENDED_FOR_APPROVAL
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  SUPERSEDED
+}
+
+enum NoticeExportFormat {
+  PDF
+  DOCX
+  JSON_MANIFEST
+  ATTACHMENT_ZIP
+  PLAIN_TEXT
+}
+
+enum NoticeLanguageLayout {
+  ENGLISH_ONLY
+  ARABIC_ONLY
+  BILINGUAL_PARALLEL
+  BILINGUAL_SEQUENTIAL
+}
+
+model NoticePackage {
+  id                           String              @id @default(uuid())
+  tenantId                     String
+  projectId                    String
+  contractPackageId            String
+  configurationRevisionId      String
+  approvedNoticeRuleSnapshotId String
+  projectEventId               String
+  eventRuleAssessmentId        String
+  deadlineCalculationId        String
+  projectDeadlineId            String?
+  noticeType                   NoticeType
+  title                        String
+  reference                    String?
+  status                       NoticePackageStatus @default(DRAFT)
+  language                     String
+  secondaryLanguage            String?
+  languageLayout               NoticeLanguageLayout @default(ENGLISH_ONLY)
+  governingLanguage            String?
+  priority                     NoticePriority      @default(NORMAL)
+  deadlineAt                   DateTime?
+  deadlineTimezone             String?
+  internalOwnerUserId          String?
+  reviewLeadUserId             String?
+  approverUserId               String?
+  createdByUserId              String
+  activeApprovedRevisionId     String?             @unique
+  sodEnforced                  Boolean             @default(true)
+  createdAt                    DateTime            @default(now())
+  updatedAt                    DateTime            @updatedAt
+
+  tenant                     Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project                    Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractPackage            ContractPackage              @relation(fields: [contractPackageId], references: [id], onDelete: Restrict)
+  configurationRevision      ContractConfigurationRevision @relation(fields: [configurationRevisionId], references: [id], onDelete: Restrict)
+  approvedNoticeRuleSnapshot ApprovedNoticeRuleSnapshot   @relation(fields: [approvedNoticeRuleSnapshotId], references: [id], onDelete: Restrict)
+  projectEvent               ProjectEvent                 @relation(fields: [projectEventId], references: [id], onDelete: Restrict)
+  eventRuleAssessment        EventRuleAssessment          @relation(fields: [eventRuleAssessmentId], references: [id], onDelete: Restrict)
+  deadlineCalculation        DeadlineCalculation          @relation(fields: [deadlineCalculationId], references: [id], onDelete: Restrict)
+  projectDeadline            ProjectDeadline?             @relation(fields: [projectDeadlineId], references: [id], onDelete: SetNull)
+  createdBy                  User                         @relation("NoticePackageCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  internalOwner              User?                        @relation("NoticePackageOwner", fields: [internalOwnerUserId], references: [id], onDelete: SetNull)
+  reviewLead                 User?                        @relation("NoticePackageReviewLead", fields: [reviewLeadUserId], references: [id], onDelete: SetNull)
+  approver                   User?                        @relation("NoticePackageApprover", fields: [approverUserId], references: [id], onDelete: SetNull)
+  activeApprovedRevision     NoticeDraftRevision?         @relation("ActiveApprovedNoticeRevision", fields: [activeApprovedRevisionId], references: [id], onDelete: SetNull)
+
+  requirementSnapshots       NoticeRequirementSnapshot[]
+  evidenceRequirements       NoticeEvidenceRequirement[]
+  evidenceLinks              NoticeEvidenceLink[]
+  completenessAssessments    EvidenceCompletenessAssessment[]
+  reviewQuestions            NoticeReviewQuestion[]
+  facts                      NoticeFact[]
+  draftRevisions             NoticeDraftRevision[]        @relation("NoticePackageDrafts")
+  deliveryPreparations       NoticeDeliveryPreparation[]
+  attachments                NoticeAttachment[]
+  exportBundles              NoticeExportBundle[]
+  reviewComments             NoticeReviewComment[]
+  approvalDecisions          NoticeApprovalDecision[]
+  controlledExceptions       NoticeControlledException[]
+
+  @@index([tenantId, projectId, status])
+  @@index([projectEventId])
+  @@index([deadlineCalculationId])
+  @@map("notice_package")
+}
+
+model NoticeRequirementSnapshot {
+  id                           String   @id @default(uuid())
+  tenantId                     String
+  projectId                    String
+  noticePackageId              String
+  approvedNoticeRuleSnapshotId String
+  sourceObligationId           String?
+  sourceClauseId               String?
+  sourceClauseReference        String?
+  evidenceSegmentId            String?
+  evidenceLocator              Json?
+  requiredRecipients           String?  @db.Text
+  requiredCopiedRecipients     String?  @db.Text
+  requiredDeliveryMethods      String?  @db.Text
+  requiredTimingExpression     String?  @db.Text
+  verifiedDeadlineAt           DateTime?
+  verifiedDeadlineTimezone     String?
+  requiredContentItems         String?  @db.Text
+  requiredAttachments          String?  @db.Text
+  requiredRecords              String?  @db.Text
+  requiredFormOrTemplate       String?  @db.Text
+  requiredReferenceFields      String?  @db.Text
+  requiredReservationLanguage  String?  @db.Text
+  continuingEventRequirements  String?  @db.Text
+  interimParticularsRequirements String? @db.Text
+  finalParticularsRequirements String?  @db.Text
+  consequenceText              String?  @db.Text
+  timeBarClassification        String?
+  ambiguityFlags               Json?
+  payload                      Json?
+  createdAt                    DateTime @default(now())
+
+  tenant                     Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project                    Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage              NoticePackage              @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  approvedNoticeRuleSnapshot ApprovedNoticeRuleSnapshot @relation(fields: [approvedNoticeRuleSnapshotId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@map("notice_requirement_snapshot")
+}
+
+model NoticeEvidenceRequirement {
+  id                    String                           @id @default(uuid())
+  tenantId              String
+  projectId             String
+  noticePackageId       String
+  category              NoticeEvidenceRequirementCategory
+  description           String                           @db.Text
+  sourceType            String?
+  sourceContractualBasis String?                         @db.Text
+  approvedRuleSnapshotId String?
+  mandatoryStatus       NoticeEvidenceMandatoryStatus
+  satisfactionStatus    NoticeEvidenceSatisfactionStatus @default(MISSING)
+  reviewerNotes         String?                          @db.Text
+  waiverRationale       String?                          @db.Text
+  reviewedByUserId      String?
+  reviewedAt            DateTime?
+  createdAt             DateTime                         @default(now())
+  updatedAt             DateTime                         @updatedAt
+
+  tenant               Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project              Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage        NoticePackage               @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  approvedRuleSnapshot ApprovedNoticeRuleSnapshot? @relation(fields: [approvedRuleSnapshotId], references: [id], onDelete: SetNull)
+  reviewedBy           User?                       @relation("NoticeEvidenceReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  evidenceLinks        NoticeEvidenceLink[]
+  relatedQuestions     NoticeReviewQuestion[]
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@map("notice_evidence_requirement")
+}
+
+model NoticeEvidenceLink {
+  id                       String                 @id @default(uuid())
+  tenantId                 String
+  projectId                String
+  noticePackageId          String
+  evidenceRequirementId    String
+  role                     NoticeEvidenceLinkRole
+  sourceDocumentId         String?
+  documentVersionId        String?
+  evidenceSegmentId        String?
+  projectEventEvidenceId   String?
+  evidenceLocator          Json?
+  reviewerAuthoredStatement String?               @db.Text
+  externalPlaceholder      String?
+  createdAt                DateTime               @default(now())
+
+  tenant              Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project             Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage       NoticePackage              @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  evidenceRequirement NoticeEvidenceRequirement  @relation(fields: [evidenceRequirementId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@index([evidenceRequirementId])
+  @@map("notice_evidence_link")
+}
+
+model EvidenceCompletenessAssessment {
+  id                String                     @id @default(uuid())
+  tenantId          String
+  projectId         String
+  noticePackageId   String
+  assessmentRevision Int
+  completenessStatus EvidenceCompletenessStatus @default(NOT_ASSESSED)
+  blockingIssues    Json?
+  nonBlockingWarnings Json?
+  assessedByUserId  String?
+  assessedAt        DateTime?
+  rulesetVersion    String
+  createdAt         DateTime                   @default(now())
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage NoticePackage @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  assessedBy    User?         @relation("NoticeAssessmentAssessor", fields: [assessedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([noticePackageId, assessmentRevision])
+  @@index([tenantId, projectId, noticePackageId])
+  @@map("evidence_completeness_assessment")
+}
+
+model NoticeReviewQuestion {
+  id                      String                   @id @default(uuid())
+  tenantId                String
+  projectId               String
+  noticePackageId         String
+  category                NoticeQuestionCategory
+  questionText            String                   @db.Text
+  reason                  String?                  @db.Text
+  relatedEvidenceRequirementId String?
+  relatedClauseOrRuleRef  String?
+  assignedToUserId        String?
+  assignedToRoleId        String?
+  priority                NoticeQuestionPriority   @default(NORMAL)
+  status                  NoticeQuestionStatus     @default(OPEN)
+  dueAt                   DateTime?
+  answerType              NoticeQuestionAnswerType
+  responseText            String?                  @db.Text
+  responseEvidence        Json?
+  responseVerified        Boolean                  @default(false)
+  becameApprovedFact      Boolean                  @default(false)
+  raisedByUserId          String
+  answeredByUserId        String?
+  reviewedByUserId        String?
+  createdAt               DateTime                 @default(now())
+  answeredAt              DateTime?
+  resolvedAt              DateTime?
+
+  tenant                     Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project                    Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage              NoticePackage              @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  relatedEvidenceRequirement NoticeEvidenceRequirement? @relation(fields: [relatedEvidenceRequirementId], references: [id], onDelete: SetNull)
+  raisedBy                   User                       @relation("NoticeQuestionRaiser", fields: [raisedByUserId], references: [id], onDelete: Restrict)
+  answeredBy                 User?                      @relation("NoticeQuestionAnswerer", fields: [answeredByUserId], references: [id], onDelete: SetNull)
+  reviewedBy                 User?                      @relation("NoticeQuestionReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, noticePackageId, status])
+  @@map("notice_review_question")
+}
+
+model NoticeFact {
+  id                   String                       @id @default(uuid())
+  tenantId             String
+  projectId            String
+  noticePackageId      String
+  factType             NoticeFactType
+  label                String
+  value                String                       @db.Text
+  normalizedValue      String?
+  sourceType           NoticeFactSourceType
+  sourceEvidence       Json?
+  projectEventId       String?
+  reviewerEntered      Boolean                      @default(false)
+  verificationStatus   NoticeFactVerificationStatus @default(UNVERIFIED)
+  certaintyLabel       String?
+  approvedForDrafting  Boolean                      @default(false)
+  approvedByUserId     String?
+  approvedAt           DateTime?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage NoticePackage @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  approvedBy    User?         @relation("NoticeFactApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@map("notice_fact")
+}
+
+model NoticeTemplate {
+  id                String               @id @default(uuid())
+  tenantId          String?
+  scope             String               @default("SYSTEM")
+  contractFormFamily String?
+  noticeType        NoticeType
+  language          String
+  jurisdiction      String?
+  templateName      String
+  description       String?              @db.Text
+  status            NoticeTemplateStatus @default(DRAFT)
+  version           String
+  createdByUserId   String?
+  approvedByUserId  String?
+  createdAt         DateTime             @default(now())
+  approvedAt        DateTime?
+
+  tenant     Tenant?                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy  User?                   @relation("NoticeTemplateCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  approvedBy User?                   @relation("NoticeTemplateApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  sections   NoticeTemplateSection[]
+
+  @@index([tenantId, noticeType, language, status])
+  @@map("notice_template")
+}
+
+model NoticeTemplateSection {
+  id                  String                 @id @default(uuid())
+  tenantId            String?
+  noticeTemplateId    String
+  sectionType         NoticeDraftSectionType
+  sequence            Int
+  required            Boolean                @default(true)
+  conditionalInclusion String?
+  allowedFactTypes    Json?
+  allowedClauseRefs   Json?
+  language            String
+  reviewerInstructions String?               @db.Text
+  externalContentHint String?                @db.Text
+  internalGuidance    String?                @db.Text
+  createdAt           DateTime               @default(now())
+
+  tenant   Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  template NoticeTemplate  @relation(fields: [noticeTemplateId], references: [id], onDelete: Cascade)
+
+  @@index([noticeTemplateId, sequence])
+  @@map("notice_template_section")
+}
+
+model NoticeDraftRevision {
+  id                              String                     @id @default(uuid())
+  tenantId                        String
+  projectId                       String
+  noticePackageId                 String
+  revisionNumber                  Int
+  status                          NoticeDraftRevisionStatus  @default(DRAFT)
+  language                        String
+  templateVersion                 String
+  generatedBy                     String
+  generatorVersion                String
+  promptVersion                   String?
+  providerMetadata                Json?
+  basedOnEvidenceAssessmentRevision Int?
+  basedOnRequirementSnapshotId    String?
+  createdByUserId                 String
+  createdAt                       DateTime                   @default(now())
+  submittedAt                     DateTime?
+  approvedAt                      DateTime?
+  supersedesRevisionId            String?
+  validationSnapshot              Json?
+
+  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project       Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage NoticePackage         @relation("NoticePackageDrafts", fields: [noticePackageId], references: [id], onDelete: Cascade)
+  createdBy     User                  @relation("NoticeDraftCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  supersedes    NoticeDraftRevision?  @relation("NoticeDraftSupersedes", fields: [supersedesRevisionId], references: [id], onDelete: SetNull)
+  supersededBy  NoticeDraftRevision[] @relation("NoticeDraftSupersedes")
+  asActiveFor   NoticePackage?        @relation("ActiveApprovedNoticeRevision")
+  sections      NoticeDraftSection[]
+  reviewComments NoticeReviewComment[]
+  approvalDecisions NoticeApprovalDecision[]
+  exportBundles NoticeExportBundle[]
+
+  @@unique([noticePackageId, revisionNumber])
+  @@index([tenantId, projectId, noticePackageId])
+  @@map("notice_draft_revision")
+}
+
+model NoticeDraftSection {
+  id                 String                        @id @default(uuid())
+  tenantId           String
+  projectId          String
+  draftRevisionId    String
+  sectionType        NoticeDraftSectionType
+  sequence           Int
+  heading            String
+  body               String                        @db.Text
+  language           String
+  sourceFactIds      Json?
+  sourceEvidenceRefs Json?
+  sourceClauseRefs   Json?
+  machineGenerated   Boolean                       @default(true)
+  humanEdited        Boolean                       @default(false)
+  internalOnly       Boolean                       @default(false)
+  reviewStatus       NoticeDraftSectionReviewStatus @default(PENDING)
+  warnings           Json?
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  draftRevision NoticeDraftRevision @relation(fields: [draftRevisionId], references: [id], onDelete: Cascade)
+  reviewComments NoticeReviewComment[]
+
+  @@index([tenantId, projectId, draftRevisionId])
+  @@map("notice_draft_section")
+}
+
+model NoticeDeliveryPreparation {
+  id                 String                           @id @default(uuid())
+  tenantId           String
+  projectId          String
+  noticePackageId    String
+  recipientRole      String?
+  recipientParty     String?
+  namedRecipient     String?
+  physicalAddress    String?                          @db.Text
+  emailAddress       String?
+  platformAddress    String?
+  attentionLine      String?
+  permittedMethod    String?
+  selectedMethod     String?
+  copiedRecipient    Boolean                          @default(false)
+  sourceClauseRef    String?
+  sourceEvidence     Json?
+  verificationStatus NoticeDeliveryVerificationStatus @default(UNVERIFIED)
+  reviewerApproved   Boolean                          @default(false)
+  contactPointId     String?
+  obligationRecipientId String?
+  createdAt          DateTime                         @default(now())
+  updatedAt          DateTime                         @updatedAt
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage NoticePackage @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@map("notice_delivery_preparation")
+}
+
+model NoticeAttachment {
+  id                String                         @id @default(uuid())
+  tenantId          String
+  projectId         String
+  noticePackageId   String
+  sourceDocumentId  String?
+  documentVersionId String?
+  evidenceLocator   Json?
+  category          NoticeAttachmentCategory
+  externalFilename  String
+  description       String?
+  inclusionStatus   NoticeAttachmentInclusionStatus @default(PROPOSED)
+  sequence          Int                            @default(0)
+  confidentialityLabel String?
+  checksumSha256    String?
+  addedByUserId     String
+  reviewedByUserId  String?
+  createdAt         DateTime                       @default(now())
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage NoticePackage @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  addedBy       User          @relation("NoticeAttachmentAdder", fields: [addedByUserId], references: [id], onDelete: Restrict)
+  reviewedBy    User?         @relation("NoticeAttachmentReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@map("notice_attachment")
+}
+
+model NoticeExportBundle {
+  id                 String            @id @default(uuid())
+  tenantId           String
+  projectId          String
+  noticePackageId    String
+  draftRevisionId    String
+  format             NoticeExportFormat
+  artifactChecksum   String
+  storageKey         String?
+  artifactBytes      Int?
+  manifest           Json
+  templateVersion    String
+  generatedAt        DateTime          @default(now())
+  generatedByUserId  String
+  language           String
+  immutable          Boolean           @default(true)
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage NoticePackage       @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  draftRevision NoticeDraftRevision @relation(fields: [draftRevisionId], references: [id], onDelete: Restrict)
+  generatedBy   User                @relation("NoticeExportGenerator", fields: [generatedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@index([draftRevisionId])
+  @@map("notice_export_bundle")
+}
+
+model NoticeReviewComment {
+  id              String                    @id @default(uuid())
+  tenantId        String
+  projectId       String
+  noticePackageId String
+  draftRevisionId String
+  sectionId       String?
+  commentType     NoticeReviewCommentType
+  commentText     String                    @db.Text
+  internalOnly    Boolean                   @default(true)
+  status          NoticeReviewCommentStatus @default(OPEN)
+  raisedByUserId  String
+  assignedToUserId String?
+  resolvedByUserId String?
+  createdAt       DateTime                  @default(now())
+  resolvedAt      DateTime?
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project       Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage NoticePackage        @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  draftRevision NoticeDraftRevision  @relation(fields: [draftRevisionId], references: [id], onDelete: Cascade)
+  section       NoticeDraftSection?  @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  raisedBy      User                 @relation("NoticeCommentRaiser", fields: [raisedByUserId], references: [id], onDelete: Restrict)
+  resolvedBy    User?                @relation("NoticeCommentResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@map("notice_review_comment")
+}
+
+model NoticeApprovalDecision {
+  id                 String                     @id @default(uuid())
+  tenantId           String
+  projectId          String
+  noticePackageId    String
+  draftRevisionId    String
+  decision           NoticeApprovalDecisionType
+  actorUserId        String
+  actorRole          String?
+  rationale          String?                    @db.Text
+  conditions         String?                    @db.Text
+  validationSnapshot Json?
+  decidedAt          DateTime                   @default(now())
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage NoticePackage       @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  draftRevision NoticeDraftRevision @relation(fields: [draftRevisionId], references: [id], onDelete: Cascade)
+  actor         User                @relation("NoticeApprovalActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@index([draftRevisionId, decidedAt])
+  @@map("notice_approval_decision")
+}
+
+model NoticeControlledException {
+  id              String   @id @default(uuid())
+  tenantId        String
+  projectId       String
+  noticePackageId String
+  issueCategory   String
+  description     String   @db.Text
+  risk            String?  @db.Text
+  contractualImpact String? @db.Text
+  approvedException Boolean @default(true)
+  approvedByUserId String
+  expiryOrReviewAt DateTime?
+  rationale       String   @db.Text
+  createdAt       DateTime @default(now())
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage NoticePackage @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  approvedBy    User          @relation("NoticeExceptionApprover", fields: [approvedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@map("notice_controlled_exception")
 }

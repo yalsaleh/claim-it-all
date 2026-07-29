@@ -61,3 +61,5 @@ Require the **Live ingestion** workflow to pass before merging PRs that change i
 ## Foundation CI (`.github/workflows/ci.yml`)
 
 Static + unit + Postgres/Redis/MinIO-backed integration with `MALWARE_SCANNER=fake_test`. Complements Mode B; does not replace it.
+
+Slice 6 adds `@contractradar/notice-drafting` unit tests and PostgreSQL notice workflow integration coverage in Mode A verify.

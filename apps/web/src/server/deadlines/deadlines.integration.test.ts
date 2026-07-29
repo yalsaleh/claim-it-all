@@ -54,6 +54,7 @@ import {
   verifyDeadlineCalculation,
   verifyProjectEventDate,
 } from '@/server/services/deadlines';
+import { purgeNoticeTables } from '@/server/notices/test-purge';
 
 requireTestDatabaseUrl();
 
@@ -93,6 +94,7 @@ describe('deadline engine integration', () => {
       await tx.$executeRaw`SELECT set_config('app.allow_deadline_purge', 'on', true)`;
       await tx.$executeRaw`SELECT set_config('app.allow_contract_revision_purge', 'on', true)`;
       await tx.$executeRaw`SELECT set_config('app.allow_detection_purge', 'on', true)`;
+      await purgeNoticeTables(tx);
 
       await tx.detectionReviewerFeedback.deleteMany();
       await tx.suggestionPartyCandidate.deleteMany();

@@ -138,3 +138,6 @@ Detailed backlog: [docs/backlog/phase-1.md](./docs/backlog/phase-1.md)
 - Mobile-native applications
 - Marketplace of third-party plugins (until API stability)
 - Guaranteed win-prediction or “claim success scores” marketed as certainty
+
+### Slice 6 (done — Mode A)
+Evidence completion, reviewer questions, deterministic/AI-assisted notice drafting, human approval, and export-ready packages. **No automatic delivery.**

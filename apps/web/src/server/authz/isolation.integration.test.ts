@@ -31,6 +31,7 @@ import {
 import { selectActiveTenant } from '@/server/services/tenants';
 import { AppError } from '@/server/errors';
 import { setRlsContext } from '@/server/db/tenant-context';
+import { purgeNoticeTables } from '@/server/notices/test-purge';
 
 requireTestDatabaseUrl();
 
@@ -86,6 +87,7 @@ describe('tenant isolation + hardening integration', () => {
       await tx.$executeRaw`SELECT set_config('app.allow_contract_revision_purge', 'on', true)`;
       await tx.$executeRaw`SELECT set_config('app.allow_deadline_purge', 'on', true)`;
       await tx.$executeRaw`SELECT set_config('app.allow_detection_purge', 'on', true)`;
+      await purgeNoticeTables(tx);
       await tx.detectionReviewerFeedback.deleteMany();
       await tx.suggestionPartyCandidate.deleteMany();
       await tx.suggestionRuleCandidate.deleteMany();

@@ -6,6 +6,7 @@ import { requireTestDatabaseUrl } from '@/lib/db-url-guard';
 import { prisma } from '@/server/db';
 import { setRlsContext } from '@/server/db/tenant-context';
 import { writeProcessDocumentOutbox } from '@/server/queue/outbox';
+import { purgeNoticeTables } from '@/server/notices/test-purge';
 
 requireTestDatabaseUrl();
 
@@ -36,6 +37,7 @@ describe('outbox transactional write (embedded/CI Postgres)', () => {
       await tx.$executeRaw`SELECT set_config('app.allow_contract_revision_purge', 'on', true)`;
       await tx.$executeRaw`SELECT set_config('app.allow_deadline_purge', 'on', true)`;
       await tx.$executeRaw`SELECT set_config('app.allow_detection_purge', 'on', true)`;
+      await purgeNoticeTables(tx);
       await tx.detectionReviewerFeedback.deleteMany();
       await tx.suggestionPartyCandidate.deleteMany();
       await tx.suggestionRuleCandidate.deleteMany();

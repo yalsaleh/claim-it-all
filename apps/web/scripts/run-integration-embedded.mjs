@@ -100,7 +100,11 @@ async function main() {
     shell: process.platform === 'win32',
   });
   if (result.status !== 0) {
-    await pg.stop();
+    try {
+      await pg.stop();
+    } catch {
+      /* ignore */
+    }
     process.exit(result.status ?? 1);
   }
 
@@ -112,7 +116,11 @@ async function main() {
     shell: process.platform === 'win32',
   });
   if (result.status !== 0) {
-    await pg.stop();
+    try {
+      await pg.stop();
+    } catch {
+      /* ignore */
+    }
     process.exit(result.status ?? 1);
   }
 
@@ -127,12 +135,14 @@ async function main() {
     'src/server/queue/outbox.integration.test.ts',
     'src/server/contracts/contracts.integration.test.ts',
     'src/server/detections/detections.integration.test.ts',
+    'src/server/notices/notices.integration.test.ts',
     'src/server/deadlines/deadlines.integration.test.ts',
   ];
   const suites = vitestArgs.length > 0 ? vitestArgs : defaultSuites;
   for (const suite of suites) {
     for (const sql of [
       "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'contractradar_test' AND pid <> pg_backend_pid() AND backend_type = 'client backend'",
+      'SELECT pg_sleep(0.2)',
       'TRUNCATE TABLE "tenant" CASCADE',
     ]) {
       const reset = spawnSync(
@@ -171,12 +181,20 @@ async function main() {
       },
     );
     if (result.status !== 0) {
-      await pg.stop();
+      try {
+        await pg.stop();
+      } catch {
+        // ignore stop errors after suite failure
+      }
       process.exit(result.status ?? 1);
     }
   }
 
-  await pg.stop();
+  try {
+    await pg.stop();
+  } catch {
+    // ignore shutdown races with client disconnect
+  }
   process.exit(0);
 }
 

@@ -266,7 +266,7 @@ Phase 1 Slice 4 delivers human-confirmed project events and deterministic deadli
 
 ## 10. Event detection
 
-**Slice 5 (done — Mode A):** Correspondence and project records feed a detection pipeline that emits `ProjectEventSuggestion` candidates (ADR-048–058). Pure deterministic detectors live in `@contractradar/event-detection`; optional AI adapters may propose structured suggestions only (fake/fixture providers are test-only). Bounded `DetectionContextGroup`s keep scans project-scoped. Human accept may create a `ProjectEvent` transactionally but does **not** confirm rule applicability or activate deadlines — those remain Slice 4 gates. Threat model: [docs/threat-models/project-event-detection.md](./docs/threat-models/project-event-detection.md).
+**Slice 5 (done — Mode A):** Correspondence and project records feed a detection pipeline that emits `ProjectEventSuggestion` candidates (ADR-048–058). Pure deterministic detectors live in `@contractradar/event-detection`, `@contractradar/notice-drafting`; optional AI adapters may propose structured suggestions only (fake/fixture providers are test-only). Bounded `DetectionContextGroup`s keep scans project-scoped. Human accept may create a `ProjectEvent` transactionally but does **not** confirm rule applicability or activate deadlines — those remain Slice 4 gates. Threat model: [docs/threat-models/project-event-detection.md](./docs/threat-models/project-event-detection.md).
 
 **Initial categories**
 
@@ -473,3 +473,6 @@ Docker Compose: PostgreSQL, Redis, MinIO, (later) web + document-intelligence.
 - Autonomous notice dispatch.
 - Single-country hardcoding.
 - Presenting model guesses as confirmed entitlement values.
+
+### Slice 6 notice drafting
+`NoticePackage` workflow produces export-ready approved drafts with provenance. Package `@contractradar/notice-drafting` owns deterministic assembly, validation, and export helpers. No outbound contractual delivery in this slice.

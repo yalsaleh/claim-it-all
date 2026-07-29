@@ -105,3 +105,5 @@ Storage: private bucket `contractradar-documents` with `quarantine` / `originals
 ## Recommended branch protection
 
 Require **Live ingestion** to pass before merging changes to ingestion, storage, workers, migrations, scanner, queue, evidence, authz, or RLS. Configure in GitHub branch settings (not automatic from this repo).
+
+Slice 6 adds `@contractradar/notice-drafting` unit tests and PostgreSQL notice workflow integration coverage in Mode A verify.

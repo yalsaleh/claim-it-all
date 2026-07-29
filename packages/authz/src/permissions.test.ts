@@ -35,6 +35,8 @@ describe('tenant role capabilities', () => {
     expect(hasCapability(caps, 'detection_run.read')).toBe(true);
     expect(hasCapability(caps, 'event_suggestion.read')).toBe(true);
     expect(hasCapability(caps, 'event_suggestion.accept')).toBe(false);
+    expect(hasCapability(caps, 'notice_package.read')).toBe(true);
+    expect(hasCapability(caps, 'notice_draft.approve')).toBe(false);
   });
 
   it('grants contracts managers package and approval capabilities', () => {
@@ -47,6 +49,9 @@ describe('tenant role capabilities', () => {
     expect(hasCapability(caps, 'project_calendar.approve')).toBe(true);
     expect(hasCapability(caps, 'detection_run.create')).toBe(true);
     expect(hasCapability(caps, 'event_suggestion.accept')).toBe(true);
+    expect(hasCapability(caps, 'notice_package.create')).toBe(true);
+    expect(hasCapability(caps, 'notice_draft.approve')).toBe(true);
+    expect(hasCapability(caps, 'notice_export.generate')).toBe(true);
   });
 
   it('blocks project managers from managing tenant owners', () => {

@@ -100,6 +100,14 @@ export default async function ProjectDetailPage({
             Event detections
           </Link>
         ) : null}
+        {hasCapability(ctx.capabilities, 'notice_package.read') ? (
+          <Link
+            className="rounded-md border border-ink-300 px-4 py-2 text-sm font-medium text-ink-900"
+            href={`/projects/${projectId}/notices` as Route}
+          >
+            Notices
+          </Link>
+        ) : null}
       </div>
       <ContextBanner
         organization={tenant?.name ?? ctx.tenantId}

@@ -30,6 +30,28 @@ const EVENT_DEADLINE: Capability[] = [
   'detection_rules.manage',
   'detection_evaluation.read',
   'reviewer_feedback.read',
+  'notice_package.create',
+  'notice_package.read',
+  'notice_package.update',
+  'notice_package.withdraw',
+  'notice_evidence.assess',
+  'notice_evidence.link',
+  'notice_question.create',
+  'notice_question.answer',
+  'notice_fact.create',
+  'notice_fact.verify',
+  'notice_draft.generate',
+  'notice_draft.edit',
+  'notice_draft.review',
+  'notice_draft.submit',
+  'notice_draft.approve',
+  'notice_draft.reject',
+  'notice_exception.approve',
+  'notice_attachment.manage',
+  'notice_export.generate',
+  'notice_export.read',
+  'notice_template.manage',
+  'notice_template.approve',
 ];
 
 const DOCUMENT_READ: Capability[] = [
@@ -40,6 +62,8 @@ const DOCUMENT_READ: Capability[] = [
   'project_event.read',
   'detection_run.read',
   'event_suggestion.read',
+  'notice_package.read',
+  'notice_export.read',
 ];
 
 const DOCUMENT_CONTRIBUTE: Capability[] = [
@@ -161,6 +185,8 @@ const TENANT_ROLE_CAPABILITIES: Record<TenantRole, readonly Capability[]> = {
     'event_suggestion.read',
     'detection_evaluation.read',
     'reviewer_feedback.read',
+    'notice_package.read',
+    'notice_export.read',
   ],
 };
 
@@ -207,6 +233,8 @@ const PROJECT_ROLE_CAPABILITIES: Record<ProjectRole, readonly Capability[]> = {
     'event_suggestion.read',
     'detection_evaluation.read',
     'reviewer_feedback.read',
+    'notice_package.read',
+    'notice_export.read',
   ],
 };
 
@@ -253,6 +281,26 @@ const MUTATING_PROJECT_CAPABILITIES = new Set<Capability>([
   'event_suggestion.merge',
   'event_suggestion.request_evidence',
   'detection_rules.manage',
+  'notice_package.create',
+  'notice_package.update',
+  'notice_package.withdraw',
+  'notice_evidence.assess',
+  'notice_evidence.link',
+  'notice_question.create',
+  'notice_question.answer',
+  'notice_fact.create',
+  'notice_fact.verify',
+  'notice_draft.generate',
+  'notice_draft.edit',
+  'notice_draft.review',
+  'notice_draft.submit',
+  'notice_draft.approve',
+  'notice_draft.reject',
+  'notice_exception.approve',
+  'notice_attachment.manage',
+  'notice_export.generate',
+  'notice_template.manage',
+  'notice_template.approve',
 ]);
 
 export function capabilitiesForTenantRole(role: TenantRole): ReadonlySet<Capability> {

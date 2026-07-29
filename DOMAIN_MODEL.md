@@ -402,3 +402,7 @@ Applied to dates, clause links, category labels, commercial ranges, and awarenes
 5. AI outputs persist as `interpretation` until review.
 6. Cross-tenant references are impossible via application APIs.
 7. Monetary fields never use IEEE floating point as the source of truth.
+
+## NoticePackage (Slice 6)
+
+Runtime aggregate for evidence completion → approved NoticeFacts → structured NoticeDraftRevision → human approval → export bundle. Stops before delivery. See ADR-059–073.

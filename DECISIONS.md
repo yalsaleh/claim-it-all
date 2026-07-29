@@ -416,3 +416,25 @@ Statuses: **Proposed** · **Accepted** · **Superseded** · **Rejected**
 | [ADR-056](./docs/adrs/ADR-056-incremental-detection-scanning.md) | Incremental scanning | Incremental by document version; never overwrite historical suggestions |
 | [ADR-057](./docs/adrs/ADR-057-detection-prompt-injection-controls.md) | Prompt injection | Document text is data, never instructions |
 | [ADR-058](./docs/adrs/ADR-058-suggestion-rule-candidate-matching.md) | Rule candidates | Only active `ApprovedNoticeRuleSnapshot`; advisory until HUMAN_CONFIRMED applicability |
+
+## Slice 6 — Notice drafting and approval (ADR-059–073)
+
+| ADR | Topic | Decision |
+|-----|-------|----------|
+| [ADR-059](./docs/adrs/ADR-059-notice-package-aggregate.md) | NoticePackage | Top-level aggregate bound to verified deadline + confirmed event; no SENT transition |
+| [ADR-060](./docs/adrs/ADR-060-notice-requirement-snapshot.md) | Requirement snapshot | Immutable copy from ApprovedNoticeRuleSnapshot |
+| [ADR-061](./docs/adrs/ADR-061-notice-evidence-completeness.md) | Evidence completeness | Structured requirements; waivers do not erase contractual needs |
+| [ADR-062](./docs/adrs/ADR-062-notice-reviewer-questions.md) | Reviewer questions | Structured Q&A; unverified answers stay out of approved drafts |
+| [ADR-063](./docs/adrs/ADR-063-approved-notice-facts.md) | NoticeFacts | Only approved facts enter approved draft revisions |
+| [ADR-064](./docs/adrs/ADR-064-structured-notice-sections.md) | Structured sections | Provenance-bearing sections; internalOnly excluded from export |
+| [ADR-065](./docs/adrs/ADR-065-deterministic-notice-drafting.md) | Deterministic drafting | AI not required for CI-usable notices |
+| [ADR-066](./docs/adrs/ADR-066-ai-assisted-notice-drafting.md) | AI drafting boundary | Schema-validated; invent-nothing; fake provider test-only |
+| [ADR-067](./docs/adrs/ADR-067-notice-recipient-preparation.md) | Recipient preparation | Package-scoped NoticeDeliveryPreparation; no guessed recipients |
+| [ADR-068](./docs/adrs/ADR-068-notice-attachment-manifest.md) | Attachments/manifest | Checksums; originals immutable |
+| [ADR-069](./docs/adrs/ADR-069-notice-approval-immutability.md) | Approval immutability | Approved revisions immutable; decisions append-only; SoD |
+| [ADR-070](./docs/adrs/ADR-070-notice-controlled-exceptions.md) | Controlled exceptions | Explicit risk acceptance; non-waivable blockers remain |
+| [ADR-071](./docs/adrs/ADR-071-notice-export-architecture.md) | Export | PDF/DOCX/JSON/ZIP/text; no signing or sending |
+| [ADR-072](./docs/adrs/ADR-072-bilingual-notice-handling.md) | Bilingual | AR/EN first-class; MT is derived until reviewed |
+| [ADR-073](./docs/adrs/ADR-073-notice-no-delivery-boundary.md) | No delivery | EXPORTED ≠ sent; NotificationIntent remains internal-only |
+
+Threat model: [docs/threat-models/notice-drafting.md](./docs/threat-models/notice-drafting.md)

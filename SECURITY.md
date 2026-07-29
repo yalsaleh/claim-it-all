@@ -244,4 +244,20 @@ Alert on: repeated auth failures, cross-tenant denial spikes, malware detections
 - [x] Document text treated as data, never instructions (ADR-057)
 - [x] Rule candidates only from active `ApprovedNoticeRuleSnapshot`; applicability human-confirmed (ADR-058)
 - [x] Threat model: [docs/threat-models/project-event-detection.md](./docs/threat-models/project-event-detection.md)
-- [ ] Notice drafting / evidence-completion workflows (deferred — next slice)
+- [x] Notice drafting / evidence-completion workflows moved to Slice 6
+
+## 20. Slice 6 — Notice drafting controls
+
+- [x] NoticePackage bound to confirmed event + verified deadline + approved rule snapshot (ADR-059)
+- [x] Immutable NoticeRequirementSnapshot — never execute from live NoticeRule (ADR-060)
+- [x] Evidence completeness with non-erasing waivers (ADR-061)
+- [x] Reviewer questions; unverified answers excluded from approved drafts (ADR-062)
+- [x] Approved NoticeFacts only in approved draft revisions (ADR-063)
+- [x] Structured sections with provenance; internalOnly never exports (ADR-064–065)
+- [x] AI drafting schema-validated; fake provider test-only (ADR-066)
+- [x] Recipient preparation verified; no guessed recipients (ADR-067)
+- [x] Export checksums/manifests; no signing or sending (ADR-071, ADR-073)
+- [x] Controlled exceptions with non-waivable blockers (ADR-070)
+- [x] FORCE RLS on all notice tables; approval append-only; SoD
+- [x] Threat model: [docs/threat-models/notice-drafting.md](./docs/threat-models/notice-drafting.md)
+- [ ] Controlled delivery / dispatch / acknowledgments (deferred — next slice)

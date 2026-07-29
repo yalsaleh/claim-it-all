@@ -160,3 +160,6 @@ E1–E7 (and related). `ProjectEventSuggestion` / date suggestions from determin
 - [ ] Arabic and English sample docs both flow through ingestion.
 - [ ] Audit log captures review decisions and privilege changes.
 - [ ] README reflects runnable reality — no theatrical placeholders.
+
+## Slice 6 — Notice drafting (Mode A done)
+Evidence completeness, questions, NoticeFacts, deterministic drafting, approval, PDF/DOCX/manifest export. Delivery deferred.

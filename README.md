@@ -4,7 +4,7 @@
 
 > We continuously monitor construction project records and warn contractors before they miss a contractual entitlement, evidence requirement, or notice deadline.
 
-Phase 1: secure multi-tenant platform + immutable document ingestion (Slice 2B). **Slice 3 done** — contract packages, clauses, obligations, and human-approved configuration. **Slice 4 done** — human-confirmed project events and deterministic notice-deadline calculation. **Slice 5 done (Mode A)** — evidence-backed event detection with mandatory human confirmation (suggestions are never auto-facts or auto-deadlines). Live ingestion verification remains Mode B. Notice drafting is not implemented yet.
+Phase 1: secure multi-tenant platform + immutable document ingestion (Slice 2B). **Slice 3 done** — contract packages, clauses, obligations, and human-approved configuration. **Slice 4 done** — human-confirmed project events and deterministic notice-deadline calculation. **Slice 5 done (Mode A)** — evidence-backed event detection with mandatory human confirmation. **Slice 6 done (Mode A)** — evidence completion, reviewer questions, deterministic notice drafting, human approval, and export-ready packages (no sending). Live ingestion verification remains Mode B.
 
 ---
 
@@ -34,9 +34,9 @@ Trigger Mode B: GitHub → **Actions** → **Live ingestion** → **Run workflow
 
 Implemented: auth/tenancy/RLS, document upload custody, transactional outbox, ClamAV-ready worker, scanner safety (`fake_test` refused outside tests), readiness, reconcile command, Mode A local verify, Mode B CI workflow.
 
-**Slice 2B** live ingestion remains Mode B (not claimed verified here). **Slices 3–5** (contract configuration, deadlines, detection suggestions + human accept) are implemented for Mode A. Live-ingestion GitHub regression still requires a push after commit.
+**Slice 2B** live ingestion remains Mode B (not claimed verified here). **Slices 3–6** (contract configuration, deadlines, detection suggestions, notice drafting/approval/export) are implemented for Mode A. Live-ingestion GitHub regression still requires a push after commit.
 
-Not implemented / not claimed done: live commercial LLM detection verification, entitlement conclusions, notice drafts/sending.
+Not implemented / not claimed done: live commercial LLM verification, entitlement conclusions, notice delivery/sending, electronic signatures.
 
 ---
 
