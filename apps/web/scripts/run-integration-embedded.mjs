@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_INTEGRATION_SUITES, runIntegrationSuites } from './run-integration-suites.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, '..');
@@ -68,6 +69,7 @@ async function main() {
     APP_ENV: 'test',
     DATABASE_URL: appUrl,
     INTEGRATION_DATABASE_URL: appUrl,
+    DATABASE_MIGRATE_URL: migrateUrl,
     APP_URL: 'http://localhost:3000',
     BETTER_AUTH_SECRET: 'ci-test-secret-with-sufficient-length-32',
     BETTER_AUTH_URL: 'http://localhost:3000',
@@ -126,76 +128,20 @@ async function main() {
 
   console.log('Running integration tests (fail if DB unavailable)…');
   const vitestArgs = process.argv.slice(2);
-  // Run each suite in a fresh Vitest process. Interactive transactions that hit
-  // DB immutability/parent-guard triggers can leave the Prisma pool wedged for
-  // later files in the same process (embedded runner).
-  const defaultSuites = [
-    'src/server/authz/isolation.integration.test.ts',
-    'src/server/documents/ingestion.integration.test.ts',
-    'src/server/queue/outbox.integration.test.ts',
-    'src/server/contracts/contracts.integration.test.ts',
-    'src/server/detections/detections.integration.test.ts',
-    'src/server/notices/notices.integration.test.ts',
-    'src/server/deadlines/deadlines.integration.test.ts',
-  ];
-  const suites = vitestArgs.length > 0 ? vitestArgs : defaultSuites;
-  for (const suite of suites) {
-    for (const sql of [
-      "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'contractradar_test' AND pid <> pg_backend_pid() AND backend_type = 'client backend'",
-      'SELECT pg_sleep(0.2)',
-      'TRUNCATE TABLE "tenant" CASCADE',
-    ]) {
-      const reset = spawnSync(
-        'pnpm',
-        ['exec', 'prisma', 'db', 'execute', '--url', migrateUrl, '--stdin'],
-        {
-          cwd: webRoot,
-          env: migrateEnv,
-          input: `${sql};\n`,
-          stdio: ['pipe', 'inherit', 'inherit'],
-          shell: process.platform === 'win32',
-        },
-      );
-      if (reset.status !== 0) {
-        console.warn(`Warning: between-suite SQL failed (${reset.status}): ${sql}`);
-      }
-    }
-
-    console.log(`\n=== Integration suite: ${suite} ===`);
-    result = spawnSync(
-      'pnpm',
-      [
-        'exec',
-        'vitest',
-        'run',
-        '--config',
-        'vitest.integration.config.ts',
-        '--reporter=verbose',
-        suite,
-      ],
-      {
-        cwd: webRoot,
-        env,
-        stdio: 'inherit',
-        shell: process.platform === 'win32',
-      },
-    );
-    if (result.status !== 0) {
-      try {
-        await pg.stop();
-      } catch {
-        // ignore stop errors after suite failure
-      }
-      process.exit(result.status ?? 1);
-    }
-  }
+  const suites = vitestArgs.length > 0 ? vitestArgs : DEFAULT_INTEGRATION_SUITES;
+  const code = runIntegrationSuites({
+    env,
+    migrateUrl,
+    suites,
+    databaseName,
+  });
 
   try {
     await pg.stop();
   } catch {
     // ignore shutdown races with client disconnect
   }
-  process.exit(0);
+  process.exit(code);
 }
 
 main().catch(async (error) => {

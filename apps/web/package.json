@@ -9,7 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:unit": "vitest run --config vitest.unit.config.ts",
-    "test:integration": "vitest run --config vitest.integration.config.ts --reporter=verbose",
+    "test:integration": "node scripts/run-integration-suites.mjs",
     "test:integration:embedded": "node scripts/run-integration-embedded.mjs",
     "test:security": "pnpm test:integration:embedded",
     "test:live": "vitest run --config vitest.live.config.ts --reporter=verbose",

@@ -54,7 +54,19 @@ run "${PNPM[@]}" --filter @contractradar/event-detection typecheck
 run "${PNPM[@]}" --filter @contractradar/notice-drafting typecheck
 run "${PNPM[@]}" --filter @contractradar/web typecheck
 run "${PNPM[@]}" test:unit
-run "${PNPM[@]}" test:integration:embedded
+# Match CI: fail if any non-live integration suite reports skips.
+set +e
+INTEGRATION_OUTPUT="$("${PNPM[@]}" test:integration:embedded 2>&1 | tee /tmp/verify-local-integration.out)"
+INTEGRATION_STATUS=${PIPESTATUS[0]}
+set -e
+echo "${INTEGRATION_OUTPUT}" | grep -E 'Test Files|Tests ' || true
+if echo "${INTEGRATION_OUTPUT}" | grep -E '[1-9][0-9]* skipped'; then
+  echo "Security integration tests must not skip."
+  exit 1
+fi
+if [[ "${INTEGRATION_STATUS}" -ne 0 ]]; then
+  exit "${INTEGRATION_STATUS}"
+fi
 
 # Python checks must match GitHub CI: ruff + mypy + pytest -k "not live"
 # with APP_ENV/MALWARE_SCANNER/token/ALLOW_DEV_DEFAULTS (see .github/workflows/ci.yml).
