@@ -22,6 +22,7 @@ export const DEFAULT_INTEGRATION_SUITES = [
   'src/server/notices/notices.integration.test.ts',
   'src/server/notices/delivery.integration.test.ts',
   'src/server/deadlines/deadlines.integration.test.ts',
+  'src/server/connectors/connectors.integration.test.ts',
 ];
 
 /**

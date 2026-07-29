@@ -53,6 +53,8 @@ run "${PNPM[@]}" --filter @contractradar/contract-rules typecheck
 run "${PNPM[@]}" --filter @contractradar/event-detection typecheck
 run "${PNPM[@]}" --filter @contractradar/notice-drafting typecheck
 run "${PNPM[@]}" --filter @contractradar/notice-delivery typecheck
+run "${PNPM[@]}" --filter @contractradar/connectors typecheck
+run "${PNPM[@]}" --filter @contractradar/operations typecheck
 run "${PNPM[@]}" --filter @contractradar/web typecheck
 run "${PNPM[@]}" test:unit
 # Match CI: fail if any non-live integration suite reports skips.

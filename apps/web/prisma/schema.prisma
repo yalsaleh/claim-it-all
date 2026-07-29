@@ -138,6 +138,23 @@ model User {
   deliveryProviderConfigsCreated       DeliveryProviderConfiguration[] @relation("DeliveryProviderConfigCreator")
   deliveryProviderConfigsApproved      DeliveryProviderConfiguration[] @relation("DeliveryProviderConfigApprover")
 
+  connectorAccountsConfigured          ConnectorAccount[]              @relation("ConnectorAccountConfigurer")
+  connectorAccountsApproved            ConnectorAccount[]              @relation("ConnectorAccountApprover")
+  connectorScopesConfigured            ConnectorProjectScope[]         @relation("ConnectorScopeConfigurer")
+  connectorScopesReviewed              ConnectorProjectScope[]         @relation("ConnectorScopeReviewer")
+  connectorScopesApproved              ConnectorProjectScope[]         @relation("ConnectorScopeApprover")
+  connectorScopeApprovals              ConnectorScopeApproval[]        @relation("ConnectorScopeApprovalActor")
+  connectorSyncRunsRequested           ConnectorSyncRun[]              @relation("ConnectorSyncRunRequester")
+  operationalAlertsOwned               OperationalAlert[]              @relation("OperationalAlertOwner")
+  operationalAlertEvents               OperationalAlertEvent[]         @relation("OperationalAlertEventActor")
+  escalationPoliciesCreated            EscalationPolicy[]              @relation("EscalationPolicyCreator")
+  escalationPoliciesApproved           EscalationPolicy[]              @relation("EscalationPolicyApprover")
+  escalationStepTargets                EscalationStep[]                @relation("EscalationStepTargetUser")
+  operationalTasksAssigned             OperationalTask[]               @relation("OperationalTaskAssignee")
+  internalNotifications                InternalNotification[]          @relation("InternalNotificationRecipient")
+  operationalSavedViews                OperationalSavedView[]          @relation("OperationalSavedViewOwner")
+  projectTimelineEvents                ProjectTimelineEvent[]          @relation("ProjectTimelineEventActor")
+
   @@map("user")
 }
 
@@ -286,6 +303,22 @@ model Tenant {
   deliveryProviderEvents             DeliveryProviderEvent[]
   deliveryProviderConfigurations     DeliveryProviderConfiguration[]
 
+  connectorAccounts                  ConnectorAccount[]
+  connectorProjectScopes             ConnectorProjectScope[]
+  connectorScopeApprovals            ConnectorScopeApproval[]
+  connectorSyncRuns                  ConnectorSyncRun[]
+  externalRecords                    ExternalRecord[]
+  connectorProviderEvents            ConnectorProviderEvent[]
+  operationalAlerts                  OperationalAlert[]
+  operationalAlertEvents             OperationalAlertEvent[]
+  escalationPolicies                 EscalationPolicy[]
+  escalationSteps                    EscalationStep[]
+  operationalTasks                   OperationalTask[]
+  internalNotifications              InternalNotification[]
+  operationalSavedViews              OperationalSavedView[]
+  projectTimelineEvents              ProjectTimelineEvent[]
+  projectOperationsSummaries         ProjectOperationsSummary[]
+
   @@map("tenant")
 }
 
@@ -407,6 +440,18 @@ model Project {
   deemedReceiptAssessments           DeemedReceiptAssessment[]
   noticeAcknowledgments              NoticeAcknowledgment[]
   deliveryProviderEvents             DeliveryProviderEvent[]
+
+  connectorProjectScopes             ConnectorProjectScope[]
+  connectorScopeApprovals            ConnectorScopeApproval[]
+  connectorSyncRuns                  ConnectorSyncRun[]
+  externalRecords                    ExternalRecord[]
+  operationalAlerts                  OperationalAlert[]
+  escalationPolicies                 EscalationPolicy[]
+  operationalTasks                   OperationalTask[]
+  internalNotifications              InternalNotification[]
+  operationalSavedViews              OperationalSavedView[]
+  projectTimelineEvents              ProjectTimelineEvent[]
+  projectOperationsSummary           ProjectOperationsSummary?
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -651,6 +696,7 @@ model SourceDocument {
   contractDocuments   ContractDocument[]
   projectEventEvidence ProjectEventEvidence[]
   suggestionEvidence   ProjectEventSuggestionEvidence[]
+  externalRecords      ExternalRecord[]
 
   @@index([tenantId, projectId, status])
   @@index([tenantId, projectId, documentType])
@@ -701,6 +747,7 @@ model DocumentVersion {
   contractClauses      ContractClause[]
   projectEventEvidence ProjectEventEvidence[]
   suggestionEvidence   ProjectEventSuggestionEvidence[]
+  externalRecords      ExternalRecord[]
 
   @@unique([sourceDocumentId, versionNumber])
   @@unique([tenantId, storageKey])
@@ -1737,6 +1784,9 @@ model ContractRole {
   projectEventRoles      ProjectEventRole[]
   projectDeadlinesResponsible ProjectDeadline[] @relation("DeadlineResponsibleRole")
   notificationIntentsRecipient NotificationIntent[] @relation("NotificationIntentRecipientRole")
+  operationalAlertsOwned      OperationalAlert[] @relation("OperationalAlertOwnerRole")
+  escalationStepTargets       EscalationStep[] @relation("EscalationStepTargetRole")
+  operationalTasksAssigned    OperationalTask[] @relation("OperationalTaskAssigneeRole")
 
   @@index([tenantId, projectId, contractPackageId])
   @@index([assignedPartyId])
@@ -2608,6 +2658,7 @@ model ProjectCalendar {
   currentRevision ProjectCalendarRevision?  @relation("CurrentCalendarRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
   revisions       ProjectCalendarRevision[] @relation("CalendarRevisions")
   deadlineCalculations DeadlineCalculation[]
+  escalationPolicies   EscalationPolicy[]
 
   @@index([tenantId, projectId, status])
   @@map("project_calendar")
@@ -4656,4 +4707,562 @@ model DeliveryProviderConfiguration {
   @@index([tenantId, scope, providerType])
   @@index([status])
   @@map("delivery_provider_configuration")
+}
+
+// --- Slice 8: Connector + Operations ---
+
+enum ConnectorAccountStatus {
+  DRAFT
+  VALIDATION_REQUIRED
+  VALIDATED
+  APPROVED
+  DISABLED
+  ERROR
+  REVOKED
+}
+
+enum ConnectorScopeStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  ACTIVE
+  PAUSED
+  DISABLED
+  ERROR
+}
+
+enum ConnectorScopeDirection {
+  IMPORT_ONLY
+  FUTURE_EXPORT_RESERVED
+}
+
+enum ConnectorSyncRunType {
+  MANUAL
+  SCHEDULED
+  INCREMENTAL
+  RESCAN
+}
+
+enum ConnectorSyncRunStatus {
+  QUEUED
+  RUNNING
+  PARTIALLY_SUCCEEDED
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  DEAD_LETTERED
+}
+
+enum ExternalRecordType {
+  EMAIL
+  EMAIL_ATTACHMENT
+  LETTER
+  RFI
+  INSTRUCTION
+  MEETING_MINUTES
+  DAILY_REPORT
+  PAYMENT_RECORD
+  DRAWING
+  SPREADSHEET
+  PHOTOGRAPH
+  EDMS_DOCUMENT
+  OTHER
+}
+
+enum ExternalRecordImportStatus {
+  DISCOVERED
+  QUEUED
+  IMPORTING
+  IMPORTED
+  SKIPPED
+  DUPLICATE
+  FAILED
+  QUARANTINED
+}
+
+enum OperationalAlertSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum OperationalAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  IN_PROGRESS
+  RESOLVED
+  DISMISSED
+  SUPERSEDED
+}
+
+enum OperationalTaskStatus {
+  OPEN
+  ACKNOWLEDGED
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+enum OperationalTaskType {
+  REVIEW_EVENT_SUGGESTION
+  VERIFY_EVENT_DATE
+  PROVIDE_EVIDENCE
+  REVIEW_DEADLINE
+  PREPARE_NOTICE
+  REVIEW_NOTICE
+  APPROVE_NOTICE
+  AUTHORIZE_DISPATCH
+  VERIFY_DISPATCH
+  CONFIRM_RECEIPT
+  FIX_CONNECTOR
+  REVIEW_CONTRACT_CONFIGURATION
+  OTHER
+}
+
+enum InternalNotificationChannel {
+  IN_APP
+  LOCAL_CAPTURE
+  FUTURE_EMAIL
+  FUTURE_SLACK
+  FUTURE_TEAMS
+  DIGEST
+}
+
+enum InternalNotificationStatus {
+  PENDING
+  DELIVERED
+  READ
+  DISMISSED
+  FAILED
+}
+
+enum EscalationPolicyStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  DISABLED
+  SUPERSEDED
+}
+
+model ConnectorAccount {
+  id                   String                 @id @default(uuid())
+  tenantId             String
+  connectorType        String
+  displayName          String
+  provider             String
+  status               ConnectorAccountStatus @default(DRAFT)
+  secretReference      String
+  externalAccountId    String?
+  externalTenantId     String?
+  configuredByUserId   String
+  approvedByUserId     String?
+  approvedAt           DateTime?
+  lastValidatedAt      DateTime?
+  lastValidationStatus String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  configuredBy   User                    @relation("ConnectorAccountConfigurer", fields: [configuredByUserId], references: [id], onDelete: Restrict)
+  approvedBy     User?                   @relation("ConnectorAccountApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  scopes         ConnectorProjectScope[]
+  syncRuns       ConnectorSyncRun[]
+  externalRecords ExternalRecord[]
+  providerEvents ConnectorProviderEvent[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, provider])
+  @@map("connector_account")
+}
+
+model ConnectorProjectScope {
+  id                     String                  @id @default(uuid())
+  tenantId               String
+  projectId              String
+  connectorAccountId     String
+  externalMailboxOrFolder String
+  externalProjectId      String?
+  includeRules           Json
+  excludeRules           Json
+  approvedDocumentTypes  Json
+  dateRangeStart         DateTime?
+  dateRangeEnd           DateTime?
+  direction              ConnectorScopeDirection @default(IMPORT_ONLY)
+  status                 ConnectorScopeStatus    @default(DRAFT)
+  lastCheckpoint         Json?
+  configuredByUserId     String
+  reviewedByUserId       String?
+  approvedByUserId       String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project           Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connectorAccount  ConnectorAccount        @relation(fields: [connectorAccountId], references: [id], onDelete: Cascade)
+  configuredBy      User                    @relation("ConnectorScopeConfigurer", fields: [configuredByUserId], references: [id], onDelete: Restrict)
+  reviewedBy        User?                   @relation("ConnectorScopeReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  approvedBy        User?                   @relation("ConnectorScopeApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  approvals         ConnectorScopeApproval[]
+  syncRuns          ConnectorSyncRun[]
+  externalRecords   ExternalRecord[]
+
+  @@unique([connectorAccountId, projectId, externalMailboxOrFolder])
+  @@index([tenantId, projectId, status])
+  @@map("connector_project_scope")
+}
+
+/// Append-only approval history for connector project scopes.
+model ConnectorScopeApproval {
+  id                      String   @id @default(uuid())
+  tenantId                String
+  projectId               String
+  connectorProjectScopeId String
+  decision                String
+  actorUserId             String
+  rationale               String?  @db.Text
+  decidedAt               DateTime
+  scopeSnapshot           Json
+
+  tenant                Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connectorProjectScope ConnectorProjectScope @relation(fields: [connectorProjectScopeId], references: [id], onDelete: Cascade)
+  actor                 User                  @relation("ConnectorScopeApprovalActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, connectorProjectScopeId, decidedAt])
+  @@map("connector_scope_approval")
+}
+
+model ConnectorSyncRun {
+  id                      String                 @id @default(uuid())
+  tenantId                String
+  projectId               String
+  connectorAccountId      String
+  connectorProjectScopeId String
+  scopeSnapshot           Json
+  runType                 ConnectorSyncRunType
+  status                  ConnectorSyncRunStatus @default(QUEUED)
+  requestedByUserId       String?
+  startedAt               DateTime?
+  completedAt             DateTime?
+  checkpointBefore        Json?
+  checkpointAfter         Json?
+  recordsDiscovered       Int                    @default(0)
+  recordsImported         Int                    @default(0)
+  recordsSkipped          Int                    @default(0)
+  duplicatesDetected      Int                    @default(0)
+  recordsFailed           Int                    @default(0)
+  warnings                Json?
+  failureCode             String?
+  failureMessageSafe      String?                @db.Text
+  processorVersion        String
+  correlationId           String
+  createdAt               DateTime               @default(now())
+
+  tenant                Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connectorAccount      ConnectorAccount      @relation(fields: [connectorAccountId], references: [id], onDelete: Cascade)
+  connectorProjectScope ConnectorProjectScope @relation(fields: [connectorProjectScopeId], references: [id], onDelete: Cascade)
+  requestedBy           User?                 @relation("ConnectorSyncRunRequester", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  externalRecords       ExternalRecord[]
+  providerEvents        ConnectorProviderEvent[]
+
+  @@index([tenantId, projectId, status, createdAt])
+  @@index([connectorProjectScopeId])
+  @@index([correlationId])
+  @@map("connector_sync_run")
+}
+
+model ExternalRecord {
+  id                      String                     @id @default(uuid())
+  tenantId                String
+  projectId               String
+  connectorAccountId      String
+  connectorProjectScopeId String
+  syncRunId               String?
+  externalSystem          String
+  externalRecordId        String
+  externalThreadId        String?
+  externalParentId        String?
+  recordType              ExternalRecordType
+  subjectOrTitle          String?
+  sourceTimestamp         DateTime?
+  senderAuthorSnapshot    Json?
+  recipientSnapshot       Json?
+  externalVersionId       String                     @default("")
+  externalChecksum        String?
+  importedChecksum        String?
+  sourceMetadata          Json?
+  importStatus            ExternalRecordImportStatus @default(DISCOVERED)
+  sourceDocumentId        String?
+  documentVersionId       String?
+  firstSeenAt             DateTime
+  lastSeenAt              DateTime
+  importedAt              DateTime?
+  deletedExternally       Boolean                    @default(false)
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+
+  tenant                Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project               Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connectorAccount      ConnectorAccount      @relation(fields: [connectorAccountId], references: [id], onDelete: Cascade)
+  connectorProjectScope ConnectorProjectScope @relation(fields: [connectorProjectScopeId], references: [id], onDelete: Cascade)
+  syncRun               ConnectorSyncRun?     @relation(fields: [syncRunId], references: [id], onDelete: SetNull)
+  sourceDocument        SourceDocument?       @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  documentVersion       DocumentVersion?      @relation(fields: [documentVersionId], references: [id], onDelete: SetNull)
+
+  @@unique([connectorAccountId, connectorProjectScopeId, externalRecordId, externalVersionId])
+  @@index([tenantId, projectId, importStatus])
+  @@index([syncRunId])
+  @@map("external_record")
+}
+
+model ConnectorProviderEvent {
+  id                String   @id @default(uuid())
+  tenantId          String
+  connectorAccountId String
+  provider          String
+  providerEventId   String
+  eventType         String
+  externalResourceId String?
+  occurredAt        DateTime
+  receivedAt        DateTime @default(now())
+  signatureStatus   String
+  payloadChecksum   String
+  redactedPayload   Json
+  processingStatus  String
+  linkedSyncRunId   String?
+  createdAt         DateTime @default(now())
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connectorAccount ConnectorAccount  @relation(fields: [connectorAccountId], references: [id], onDelete: Cascade)
+  linkedSyncRun    ConnectorSyncRun? @relation(fields: [linkedSyncRunId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerEventId])
+  @@index([tenantId, connectorAccountId, receivedAt])
+  @@index([linkedSyncRunId])
+  @@map("connector_provider_event")
+}
+
+model OperationalAlert {
+  id               String                   @id @default(uuid())
+  tenantId         String
+  projectId        String?
+  alertType        String
+  severity         OperationalAlertSeverity
+  title            String
+  description      String                   @db.Text
+  sourceEntityType String
+  sourceEntityId   String
+  status           OperationalAlertStatus   @default(OPEN)
+  dedupeKey        String
+  detectedAt       DateTime
+  firstObservedAt  DateTime
+  lastObservedAt   DateTime
+  dueAt            DateTime?
+  ownerUserId      String?
+  ownerRoleId      String?
+  acknowledgedAt   DateTime?
+  resolvedAt       DateTime?
+  resolution       String?                  @db.Text
+  rulesetVersion   String
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  tenant     Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project    Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  ownerUser  User?                   @relation("OperationalAlertOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  ownerRole  ContractRole?           @relation("OperationalAlertOwnerRole", fields: [ownerRoleId], references: [id], onDelete: SetNull)
+  events     OperationalAlertEvent[]
+  tasks      OperationalTask[]
+
+  @@index([tenantId, dedupeKey])
+  @@index([tenantId, projectId, status])
+  @@index([tenantId, severity, status])
+  @@map("operational_alert")
+}
+
+/// Append-only history for operational alerts.
+model OperationalAlertEvent {
+  id          String   @id @default(uuid())
+  tenantId    String
+  alertId     String
+  eventType   String
+  actorUserId String?
+  note        String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  alert  OperationalAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  actor  User?            @relation("OperationalAlertEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, alertId, createdAt])
+  @@map("operational_alert_event")
+}
+
+model EscalationPolicy {
+  id                 String                   @id @default(uuid())
+  tenantId           String
+  projectId          String?
+  name               String
+  alertTypes         Json
+  severityThreshold  OperationalAlertSeverity
+  status             EscalationPolicyStatus   @default(DRAFT)
+  businessCalendarId String?
+  enabled            Boolean                  @default(true)
+  createdByUserId    String
+  approvedByUserId   String?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project          Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  businessCalendar ProjectCalendar?  @relation(fields: [businessCalendarId], references: [id], onDelete: SetNull)
+  createdBy        User              @relation("EscalationPolicyCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  approvedBy       User?             @relation("EscalationPolicyApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  steps            EscalationStep[]
+
+  @@index([tenantId, projectId, status])
+  @@map("escalation_policy")
+}
+
+model EscalationStep {
+  id                   String                    @id @default(uuid())
+  tenantId             String
+  escalationPolicyId   String
+  stepOrder            Int
+  afterMinutes         Int
+  targetUserId         String?
+  targetRoleId         String?
+  severityChange       OperationalAlertSeverity?
+  createTask           Boolean                   @default(true)
+  requireAcknowledgment Boolean                  @default(false)
+  repeatBehavior       String?
+
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  escalationPolicy EscalationPolicy @relation(fields: [escalationPolicyId], references: [id], onDelete: Cascade)
+  targetUser       User?            @relation("EscalationStepTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  targetRole       ContractRole?    @relation("EscalationStepTargetRole", fields: [targetRoleId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, escalationPolicyId, stepOrder])
+  @@map("escalation_step")
+}
+
+model OperationalTask {
+  id               String                @id @default(uuid())
+  tenantId         String
+  projectId        String
+  sourceAlertId    String?
+  title            String
+  description      String?               @db.Text
+  taskType         OperationalTaskType
+  priority         String
+  status           OperationalTaskStatus @default(OPEN)
+  assignedUserId   String?
+  assignedRoleId   String?
+  dueAt            DateTime?
+  acknowledgedAt   DateTime?
+  completedAt      DateTime?
+  completionNotes  String?               @db.Text
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceAlert  OperationalAlert? @relation(fields: [sourceAlertId], references: [id], onDelete: SetNull)
+  assignedUser User?             @relation("OperationalTaskAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  assignedRole ContractRole?     @relation("OperationalTaskAssigneeRole", fields: [assignedRoleId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, status])
+  @@index([assignedUserId, status])
+  @@index([sourceAlertId])
+  @@map("operational_task")
+}
+
+/// NEVER used for contractual notice dispatch.
+model InternalNotification {
+  id               String                      @id @default(uuid())
+  tenantId         String
+  projectId        String?
+  recipientUserId  String
+  channel          InternalNotificationChannel
+  status           InternalNotificationStatus  @default(PENDING)
+  title            String
+  body             String                      @db.Text
+  sourceEntityType String?
+  sourceEntityId   String?
+  createdAt        DateTime                    @default(now())
+  readAt           DateTime?
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  recipient User     @relation("InternalNotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, recipientUserId, status])
+  @@index([tenantId, projectId])
+  @@map("internal_notification")
+}
+
+model OperationalSavedView {
+  id          String   @id @default(uuid())
+  tenantId    String
+  ownerUserId String
+  name        String
+  viewType    String
+  filters     Json
+  projectId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner   User     @relation("OperationalSavedViewOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, ownerUserId])
+  @@map("operational_saved_view")
+}
+
+model ProjectTimelineEvent {
+  id          String   @id @default(uuid())
+  tenantId    String
+  projectId   String
+  eventType   String
+  summary     String
+  entityType  String?
+  entityId    String?
+  actorUserId String?
+  occurredAt  DateTime
+  createdAt   DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor   User?   @relation("ProjectTimelineEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, occurredAt])
+  @@map("project_timeline_event")
+}
+
+/// Optional materialized counters for project operations dashboard.
+model ProjectOperationsSummary {
+  id                       String    @id @default(uuid())
+  tenantId                 String
+  projectId                String    @unique
+  criticalAlertCount       Int       @default(0)
+  openAlertCount           Int       @default(0)
+  deadlinesDueSoonCount    Int       @default(0)
+  overdueDeadlineCount     Int       @default(0)
+  pendingSuggestionCount   Int       @default(0)
+  noticeBlockerCount       Int       @default(0)
+  lastSuccessfulSyncAt     DateTime?
+  rebuiltAt                DateTime
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, projectId])
+  @@map("project_operations_summary")
 }

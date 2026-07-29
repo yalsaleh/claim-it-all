@@ -63,3 +63,5 @@ Require the **Live ingestion** workflow to pass before merging PRs that change i
 Static + unit + Postgres/Redis/MinIO-backed integration with `MALWARE_SCANNER=fake_test`. Complements Mode B; does not replace it.
 
 Slice 6 adds `@contractradar/notice-drafting` unit tests and PostgreSQL notice workflow integration coverage in Mode A verify.
+
+Slice 8 adds `@contractradar/connectors` and `@contractradar/operations` unit tests, fake/local provider rejection tests, and the `connectors.integration.test.ts` suite (approve scope → sync → import → alerts → portfolio membership). CI never uses live mailbox/EDMS credentials and never sends real external notifications.

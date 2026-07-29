@@ -168,3 +168,7 @@ Evidence completeness, questions, NoticeFacts, deterministic drafting, approval,
 ## Slice 7 — Controlled delivery (done)
 
 Human-authorized dispatch, immutable snapshots, manual + fake/local providers, receipt assessment, no autonomous resend. ADRs 074–086.
+
+## Slice 8 — Connectors and operations (done — Mode A)
+
+`ConnectorAccount` + approved `ConnectorProjectScope` (`IMPORT_ONLY`); `ExternalRecord` identity; connector import through existing SourceDocument/DocumentVersion/outbox/ARQ; fake/local connectors CI-only; sync checkpoints; connector webhooks; deterministic operational alerts with deduplication and escalation policies; operational task boundary; internal notifications separate from notice dispatch; project and portfolio dashboards with membership-scoped aggregation. ADRs 087–102. Threat model: [docs/threat-models/connectors-and-operations.md](../threat-models/connectors-and-operations.md). **Schedulers and connectors never confirm events, activate deadlines, or send notices.**

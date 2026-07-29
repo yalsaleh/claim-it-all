@@ -26,6 +26,9 @@ importers:
       '@contractradar/authz':
         specifier: workspace:*
         version: link:../../packages/authz
+      '@contractradar/connectors':
+        specifier: workspace:*
+        version: link:../../packages/connectors
       '@contractradar/contract-rules':
         specifier: workspace:*
         version: link:../../packages/contract-rules
@@ -38,6 +41,9 @@ importers:
       '@contractradar/notice-drafting':
         specifier: workspace:*
         version: link:../../packages/notice-drafting
+      '@contractradar/operations':
+        specifier: workspace:*
+        version: link:../../packages/operations
       '@contractradar/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -127,6 +133,25 @@ importers:
         specifier: 2.1.8
         version: 2.1.8(@types/node@22.10.2)
 
+  packages/connectors:
+    dependencies:
+      zod:
+        specifier: 3.24.1
+        version: 3.24.1
+    devDependencies:
+      '@contractradar/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 22.10.2
+        version: 22.10.2
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@22.10.2)
+
   packages/contract-rules:
     dependencies:
       luxon:
@@ -191,6 +216,25 @@ importers:
         version: 2.1.8(@types/node@22.10.2)
 
   packages/notice-drafting:
+    dependencies:
+      zod:
+        specifier: 3.24.1
+        version: 3.24.1
+    devDependencies:
+      '@contractradar/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 22.10.2
+        version: 22.10.2
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@22.10.2)
+
+  packages/operations:
     dependencies:
       zod:
         specifier: 3.24.1

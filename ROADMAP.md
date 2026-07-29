@@ -34,6 +34,7 @@ Phases are sequential for dependency reasons, but engineering spikes may overlap
 - Deterministic deadline engine + human-confirmed project events — **Slice 4 done** (ADR-037–047)
 - Evidence-backed event detection with mandatory human confirmation — **Slice 5 done (Mode A)** (ADR-048–058); suggestions never auto-activate deadlines
 - Controlled delivery with human authorization, dispatch evidence, acknowledgments — **Slice 7** (ADR-074–086); no autonomous send
+- Connectors, operational alerts, project/portfolio dashboards — **Slice 8** (ADR-087–102); import-only connectors; no autonomous legal state mutation
 - Historical detection for:
   1. Late drawings or approvals
   2. Suspension or restricted site access
@@ -142,3 +143,6 @@ Detailed backlog: [docs/backlog/phase-1.md](./docs/backlog/phase-1.md)
 
 ### Slice 6 (done — Mode A)
 Evidence completion, reviewer questions, deterministic/AI-assisted notice drafting, human approval, and export-ready packages. **No automatic delivery.**
+
+### Slice 8 (done — Mode A)
+`ConnectorAccount` + approved `ConnectorProjectScope` (`IMPORT_ONLY`); `ExternalRecord` identity; import via existing ingestion/outbox/ARQ; fake/local connectors CI-only; deterministic operational alerts and dashboards; portfolio respects membership. ADRs 087–102. Threat model: [docs/threat-models/connectors-and-operations.md](./docs/threat-models/connectors-and-operations.md). **No autonomous event confirmation, deadline activation, or notice dispatch.** Next: production hardening / real provider onboarding / pilot readiness (not started).

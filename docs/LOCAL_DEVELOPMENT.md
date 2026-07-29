@@ -29,6 +29,8 @@ Supports:
 
 Slice 4 local work covers human-confirmed project events, approved calendars, and deterministic deadline calculation via `packages/contract-rules`. Slice 5 detection work uses pure detectors in `packages/event-detection` and **fake/fixture AI only in tests** — live commercial LLM detection is not required for Mode A and is not claimed verified locally.
 
+Slice 8 local work uses **fake/local connector providers only** (`CONNECTOR_PROVIDER=fake` in tests). Fake providers are rejected outside test/dev. Imports create `SourceDocument`/`DocumentVersion` and outbox jobs through the existing ingestion path; they do not auto-confirm events or send notices. See [CONNECTOR_PRIVACY.md](./CONNECTOR_PRIVACY.md) and [OPERATIONS.md](./OPERATIONS.md).
+
 ### Install (no Docker)
 
 ```bash

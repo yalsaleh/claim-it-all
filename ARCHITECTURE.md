@@ -423,6 +423,8 @@ See [SECURITY.md](./SECURITY.md) for the full control set. Architecture-level co
 
 Each connector implements: auth, incremental sync, document normalization, tenant mapping, and failure isolation.
 
+**Slice 8 (implemented):** `@contractradar/connectors` provides `fake` and `local_fixture` providers only; imports flow through existing `SourceDocument` / `DocumentVersion` / transactional outbox. `@contractradar/operations` evaluates deterministic alerts and dashboard counts. Connectors and schedulers never confirm events, activate deadlines, or dispatch notices.
+
 ---
 
 ## 19. Deployment

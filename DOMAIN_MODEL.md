@@ -411,3 +411,7 @@ Runtime aggregate for evidence completion → approved NoticeFacts → structure
 ### Slice 7 delivery entities
 
 `NoticeDispatchPackageSnapshot`, `NoticeDispatchAuthorization`, `NoticeDispatchAttempt`, `NoticeDispatchRecipient`, `ManualDispatchRecord`, `DispatchEvidence`, `NoticeReceiptAssessment`, `DeemedReceiptAssessment`, `NoticeAcknowledgment`, `DeliveryProviderEvent`, `DeliveryProviderConfiguration`. Provider delivery ≠ contractual service.
+
+### Slice 8 connectors and operations
+
+`ConnectorAccount` (secret references only; statuses DRAFT→APPROVED/DISABLED/REVOKED), `ConnectorProjectScope` (`IMPORT_ONLY`; explicit approval), `ConnectorSyncRun`, `ExternalRecord` (provider identity + provenance; links to `SourceDocument`/`DocumentVersion`), `ConnectorProviderEvent` (append-only webhooks), `OperationalAlert` / `OperationalAlertEvent`, `EscalationPolicy` / `EscalationStep`, `OperationalTask`, `InternalNotification` (separate from contractual dispatch), `ProjectTimelineEvent`, `ProjectOperationsSummary`, `OperationalSavedView`. Imported records are evidence, not conclusions. Sync never confirms events, activates deadlines, or sends notices.

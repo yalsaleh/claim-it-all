@@ -4,7 +4,7 @@
 
 > We continuously monitor construction project records and warn contractors before they miss a contractual entitlement, evidence requirement, or notice deadline.
 
-Phase 1: secure multi-tenant platform + immutable document ingestion (Slice 2B). **Slice 3 done** — contract packages, clauses, obligations, and human-approved configuration. **Slice 4 done** — human-confirmed project events and deterministic notice-deadline calculation. **Slice 5 done (Mode A)** — evidence-backed event detection with mandatory human confirmation. **Slice 6 done (Mode A)** — evidence completion, reviewer questions, deterministic notice drafting, human approval, and export-ready packages (no sending). Live ingestion verification remains Mode B.
+Phase 1: secure multi-tenant platform + immutable document ingestion (Slice 2B). **Slices 3–7 done (Mode A)** — contract configuration, deadlines, detection, notice drafting, and controlled delivery. **Slice 8 done (Mode A)** — approved connector scopes, fake/local import through the existing ingestion pipeline, deterministic operational alerts/escalations/tasks, and membership-filtered project/portfolio dashboards. Live ingestion verification remains Mode B.
 
 ---
 
@@ -34,9 +34,9 @@ Trigger Mode B: GitHub → **Actions** → **Live ingestion** → **Run workflow
 
 Implemented: auth/tenancy/RLS, document upload custody, transactional outbox, ClamAV-ready worker, scanner safety (`fake_test` refused outside tests), readiness, reconcile command, Mode A local verify, Mode B CI workflow.
 
-**Slice 2B** live ingestion remains Mode B (not claimed verified here). **Slices 3–6** (contract configuration, deadlines, detection suggestions, notice drafting/approval/export) are implemented for Mode A. Live-ingestion GitHub regression still requires a push after commit.
+**Slice 2B** live ingestion remains Mode B (not claimed verified here). **Slices 3–8** are implemented for Mode A (including fake/local connectors and operational dashboards). Live-ingestion GitHub regression still requires a push after commit.
 
-Not implemented / not claimed done: live commercial LLM verification, entitlement conclusions, notice delivery/sending, electronic signatures.
+Not implemented / not claimed done: live commercial mailbox/EDMS providers, entitlement conclusions, autonomous legal-state mutation, electronic signatures, claim valuation.
 
 ---
 
@@ -52,6 +52,8 @@ Not implemented / not claimed done: live commercial LLM verification, entitlemen
 | [docs/LOCAL_DEVELOPMENT.md](./docs/LOCAL_DEVELOPMENT.md) | Mode A / Mode B |
 | [docs/CI.md](./docs/CI.md) | CI workflows |
 | [docs/backlog/phase-1.md](./docs/backlog/phase-1.md) | Phase 1 backlog |
+| [docs/CONNECTOR_PRIVACY.md](./docs/CONNECTOR_PRIVACY.md) | Connector scope and privacy |
+| [docs/OPERATIONS.md](./docs/OPERATIONS.md) | Operational monitoring guide |
 
 ## Operating principles
 

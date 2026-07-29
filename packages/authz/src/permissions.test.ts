@@ -39,6 +39,20 @@ describe('tenant role capabilities', () => {
     expect(hasCapability(caps, 'notice_draft.approve')).toBe(false);
     expect(hasCapability(caps, 'notice_dispatch.send')).toBe(false);
     expect(hasCapability(caps, 'notice_dispatch.read')).toBe(true);
+    expect(hasCapability(caps, 'operations_dashboard.read')).toBe(true);
+    expect(hasCapability(caps, 'portfolio.read')).toBe(true);
+    expect(hasCapability(caps, 'connector_account.approve')).toBe(false);
+  });
+
+  it('grants tenant owners connector approve and portfolio read', () => {
+    const owner = capabilitiesForTenantRole('TENANT_OWNER');
+    expect(hasCapability(owner, 'connector_account.approve')).toBe(true);
+    expect(hasCapability(owner, 'portfolio.read')).toBe(true);
+    expect(hasCapability(owner, 'operations_dashboard.read')).toBe(true);
+
+    const admin = capabilitiesForTenantRole('TENANT_ADMIN');
+    expect(hasCapability(admin, 'connector_account.approve')).toBe(true);
+    expect(hasCapability(admin, 'portfolio.read')).toBe(true);
   });
 
   it('grants contracts managers package and approval capabilities', () => {

@@ -266,3 +266,13 @@ Alert on: repeated auth failures, cross-tenant denial spikes, malware detections
 ## Slice 7 delivery controls
 
 Controlled notice delivery requires immutable dispatch snapshots, explicit human authorization, explicit send action, FORCE RLS on dispatch tables, verified webhooks, and human confirmation of contractual service. See `docs/threat-models/notice-delivery.md`.
+
+## Slice 8 connectors and operations
+
+- Import-only `ConnectorProjectScope`; no export or autonomous legal mutation (ADR-087, ADR-102).
+- `fake` / `local_fixture` providers rejected in production and staging (ADR-089).
+- Connector credentials stored as `secretReference` only — never raw secrets in the database.
+- Segregation of duties on connector account and scope approval (`CONNECTOR_SOD`).
+- Operational alerts are deterministic and deduplicated; `InternalNotification` is in-app only and never used for contractual notice dispatch.
+- Portfolio dashboard respects project membership — no cross-tenant or tenant-wide leakage for restricted roles.
+- Threat model: [docs/threat-models/connectors-and-operations.md](./docs/threat-models/connectors-and-operations.md)

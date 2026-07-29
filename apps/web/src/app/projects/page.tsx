@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { Route } from 'next';
 import { redirect } from 'next/navigation';
 import { hasCapability } from '@contractradar/authz';
 import { Card, ContextBanner, PageTitle, Shell } from '@/components/ui';
@@ -47,6 +48,33 @@ export default async function ProjectsPage() {
         project={null}
         role={ctx.tenantRole}
       />
+
+      <div className="mb-6 flex flex-wrap gap-3">
+        {hasCapability(ctx.capabilities, 'portfolio.read') ? (
+          <Link
+            className="rounded-md border border-ink-300 px-4 py-2 text-sm font-medium"
+            href={'/portfolio' as Route}
+          >
+            Portfolio
+          </Link>
+        ) : null}
+        {hasCapability(ctx.capabilities, 'connector_account.read') ? (
+          <Link
+            className="rounded-md border border-ink-300 px-4 py-2 text-sm font-medium"
+            href={'/connectors' as Route}
+          >
+            Connectors
+          </Link>
+        ) : null}
+        {hasCapability(ctx.capabilities, 'internal_notification.read') ? (
+          <Link
+            className="rounded-md border border-ink-300 px-4 py-2 text-sm font-medium"
+            href={'/notifications' as Route}
+          >
+            Notifications
+          </Link>
+        ) : null}
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <Card>

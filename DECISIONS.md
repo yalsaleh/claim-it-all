@@ -443,3 +443,26 @@ Threat model: [docs/threat-models/notice-drafting.md](./docs/threat-models/notic
 ## Slice 7 — Controlled delivery (ADR-074–086)
 
 See `docs/adrs/ADR-074-controlled-delivery-boundary.md` through `ADR-086-no-autonomous-resend.md` and `docs/threat-models/notice-delivery.md`.
+
+## Slice 8 — Connectors and operations (ADR-087–102)
+
+| ADR | Title | Decision (brief) |
+|-----|-------|------------------|
+| [ADR-087](./docs/adrs/ADR-087-connector-account-project-scope.md) | Connector account and scope | `ConnectorAccount` + approved `ConnectorProjectScope`; `IMPORT_ONLY` only |
+| [ADR-088](./docs/adrs/ADR-088-external-record-identity.md) | External record identity | Unique on account + scope + externalId + version |
+| [ADR-089](./docs/adrs/ADR-089-connector-provider-abstraction.md) | Connector provider abstraction | Provider-neutral adapters; fake/local CI-only; reject in production |
+| [ADR-090](./docs/adrs/ADR-090-controlled-email-ingestion.md) | Controlled email ingestion | Allowlisted mailboxes per scope; provenance only |
+| [ADR-091](./docs/adrs/ADR-091-import-through-existing-ingestion.md) | Import through ingestion | SourceDocument/DocumentVersion/outbox/ARQ; no parallel path |
+| [ADR-092](./docs/adrs/ADR-092-sync-checkpoints.md) | Sync checkpoints | Per-scope cursors; schedulers never confirm legal state |
+| [ADR-093](./docs/adrs/ADR-093-connector-webhook-processing.md) | Connector webhooks | Untrusted; verify + replay protection; import enqueue only |
+| [ADR-094](./docs/adrs/ADR-094-operational-alert-model.md) | Operational alerts | Deterministic conditions; no health scores or money-at-risk |
+| [ADR-095](./docs/adrs/ADR-095-alert-deduplication.md) | Alert deduplication | Stable dedupe keys; in-place update of open alerts |
+| [ADR-096](./docs/adrs/ADR-096-escalation-policies.md) | Escalation policies | Internal notifications/tasks only; never notice dispatch |
+| [ADR-097](./docs/adrs/ADR-097-operational-task-boundary.md) | Operational task boundary | Ops tasks ≠ legal confirmation or dispatch |
+| [ADR-098](./docs/adrs/ADR-098-internal-notification-separation.md) | Internal notification separation | InternalNotification/NotificationIntent never contractual dispatch |
+| [ADR-099](./docs/adrs/ADR-099-project-dashboard.md) | Project dashboard | Authoritative counts/statuses; no composite scores |
+| [ADR-100](./docs/adrs/ADR-100-portfolio-authorization.md) | Portfolio authorization | Membership-filtered; no cross-project leakage |
+| [ADR-101](./docs/adrs/ADR-101-dashboard-aggregation.md) | Dashboard aggregation | Deterministic reductions; explainable widget metadata |
+| [ADR-102](./docs/adrs/ADR-102-no-autonomous-legal-state-mutation.md) | No autonomous legal mutation | Background jobs never confirm events/deadlines or send notices |
+
+Threat model: [docs/threat-models/connectors-and-operations.md](./docs/threat-models/connectors-and-operations.md)

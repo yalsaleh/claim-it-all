@@ -108,6 +108,22 @@ export default async function ProjectDetailPage({
             Notices
           </Link>
         ) : null}
+        {hasCapability(ctx.capabilities, 'operations_dashboard.read') ? (
+          <Link
+            className="rounded-md border border-ink-300 px-4 py-2 text-sm font-medium text-ink-900"
+            href={`/projects/${projectId}/operations` as Route}
+          >
+            Operations
+          </Link>
+        ) : null}
+        {hasCapability(ctx.capabilities, 'connector_account.read') ? (
+          <Link
+            className="rounded-md border border-ink-300 px-4 py-2 text-sm font-medium text-ink-900"
+            href={`/projects/${projectId}/connectors` as Route}
+          >
+            Connectors
+          </Link>
+        ) : null}
       </div>
       <ContextBanner
         organization={tenant?.name ?? ctx.tenantId}
