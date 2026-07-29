@@ -49,28 +49,29 @@ run "${PNPM[@]}" --filter @contractradar/web typecheck
 run "${PNPM[@]}" test:unit
 run "${PNPM[@]}" test:integration:embedded
 
-if [[ -x services/document-intelligence/.venv/bin/ruff ]]; then
-  (
-    cd services/document-intelligence
-    run .venv/bin/ruff check src tests
-    run .venv/bin/mypy src
-    run env APP_ENV=test MALWARE_SCANNER=fake_test \
-      DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN=test-internal-token-32chars \
-      ALLOW_DEV_DEFAULTS=true \
-      .venv/bin/pytest -q -k "not live"
-  )
-else
-  (
-    cd services/document-intelligence
-    run python3 -m pip install -e ".[dev]"
-    run ruff check src tests
-    run mypy src
-    run env APP_ENV=test MALWARE_SCANNER=fake_test \
-      DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN=test-internal-token-32chars \
-      ALLOW_DEV_DEFAULTS=true \
-      pytest -q -k "not live"
-  )
-fi
+# Python checks must match GitHub CI: ruff + mypy + pytest -k "not live"
+# with APP_ENV/MALWARE_SCANNER/token/ALLOW_DEV_DEFAULTS (see .github/workflows/ci.yml).
+# Prefer Python 3.12 (CI version) when available so mypy/deps match Actions.
+(
+  cd services/document-intelligence
+  DI_PYTHON="python3"
+  if command -v python3.12 >/dev/null 2>&1; then
+    DI_PYTHON="python3.12"
+  fi
+  if [[ ! -x .venv-ci/bin/python ]] || ! .venv-ci/bin/python -c 'import sys; raise SystemExit(0 if sys.version_info[:2]==(3,12) else 1)' 2>/dev/null; then
+    echo "==> Recreating services/document-intelligence/.venv-ci with ${DI_PYTHON} (CI parity)"
+    rm -rf .venv-ci
+    "${DI_PYTHON}" -m venv .venv-ci
+    .venv-ci/bin/python -m pip install --upgrade pip
+    .venv-ci/bin/pip install --only-binary=:all: -e ".[dev]" || .venv-ci/bin/pip install -e ".[dev]"
+  fi
+  run .venv-ci/bin/ruff check src tests
+  run .venv-ci/bin/mypy src
+  run env APP_ENV=test MALWARE_SCANNER=fake_test \
+    DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN=ci-internal-token-32chars \
+    ALLOW_DEV_DEFAULTS=true \
+    .venv-ci/bin/pytest -q -k "not live"
+)
 
 run "${PNPM[@]}" build
 

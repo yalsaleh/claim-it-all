@@ -57,7 +57,10 @@ select = ["E", "F", "I", "B", "UP"]
 ignore = ["UP007", "UP006", "UP035"]
 
 [tool.mypy]
-python_version = "3.9"
+# Keep in sync with CI (.github/workflows/ci.yml Setup Python = 3.12).
+# Using 3.9 here makes mypy follow 3.12-installed deps (e.g. click match syntax)
+# and fail with exit code 2 on GitHub Actions while local 3.9 venvs stay green.
+python_version = "3.12"
 strict = true
 packages = ["document_intelligence"]
 mypy_path = "src"

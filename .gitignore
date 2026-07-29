@@ -2,6 +2,8 @@
 node_modules/
 .pnpm-store/
 .venv/
+.venv-ci/
+.tools/
 venv/
 __pycache__/
 *.py[cod]
