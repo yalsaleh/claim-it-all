@@ -17,6 +17,17 @@ describe('db url guard', () => {
   });
 
   it('requireTestDatabaseUrl demands INTEGRATION_DATABASE_URL', () => {
-    expect(() => requireTestDatabaseUrl(undefined)).toThrow(/INTEGRATION_DATABASE_URL is required/);
+    // Default-parameter semantics treat an omitted/undefined argument as
+    // "read process.env". Isolate the env so CI (which sets INTEGRATION_DATABASE_URL
+    // for the whole workflow) cannot mask a missing URL.
+    const previous = process.env.INTEGRATION_DATABASE_URL;
+    delete process.env.INTEGRATION_DATABASE_URL;
+    try {
+      expect(() => requireTestDatabaseUrl()).toThrow(/INTEGRATION_DATABASE_URL is required/);
+      expect(() => requireTestDatabaseUrl('')).toThrow(/INTEGRATION_DATABASE_URL is required/);
+    } finally {
+      if (previous === undefined) delete process.env.INTEGRATION_DATABASE_URL;
+      else process.env.INTEGRATION_DATABASE_URL = previous;
+    }
   });
 });

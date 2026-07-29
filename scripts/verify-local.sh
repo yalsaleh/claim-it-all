@@ -5,14 +5,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
+# Match .github/workflows/ci.yml job env so unit tests see the same variables
+# (notably INTEGRATION_DATABASE_URL / REQUIRE_INTEGRATION_DB).
 export NODE_ENV="${NODE_ENV:-test}"
 export APP_ENV="${APP_ENV:-test}"
 export MALWARE_SCANNER="${MALWARE_SCANNER:-fake_test}"
 export ALLOW_DEV_DEFAULTS="${ALLOW_DEV_DEFAULTS:-true}"
 export APP_URL="${APP_URL:-http://localhost:3000}"
+export DATABASE_URL="${DATABASE_URL:-postgresql://contractradar_app:contractradar@127.0.0.1:5432/contractradar_test?schema=public}"
+export INTEGRATION_DATABASE_URL="${INTEGRATION_DATABASE_URL:-postgresql://contractradar_app:contractradar@127.0.0.1:5432/contractradar_test?schema=public}"
+export DATABASE_MIGRATE_URL="${DATABASE_MIGRATE_URL:-postgresql://contractradar:contractradar@127.0.0.1:5432/contractradar_test?schema=public}"
 export BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-ci-test-secret-with-sufficient-length-32}"
+export BETTER_AUTH_URL="${BETTER_AUTH_URL:-http://localhost:3000}"
 export DOCUMENT_INTELLIGENCE_URL="${DOCUMENT_INTELLIGENCE_URL:-http://localhost:8000}"
-export DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN="${DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN:-dev-internal-token-change-me}"
+export DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN="${DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN:-ci-internal-token-32chars}"
 export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 export S3_ENDPOINT="${S3_ENDPOINT:-http://127.0.0.1:9000}"
 export S3_REGION="${S3_REGION:-us-east-1}"
@@ -21,6 +27,7 @@ export S3_SECRET_ACCESS_KEY="${S3_SECRET_ACCESS_KEY:-minioadmin}"
 export S3_BUCKET="${S3_BUCKET:-contractradar-documents}"
 export S3_FORCE_PATH_STYLE="${S3_FORCE_PATH_STYLE:-true}"
 export LOG_LEVEL="${LOG_LEVEL:-info}"
+export REQUIRE_INTEGRATION_DB="${REQUIRE_INTEGRATION_DB:-true}"
 # Never treat local Mode A as live-ingestion verification.
 export LIVE_INGESTION_TESTS=false
 export REQUIRE_LIVE_INGESTION_TESTS=false
