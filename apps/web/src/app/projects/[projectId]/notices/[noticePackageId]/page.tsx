@@ -53,7 +53,7 @@ export default async function NoticePackagePage({
       </div>
       <PageTitle
         title={pkg.title}
-        subtitle={`${pkg.noticeType} · ${statusLabel(pkg.status)} · No delivery in this slice`}
+        subtitle={`${pkg.noticeType} · ${statusLabel(pkg.status)} · Controlled delivery available`}
       />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -100,9 +100,19 @@ export default async function NoticePackagePage({
             canApprove={hasCapability(ctx.capabilities, 'notice_draft.approve')}
             canExport={hasCapability(ctx.capabilities, 'notice_export.generate')}
           />
+          {hasCapability(ctx.capabilities, 'notice_dispatch.read') ? (
+            <p className="mt-4">
+              <Link
+                className="text-sm text-accent-700 underline"
+                href={`/projects/${projectId}/notices/${noticePackageId}/delivery` as Route}
+              >
+                Open controlled delivery
+              </Link>
+            </p>
+          ) : null}
           <p className="mt-4 text-xs text-ink-600">
-            Exports exclude internal comments and provider metadata. Sending notices outside the
-            system is not available in Slice 6.
+            Exports exclude internal comments and provider metadata. Sending requires human
+            authorization in the delivery workflow.
           </p>
         </Card>
       </div>

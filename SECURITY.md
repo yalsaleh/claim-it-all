@@ -261,3 +261,8 @@ Alert on: repeated auth failures, cross-tenant denial spikes, malware detections
 - [x] FORCE RLS on all notice tables; approval append-only; SoD
 - [x] Threat model: [docs/threat-models/notice-drafting.md](./docs/threat-models/notice-drafting.md)
 - [ ] Controlled delivery / dispatch / acknowledgments (deferred — next slice)
+
+
+## Slice 7 delivery controls
+
+Controlled notice delivery requires immutable dispatch snapshots, explicit human authorization, explicit send action, FORCE RLS on dispatch tables, verified webhooks, and human confirmation of contractual service. See `docs/threat-models/notice-delivery.md`.

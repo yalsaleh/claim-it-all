@@ -37,7 +37,8 @@
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "zod": "3.24.1",
-    "@contractradar/notice-drafting": "workspace:*"
+    "@contractradar/notice-drafting": "workspace:*",
+    "@contractradar/notice-delivery": "workspace:*"
   },
   "devDependencies": {
     "@contractradar/typescript-config": "workspace:*",

@@ -3,6 +3,17 @@ import type { Prisma } from '@prisma/client';
 /** Test-only cleanup for notice drafting tables (requires app.allow_notice_purge). */
 export async function purgeNoticeTables(tx: Prisma.TransactionClient): Promise<void> {
   await tx.$executeRaw`SELECT set_config('app.allow_notice_purge', 'on', true)`;
+  await tx.deliveryProviderEvent.deleteMany();
+  await tx.deemedReceiptAssessment.deleteMany();
+  await tx.noticeReceiptAssessment.deleteMany();
+  await tx.noticeAcknowledgment.deleteMany();
+  await tx.dispatchEvidence.deleteMany();
+  await tx.noticeDispatchRecipient.deleteMany();
+  await tx.manualDispatchRecord.deleteMany();
+  await tx.noticeDispatchAttempt.deleteMany();
+  await tx.noticeDispatchAuthorization.deleteMany();
+  await tx.noticeDispatchCoverMessage.deleteMany();
+  await tx.noticeDispatchPackageSnapshot.deleteMany();
   await tx.noticeExportBundle.deleteMany();
   await tx.noticeReviewComment.deleteMany();
   await tx.noticeApprovalDecision.deleteMany();

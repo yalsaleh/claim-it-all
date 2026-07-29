@@ -476,3 +476,8 @@ Docker Compose: PostgreSQL, Redis, MinIO, (later) web + document-intelligence.
 
 ### Slice 6 notice drafting
 `NoticePackage` workflow produces export-ready approved drafts with provenance. Package `@contractradar/notice-drafting` owns deterministic assembly, validation, and export helpers. No outbound contractual delivery in this slice.
+
+
+### Slice 7 controlled delivery
+
+Human-authorized dispatch via provider-neutral adapters (`fake`, `local_capture`). Manual dispatch is first-class. No autonomous send/resend. Package `@contractradar/notice-delivery` holds deterministic domain rules.

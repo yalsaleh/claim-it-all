@@ -123,6 +123,21 @@ model User {
   noticeTemplatesApproved           NoticeTemplate[]                @relation("NoticeTemplateApprover")
   noticeAssessmentsAssessed         EvidenceCompletenessAssessment[] @relation("NoticeAssessmentAssessor")
 
+  noticeDispatchSnapshotsCreated       NoticeDispatchPackageSnapshot[] @relation("DispatchSnapshotCreator")
+  noticeDispatchCoverMessagesCreated   NoticeDispatchCoverMessage[]    @relation("DispatchCoverMessageCreator")
+  noticeDispatchAuthorizationsRequested NoticeDispatchAuthorization[] @relation("DispatchAuthorizationRequester")
+  noticeDispatchAuthorizationsReviewed  NoticeDispatchAuthorization[] @relation("DispatchAuthorizationReviewer")
+  noticeDispatchAuthorizationsAuthorized NoticeDispatchAuthorization[] @relation("DispatchAuthorizationAuthorizer")
+  noticeDispatchAttemptsInitiated      NoticeDispatchAttempt[]         @relation("DispatchAttemptInitiator")
+  manualDispatchRecordsDispatched      ManualDispatchRecord[]          @relation("ManualDispatchRecorder")
+  dispatchEvidenceRecorded             DispatchEvidence[]              @relation("DispatchEvidenceRecorder")
+  dispatchEvidenceVerified             DispatchEvidence[]              @relation("DispatchEvidenceVerifier")
+  noticeReceiptAssessmentsReviewed     NoticeReceiptAssessment[]       @relation("ReceiptAssessmentReviewer")
+  noticeAcknowledgmentsRecorded        NoticeAcknowledgment[]          @relation("NoticeAcknowledgmentRecorder")
+  noticeAcknowledgmentsVerified        NoticeAcknowledgment[]          @relation("NoticeAcknowledgmentVerifier")
+  deliveryProviderConfigsCreated       DeliveryProviderConfiguration[] @relation("DeliveryProviderConfigCreator")
+  deliveryProviderConfigsApproved      DeliveryProviderConfiguration[] @relation("DeliveryProviderConfigApprover")
+
   @@map("user")
 }
 
@@ -258,6 +273,19 @@ model Tenant {
   noticeApprovalDecisions            NoticeApprovalDecision[]
   noticeControlledExceptions         NoticeControlledException[]
 
+  noticeDispatchPackageSnapshots     NoticeDispatchPackageSnapshot[]
+  noticeDispatchCoverMessages        NoticeDispatchCoverMessage[]
+  noticeDispatchAuthorizations       NoticeDispatchAuthorization[]
+  noticeDispatchAttempts             NoticeDispatchAttempt[]
+  noticeDispatchRecipients           NoticeDispatchRecipient[]
+  manualDispatchRecords              ManualDispatchRecord[]
+  dispatchEvidence                   DispatchEvidence[]
+  noticeReceiptAssessments           NoticeReceiptAssessment[]
+  deemedReceiptAssessments           DeemedReceiptAssessment[]
+  noticeAcknowledgments              NoticeAcknowledgment[]
+  deliveryProviderEvents             DeliveryProviderEvent[]
+  deliveryProviderConfigurations     DeliveryProviderConfiguration[]
+
   @@map("tenant")
 }
 
@@ -367,6 +395,18 @@ model Project {
   noticeReviewComments               NoticeReviewComment[]
   noticeApprovalDecisions            NoticeApprovalDecision[]
   noticeControlledExceptions         NoticeControlledException[]
+
+  noticeDispatchPackageSnapshots     NoticeDispatchPackageSnapshot[]
+  noticeDispatchCoverMessages        NoticeDispatchCoverMessage[]
+  noticeDispatchAuthorizations       NoticeDispatchAuthorization[]
+  noticeDispatchAttempts             NoticeDispatchAttempt[]
+  noticeDispatchRecipients           NoticeDispatchRecipient[]
+  manualDispatchRecords              ManualDispatchRecord[]
+  dispatchEvidence                   DispatchEvidence[]
+  noticeReceiptAssessments           NoticeReceiptAssessment[]
+  deemedReceiptAssessments           DeemedReceiptAssessment[]
+  noticeAcknowledgments              NoticeAcknowledgment[]
+  deliveryProviderEvents             DeliveryProviderEvent[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -3223,8 +3263,18 @@ enum NoticePackageStatus {
   SUPERSEDED
   WITHDRAWN
   EXPORTED
+  AUTHORIZATION_PENDING
+  AUTHORIZED_FOR_DISPATCH
+  DISPATCH_IN_PROGRESS
+  DISPATCHED
+  DELIVERY_PENDING
+  DELIVERY_PARTIAL
+  DELIVERY_CONFIRMED
+  RECEIPT_UNCONFIRMED
+  RECEIPT_CONFIRMED
+  DELIVERY_FAILED
   ARCHIVED
-  /// Reserved — no operational transition in Slice 6
+  /// May be set when first successful dispatch is recorded (Slice 7); prefer finer dispatch statuses when available
   SENT
 }
 
@@ -3592,6 +3642,14 @@ model NoticePackage {
   approvalDecisions          NoticeApprovalDecision[]
   controlledExceptions       NoticeControlledException[]
 
+  dispatchSnapshots          NoticeDispatchPackageSnapshot[]
+  dispatchAuthorizations     NoticeDispatchAuthorization[]
+  dispatchAttempts           NoticeDispatchAttempt[]
+  coverMessages              NoticeDispatchCoverMessage[]
+  receiptAssessments         NoticeReceiptAssessment[]
+  acknowledgments            NoticeAcknowledgment[]
+  deemedReceiptAssessments   DeemedReceiptAssessment[]
+
   @@index([tenantId, projectId, status])
   @@index([projectEventId])
   @@index([deadlineCalculationId])
@@ -3871,6 +3929,7 @@ model NoticeDraftRevision {
   reviewComments NoticeReviewComment[]
   approvalDecisions NoticeApprovalDecision[]
   exportBundles NoticeExportBundle[]
+  dispatchSnapshots NoticeDispatchPackageSnapshot[]
 
   @@unique([noticePackageId, revisionNumber])
   @@index([tenantId, projectId, noticePackageId])
@@ -3935,6 +3994,8 @@ model NoticeDeliveryPreparation {
   project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   noticePackage NoticePackage @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
 
+  dispatchRecipients NoticeDispatchRecipient[]
+
   @@index([tenantId, projectId, noticePackageId])
   @@map("notice_delivery_preparation")
 }
@@ -3990,6 +4051,8 @@ model NoticeExportBundle {
   noticePackage NoticePackage       @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
   draftRevision NoticeDraftRevision @relation(fields: [draftRevisionId], references: [id], onDelete: Restrict)
   generatedBy   User                @relation("NoticeExportGenerator", fields: [generatedByUserId], references: [id], onDelete: Restrict)
+
+  dispatchSnapshots NoticeDispatchPackageSnapshot[]
 
   @@index([tenantId, projectId, noticePackageId])
   @@index([draftRevisionId])
@@ -4072,4 +4135,525 @@ model NoticeControlledException {
 
   @@index([tenantId, projectId, noticePackageId])
   @@map("notice_controlled_exception")
+}
+
+// --- Slice 7: Controlled delivery ---
+
+enum NoticeDispatchAuthorizationStatus {
+  DRAFT
+  REQUESTED
+  UNDER_REVIEW
+  AUTHORIZED
+  REJECTED
+  EXPIRED
+  REVOKED
+  USED
+  CANCELLED
+}
+
+enum NoticeDispatchAttemptStatus {
+  PREPARED
+  QUEUED
+  SENDING
+  SUBMITTED
+  SENT
+  DELIVERY_PENDING
+  DELIVERED
+  FAILED
+  CANCELLED
+  PARTIALLY_DELIVERED
+  MANUAL_DISPATCH_RECORDED
+  AWAITING_EVIDENCE
+  UNCERTAIN_MANUAL_REVIEW
+}
+
+enum NoticeDispatchRecipientStatus {
+  PENDING
+  SUBMITTED
+  SENT
+  DELIVERED
+  BOUNCED
+  REJECTED
+  FAILED
+  ACKNOWLEDGED
+  UNKNOWN
+  MANUALLY_CONFIRMED
+}
+
+enum DispatchEvidenceType {
+  EMAIL_PROVIDER_ACCEPTANCE
+  EMAIL_DELIVERY_CONFIRMATION
+  EMAIL_BOUNCE
+  READ_RECEIPT
+  MANUAL_SENT_EMAIL_COPY
+  COURIER_RECEIPT
+  POSTAL_RECEIPT
+  HAND_DELIVERY_RECEIPT
+  EDMS_SUBMISSION_CONFIRMATION
+  SCREENSHOT
+  ACKNOWLEDGMENT_EMAIL
+  SIGNED_RECEIPT
+  TRACKING_RESULT
+  OTHER
+}
+
+enum DispatchEvidenceVerificationStatus {
+  UNVERIFIED
+  VERIFIED
+  DISPUTED
+  REJECTED
+  SUPERSEDED
+}
+
+enum NoticeReceiptStatus {
+  UNKNOWN
+  PROVIDER_ACCEPTED
+  SENT
+  DELIVERED
+  ACKNOWLEDGED
+  BOUNCED
+  REFUSED
+  DISPUTED
+  MANUALLY_CONFIRMED
+}
+
+enum ContractualServiceStatus {
+  NOT_ASSESSED
+  EVIDENCE_INCOMPLETE
+  POTENTIALLY_SATISFIED
+  REVIEW_REQUIRED
+  HUMAN_CONFIRMED
+  DISPUTED
+}
+
+enum NoticeAcknowledgmentStatus {
+  RECORDED
+  VERIFIED
+  DISPUTED
+  REJECTED
+  SUPERSEDED
+}
+
+enum DeliveryProviderConfigStatus {
+  DRAFT
+  VALIDATED
+  APPROVED
+  DISABLED
+  ERROR
+}
+
+model NoticeDispatchPackageSnapshot {
+  id                         String   @id @default(uuid())
+  tenantId                   String
+  projectId                  String
+  noticePackageId            String
+  approvedDraftRevisionId    String
+  noticeExportId             String?
+  exportManifestChecksum     String
+  bundleChecksum             String
+  noticeChecksum             String
+  attachmentManifestChecksum String
+  templateVersion            String
+  language                   String
+  governingLanguage          String?
+  subject                    String
+  externalFilename           String?
+  recipientSnapshot          Json
+  copiedRecipientSnapshot    Json
+  deliveryMethodSnapshot     Json
+  attachmentSnapshot         Json
+  coverMessageSnapshot       Json
+  channel                    String
+  createdByUserId            String
+  createdAt                  DateTime @default(now())
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project             Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage       NoticePackage       @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  approvedDraftRevision NoticeDraftRevision @relation(fields: [approvedDraftRevisionId], references: [id], onDelete: Restrict)
+  noticeExport        NoticeExportBundle? @relation(fields: [noticeExportId], references: [id], onDelete: Restrict)
+  createdBy           User                @relation("DispatchSnapshotCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  authorizations NoticeDispatchAuthorization[]
+  attempts       NoticeDispatchAttempt[]
+  coverMessages  NoticeDispatchCoverMessage[]
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@index([approvedDraftRevisionId])
+  @@index([noticeExportId])
+  @@map("notice_dispatch_package_snapshot")
+}
+
+model NoticeDispatchCoverMessage {
+  id              String   @id @default(uuid())
+  tenantId        String
+  projectId       String
+  noticePackageId String
+  snapshotId      String?
+  subject         String
+  plainText       String   @db.Text
+  htmlSafe        String?  @db.Text
+  checksumSha256  String
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  immutable       Boolean  @default(true)
+
+  tenant        Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project       Project                        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage NoticePackage                  @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  snapshot      NoticeDispatchPackageSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
+  createdBy     User                           @relation("DispatchCoverMessageCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@index([snapshotId])
+  @@map("notice_dispatch_cover_message")
+}
+
+model NoticeDispatchAuthorization {
+  id                         String                            @id @default(uuid())
+  tenantId                   String
+  projectId                  String
+  noticePackageId            String
+  dispatchPackageSnapshotId  String
+  requestedByUserId          String
+  reviewedByUserId           String?
+  authorizedByUserId         String?
+  status                     NoticeDispatchAuthorizationStatus @default(DRAFT)
+  requestedAt                DateTime                          @default(now())
+  reviewedAt                 DateTime?
+  authorizedAt               DateTime?
+  expiresAt                  DateTime?
+  intendedSendWindowStart    DateTime?
+  intendedSendWindowEnd      DateTime?
+  selectedChannel            String
+  recipientCount             Int
+  copiedRecipientCount       Int
+  deliveryRiskAcknowledged   Boolean                           @default(false)
+  controlledExceptions       Json?
+  rationale                  String?                           @db.Text
+  conditions                 String?                           @db.Text
+  recipientsReviewed         Boolean                           @default(false)
+  methodReviewed             Boolean                           @default(false)
+  attachmentsReviewed        Boolean                           @default(false)
+  deadlineReviewed           Boolean                           @default(false)
+  scopeReviewed              Boolean                           @default(false)
+  createdAt                  DateTime                          @default(now())
+  updatedAt                  DateTime                          @updatedAt
+
+  tenant                    Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project                   Project                       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage             NoticePackage                 @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  dispatchPackageSnapshot   NoticeDispatchPackageSnapshot @relation(fields: [dispatchPackageSnapshotId], references: [id], onDelete: Restrict)
+  requestedBy               User                          @relation("DispatchAuthorizationRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  reviewedBy                User?                         @relation("DispatchAuthorizationReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  authorizedBy              User?                         @relation("DispatchAuthorizationAuthorizer", fields: [authorizedByUserId], references: [id], onDelete: SetNull)
+
+  dispatchAttempts NoticeDispatchAttempt[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, projectId, noticePackageId])
+  @@index([dispatchPackageSnapshotId])
+  @@index([status])
+  @@map("notice_dispatch_authorization")
+}
+
+model NoticeDispatchAttempt {
+  id                        String                      @id @default(uuid())
+  tenantId                  String
+  projectId                 String
+  noticePackageId           String
+  dispatchAuthorizationId   String
+  dispatchPackageSnapshotId String
+  attemptNumber             Int
+  channel                   String
+  provider                  String
+  providerAccountReference  String?
+  status                    NoticeDispatchAttemptStatus @default(PREPARED)
+  initiatedByUserId         String
+  initiatedAt               DateTime                    @default(now())
+  queuedAt                  DateTime?
+  startedAt                 DateTime?
+  completedAt               DateTime?
+  cancelledAt               DateTime?
+  providerMessageId         String?
+  providerSubmissionId      String?
+  trackingNumber            String?
+  externalReference         String?
+  failureCode               String?
+  failureMessageSafe        String?                     @db.Text
+  correlationId             String
+  idempotencyKey            String
+  retryClass                String?
+  createdAt                 DateTime                    @default(now())
+
+  tenant                    Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project                   Project                       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage             NoticePackage                 @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  dispatchAuthorization     NoticeDispatchAuthorization   @relation(fields: [dispatchAuthorizationId], references: [id], onDelete: Restrict)
+  dispatchPackageSnapshot   NoticeDispatchPackageSnapshot @relation(fields: [dispatchPackageSnapshotId], references: [id], onDelete: Restrict)
+  initiatedBy               User                          @relation("DispatchAttemptInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+
+  recipients            NoticeDispatchRecipient[]
+  manualDispatchRecord  ManualDispatchRecord?
+  dispatchEvidence      DispatchEvidence[]
+  receiptAssessments    NoticeReceiptAssessment[]
+  acknowledgments       NoticeAcknowledgment[]
+  providerEvents        DeliveryProviderEvent[]
+
+  @@unique([dispatchAuthorizationId, attemptNumber])
+  @@unique([idempotencyKey])
+  @@index([tenantId, projectId, noticePackageId])
+  @@index([dispatchPackageSnapshotId])
+  @@index([status])
+  @@map("notice_dispatch_attempt")
+}
+
+model NoticeDispatchRecipient {
+  id                   String                        @id @default(uuid())
+  tenantId             String
+  projectId            String
+  dispatchAttemptId    String
+  recipientType        String
+  preparationId        String?
+  partyOrRoleRef       String?
+  displayName          String
+  addressOrEmail       String?
+  copiedRecipient      Boolean                       @default(false)
+  requiredRecipient    Boolean                       @default(true)
+  method               String
+  status               NoticeDispatchRecipientStatus @default(PENDING)
+  providerRecipientId  String?
+  providerResponseCode String?
+  failureReason        String?                       @db.Text
+  sentAt               DateTime?
+  deliveredAt          DateTime?
+  bouncedAt            DateTime?
+  acknowledgedAt       DateTime?
+  receiptEvidenceId    String?
+  createdAt            DateTime                      @default(now())
+
+  tenant            Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project           Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  dispatchAttempt   NoticeDispatchAttempt      @relation(fields: [dispatchAttemptId], references: [id], onDelete: Cascade)
+  preparation       NoticeDeliveryPreparation? @relation(fields: [preparationId], references: [id], onDelete: SetNull)
+  receiptEvidence   DispatchEvidence?          @relation("RecipientReceiptEvidence", fields: [receiptEvidenceId], references: [id], onDelete: SetNull)
+
+  dispatchEvidence DispatchEvidence[]
+  receiptAssessments NoticeReceiptAssessment[]
+  acknowledgments NoticeAcknowledgment[]
+  providerEvents  DeliveryProviderEvent[]
+
+  @@index([tenantId, projectId, dispatchAttemptId])
+  @@index([preparationId])
+  @@map("notice_dispatch_recipient")
+}
+
+model ManualDispatchRecord {
+  id                          String   @id @default(uuid())
+  tenantId                    String
+  projectId                   String
+  dispatchAttemptId           String   @unique
+  method                      String
+  dispatchedByUserId          String
+  dispatchAt                  DateTime
+  location                    String?
+  courierOrProviderName       String?
+  trackingNumber              String?
+  handDeliveredToName         String?
+  externalSubmissionReference String?
+  physicalReceiptReference    String?
+  notes                       String?  @db.Text
+  createdAt                   DateTime @default(now())
+
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project         Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  dispatchAttempt NoticeDispatchAttempt @relation(fields: [dispatchAttemptId], references: [id], onDelete: Cascade)
+  dispatchedBy    User                  @relation("ManualDispatchRecorder", fields: [dispatchedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, projectId])
+  @@map("manual_dispatch_record")
+}
+
+model DispatchEvidence {
+  id                   String                             @id @default(uuid())
+  tenantId             String
+  projectId            String
+  dispatchAttemptId    String
+  dispatchRecipientId  String?
+  evidenceType         DispatchEvidenceType
+  sourceDocumentId     String?
+  documentVersionId    String?
+  storageKey           String?
+  filename             String?
+  checksumSha256       String
+  capturedAt           DateTime                           @default(now())
+  occurredAt           DateTime?
+  recordedByUserId     String
+  verifiedByUserId     String?
+  verificationStatus   DispatchEvidenceVerificationStatus @default(UNVERIFIED)
+  metadata             Json?
+  createdAt            DateTime                           @default(now())
+
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project           Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  dispatchAttempt   NoticeDispatchAttempt  @relation(fields: [dispatchAttemptId], references: [id], onDelete: Cascade)
+  dispatchRecipient NoticeDispatchRecipient? @relation(fields: [dispatchRecipientId], references: [id], onDelete: SetNull)
+  recordedBy        User                   @relation("DispatchEvidenceRecorder", fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  verifiedBy        User?                  @relation("DispatchEvidenceVerifier", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
+
+  recipientReceiptFor NoticeDispatchRecipient[] @relation("RecipientReceiptEvidence")
+  receiptAssessments  NoticeReceiptAssessment[]
+  acknowledgments     NoticeAcknowledgment[]
+
+  @@index([tenantId, projectId, dispatchAttemptId])
+  @@index([dispatchRecipientId])
+  @@map("dispatch_evidence")
+}
+
+model NoticeReceiptAssessment {
+  id                       String                   @id @default(uuid())
+  tenantId                 String
+  projectId                String
+  noticePackageId          String
+  dispatchAttemptId        String
+  dispatchRecipientId      String?
+  receiptStatus            NoticeReceiptStatus      @default(UNKNOWN)
+  receiptAt                DateTime?
+  receiptTimezone          String?
+  source                   String?
+  evidenceId               String?
+  deemedReceiptRule        String?
+  deemedReceiptResult      Json?
+  contractualServiceStatus ContractualServiceStatus @default(NOT_ASSESSED)
+  reviewedByUserId         String?
+  reviewedAt               DateTime?
+  rationale                String?                  @db.Text
+  ambiguity                String?                  @db.Text
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project           Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage     NoticePackage            @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  dispatchAttempt   NoticeDispatchAttempt    @relation(fields: [dispatchAttemptId], references: [id], onDelete: Cascade)
+  dispatchRecipient NoticeDispatchRecipient? @relation(fields: [dispatchRecipientId], references: [id], onDelete: SetNull)
+  evidence          DispatchEvidence?        @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  reviewedBy        User?                    @relation("ReceiptAssessmentReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  deemedReceiptAssessments DeemedReceiptAssessment[]
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@index([dispatchAttemptId])
+  @@index([dispatchRecipientId])
+  @@map("notice_receipt_assessment")
+}
+
+model DeemedReceiptAssessment {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  projectId           String
+  noticePackageId     String
+  receiptAssessmentId String
+  ruleKind            String
+  inputs              Json
+  calculationTrace    Json
+  advisoryAt          DateTime?
+  ambiguity           String?  @db.Text
+  createdAt           DateTime @default(now())
+
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project           Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage     NoticePackage           @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  receiptAssessment NoticeReceiptAssessment @relation(fields: [receiptAssessmentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@index([receiptAssessmentId])
+  @@map("deemed_receipt_assessment")
+}
+
+model NoticeAcknowledgment {
+  id                  String                     @id @default(uuid())
+  tenantId            String
+  projectId           String
+  noticePackageId     String
+  dispatchAttemptId   String
+  dispatchRecipientId String?
+  acknowledgmentType  String
+  acknowledgedAt      DateTime
+  sourceEvidenceId    String?
+  summary             String?                    @db.Text
+  recordedByUserId    String
+  verifiedByUserId    String?
+  status              NoticeAcknowledgmentStatus @default(RECORDED)
+  createdAt           DateTime                   @default(now())
+
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project           Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  noticePackage     NoticePackage            @relation(fields: [noticePackageId], references: [id], onDelete: Cascade)
+  dispatchAttempt   NoticeDispatchAttempt    @relation(fields: [dispatchAttemptId], references: [id], onDelete: Cascade)
+  dispatchRecipient NoticeDispatchRecipient? @relation(fields: [dispatchRecipientId], references: [id], onDelete: SetNull)
+  sourceEvidence    DispatchEvidence?        @relation(fields: [sourceEvidenceId], references: [id], onDelete: SetNull)
+  recordedBy        User                     @relation("NoticeAcknowledgmentRecorder", fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  verifiedBy        User?                    @relation("NoticeAcknowledgmentVerifier", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectId, noticePackageId])
+  @@index([dispatchAttemptId])
+  @@index([dispatchRecipientId])
+  @@map("notice_acknowledgment")
+}
+
+model DeliveryProviderEvent {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  projectId           String?
+  provider            String
+  providerEventId     String
+  providerMessageId   String
+  eventType           String
+  occurredAt          DateTime
+  receivedAt          DateTime @default(now())
+  signatureStatus     String
+  payloadChecksum     String
+  redactedPayload     Json
+  processingStatus    String
+  dispatchAttemptId   String?
+  dispatchRecipientId String?
+  createdAt           DateTime @default(now())
+
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project           Project?                 @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  dispatchAttempt   NoticeDispatchAttempt?   @relation(fields: [dispatchAttemptId], references: [id], onDelete: SetNull)
+  dispatchRecipient NoticeDispatchRecipient? @relation(fields: [dispatchRecipientId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerEventId])
+  @@index([tenantId, providerMessageId])
+  @@index([dispatchAttemptId])
+  @@map("delivery_provider_event")
+}
+
+model DeliveryProviderConfiguration {
+  id                 String                       @id @default(uuid())
+  tenantId           String?
+  scope              String
+  providerType       String
+  displayName        String
+  enabled            Boolean                      @default(false)
+  approvedChannels   Json
+  secretReferenceId  String?
+  senderIdentity     String?
+  senderDomain       String?
+  webhookConfigured  Boolean                      @default(false)
+  status             DeliveryProviderConfigStatus @default(DRAFT)
+  createdByUserId    String
+  approvedByUserId   String?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+
+  tenant     Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy  User    @relation("DeliveryProviderConfigCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  approvedBy User?   @relation("DeliveryProviderConfigApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, scope, providerType])
+  @@index([status])
+  @@map("delivery_provider_configuration")
 }

@@ -406,3 +406,8 @@ Applied to dates, clause links, category labels, commercial ranges, and awarenes
 ## NoticePackage (Slice 6)
 
 Runtime aggregate for evidence completion → approved NoticeFacts → structured NoticeDraftRevision → human approval → export bundle. Stops before delivery. See ADR-059–073.
+
+
+### Slice 7 delivery entities
+
+`NoticeDispatchPackageSnapshot`, `NoticeDispatchAuthorization`, `NoticeDispatchAttempt`, `NoticeDispatchRecipient`, `ManualDispatchRecord`, `DispatchEvidence`, `NoticeReceiptAssessment`, `DeemedReceiptAssessment`, `NoticeAcknowledgment`, `DeliveryProviderEvent`, `DeliveryProviderConfiguration`. Provider delivery ≠ contractual service.

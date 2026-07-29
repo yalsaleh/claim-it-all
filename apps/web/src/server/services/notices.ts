@@ -199,7 +199,7 @@ function stripHtml(input: string): string {
     .trim();
 }
 
-/** Slice 6 boundary — no send/dispatch operations exist in this module. */
+/** Slice 6 boundary — controlled send lives only in notice-delivery.ts with human authorization. */
 export function assertNoSendOperations(): void {
   const forbiddenNames = ['sendNotice', 'dispatchNotice', 'deliverNotice'];
   for (const name of forbiddenNames) {

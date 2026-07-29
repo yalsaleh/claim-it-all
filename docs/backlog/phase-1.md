@@ -163,3 +163,8 @@ E1–E7 (and related). `ProjectEventSuggestion` / date suggestions from determin
 
 ## Slice 6 — Notice drafting (Mode A done)
 Evidence completeness, questions, NoticeFacts, deterministic drafting, approval, PDF/DOCX/manifest export. Delivery deferred.
+
+
+## Slice 7 — Controlled delivery (done)
+
+Human-authorized dispatch, immutable snapshots, manual + fake/local providers, receipt assessment, no autonomous resend. ADRs 074–086.

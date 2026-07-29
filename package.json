@@ -8,7 +8,7 @@
     "dev": "pnpm --filter @contractradar/web dev",
     "dev:web": "pnpm --filter @contractradar/web dev",
     "dev:di": "pnpm --filter @contractradar/document-intelligence --if-present start || (cd services/document-intelligence && .venv/bin/uvicorn document_intelligence.main:app --reload --port 8000)",
-    "build": "pnpm -r --filter @contractradar/shared --filter @contractradar/authz --filter @contractradar/contract-rules --filter @contractradar/event-detection --filter @contractradar/notice-drafting --filter @contractradar/web build",
+    "build": "pnpm -r --filter @contractradar/shared --filter @contractradar/authz --filter @contractradar/contract-rules --filter @contractradar/event-detection --filter @contractradar/notice-drafting --filter @contractradar/notice-delivery --filter @contractradar/web build",
     "lint": "pnpm -r --filter './packages/*' --filter @contractradar/web lint && pnpm lint:python",
     "lint:python": "cd services/document-intelligence && (.venv/bin/ruff check src tests || ruff check src tests)",
     "format": "prettier --write . && (cd services/document-intelligence && (.venv/bin/ruff format src tests || true))",

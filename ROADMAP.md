@@ -33,6 +33,7 @@ Phases are sequential for dependency reasons, but engineering spikes may overlap
 - Contract package + human-confirmed clause/obligation register — **Slice 3 done**
 - Deterministic deadline engine + human-confirmed project events — **Slice 4 done** (ADR-037–047)
 - Evidence-backed event detection with mandatory human confirmation — **Slice 5 done (Mode A)** (ADR-048–058); suggestions never auto-activate deadlines
+- Controlled delivery with human authorization, dispatch evidence, acknowledgments — **Slice 7** (ADR-074–086); no autonomous send
 - Historical detection for:
   1. Late drawings or approvals
   2. Suspension or restricted site access

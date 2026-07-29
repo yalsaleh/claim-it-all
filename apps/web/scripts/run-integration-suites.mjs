@@ -20,6 +20,7 @@ export const DEFAULT_INTEGRATION_SUITES = [
   'src/server/contracts/contracts.integration.test.ts',
   'src/server/detections/detections.integration.test.ts',
   'src/server/notices/notices.integration.test.ts',
+  'src/server/notices/delivery.integration.test.ts',
   'src/server/deadlines/deadlines.integration.test.ts',
 ];
 

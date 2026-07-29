@@ -52,6 +52,24 @@ const EVENT_DEADLINE: Capability[] = [
   'notice_export.read',
   'notice_template.manage',
   'notice_template.approve',
+  'notice_dispatch.prepare',
+  'notice_dispatch.request_authorization',
+  'notice_dispatch.authorize',
+  'notice_dispatch.revoke',
+  'notice_dispatch.send',
+  'notice_dispatch.cancel',
+  'notice_dispatch.retry',
+  'notice_dispatch.record_manual',
+  'notice_dispatch.read',
+  'dispatch_evidence.upload',
+  'dispatch_evidence.verify',
+  'notice_receipt.assess',
+  'notice_receipt.confirm',
+  'notice_acknowledgment.record',
+  'notice_acknowledgment.verify',
+  'delivery_provider.manage',
+  'delivery_webhook.read',
+  'delivery_risk.read',
 ];
 
 const DOCUMENT_READ: Capability[] = [
@@ -64,6 +82,8 @@ const DOCUMENT_READ: Capability[] = [
   'event_suggestion.read',
   'notice_package.read',
   'notice_export.read',
+  'notice_dispatch.read',
+  'delivery_risk.read',
 ];
 
 const DOCUMENT_CONTRIBUTE: Capability[] = [
@@ -187,6 +207,8 @@ const TENANT_ROLE_CAPABILITIES: Record<TenantRole, readonly Capability[]> = {
     'reviewer_feedback.read',
     'notice_package.read',
     'notice_export.read',
+    'notice_dispatch.read',
+    'delivery_risk.read',
   ],
 };
 
@@ -235,6 +257,8 @@ const PROJECT_ROLE_CAPABILITIES: Record<ProjectRole, readonly Capability[]> = {
     'reviewer_feedback.read',
     'notice_package.read',
     'notice_export.read',
+    'notice_dispatch.read',
+    'delivery_risk.read',
   ],
 };
 
@@ -301,6 +325,21 @@ const MUTATING_PROJECT_CAPABILITIES = new Set<Capability>([
   'notice_export.generate',
   'notice_template.manage',
   'notice_template.approve',
+  'notice_dispatch.prepare',
+  'notice_dispatch.request_authorization',
+  'notice_dispatch.authorize',
+  'notice_dispatch.revoke',
+  'notice_dispatch.send',
+  'notice_dispatch.cancel',
+  'notice_dispatch.retry',
+  'notice_dispatch.record_manual',
+  'dispatch_evidence.upload',
+  'dispatch_evidence.verify',
+  'notice_receipt.assess',
+  'notice_receipt.confirm',
+  'notice_acknowledgment.record',
+  'notice_acknowledgment.verify',
+  'delivery_provider.manage',
 ]);
 
 export function capabilitiesForTenantRole(role: TenantRole): ReadonlySet<Capability> {

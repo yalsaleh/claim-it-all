@@ -438,3 +438,8 @@ Statuses: **Proposed** · **Accepted** · **Superseded** · **Rejected**
 | [ADR-073](./docs/adrs/ADR-073-notice-no-delivery-boundary.md) | No delivery | EXPORTED ≠ sent; NotificationIntent remains internal-only |
 
 Threat model: [docs/threat-models/notice-drafting.md](./docs/threat-models/notice-drafting.md)
+
+
+## Slice 7 — Controlled delivery (ADR-074–086)
+
+See `docs/adrs/ADR-074-controlled-delivery-boundary.md` through `ADR-086-no-autonomous-resend.md` and `docs/threat-models/notice-delivery.md`.
