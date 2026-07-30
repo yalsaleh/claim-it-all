@@ -14,7 +14,8 @@ DUMP_FILE="${OUT_DIR}/pg-${STAMP}.sql"
 MANIFEST="${OUT_DIR}/pg-${STAMP}.manifest.json"
 
 echo "Creating logical backup → ${DUMP_FILE}"
-pg_dump --no-owner --no-acl --format=plain "${MIGRATE_URL}" > "${DUMP_FILE}"
+# Keep ACLs so runtime role grants survive restore; omit owner to avoid role-name drift across environments.
+pg_dump --no-owner --format=plain "${MIGRATE_URL}" > "${DUMP_FILE}"
 if command -v sha256sum >/dev/null 2>&1; then
   CHECKSUM="$(sha256sum "${DUMP_FILE}" | awk '{print $1}')"
 else

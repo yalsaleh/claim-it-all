@@ -34,12 +34,12 @@ echo "==> Seed multi-tenant synthetic data"
 psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 SELECT set_config('app.bypass_rls', 'on', false);
 DELETE FROM project WHERE id IN (
-  'p1111111-1111-4111-8111-111111111111',
-  'p2222222-2222-4222-8222-222222222222'
+  'a1111111-1111-4111-8111-111111111111',
+  'a2222222-2222-4222-8222-222222222222'
 );
 DELETE FROM tenant_membership WHERE id IN (
-  'm1111111-1111-4111-8111-111111111111',
-  'm2222222-2222-4222-8222-222222222222'
+  'b1111111-1111-4111-8111-111111111111',
+  'b2222222-2222-4222-8222-222222222222'
 );
 DELETE FROM "user" WHERE email IN ('restore-a@example.com', 'restore-b@example.com')
   OR id IN ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
@@ -55,17 +55,17 @@ INSERT INTO "user" (id, email, name, status, "createdAt", "updatedAt") VALUES
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'restore-b@example.com', 'Restore B User', 'ACTIVE', NOW(), NOW())
 ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
 INSERT INTO tenant_membership (id, "tenantId", "userId", role, status, "createdAt", "updatedAt") VALUES
-  ('m1111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'TENANT_OWNER', 'ACTIVE', NOW(), NOW()),
-  ('m2222222-2222-4222-8222-222222222222', '22222222-2222-4222-8222-222222222222', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'TENANT_OWNER', 'ACTIVE', NOW(), NOW());
+  ('b1111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'TENANT_OWNER', 'ACTIVE', NOW(), NOW()),
+  ('b2222222-2222-4222-8222-222222222222', '22222222-2222-4222-8222-222222222222', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'TENANT_OWNER', 'ACTIVE', NOW(), NOW());
 INSERT INTO project (id, "tenantId", name, code, status, "countryCode", "defaultCurrency", timezone, "createdAt", "updatedAt") VALUES
-  ('p1111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111', 'Project A', 'RA', 'ACTIVE', 'AE', 'AED', 'Asia/Dubai', NOW(), NOW()),
-  ('p2222222-2222-4222-8222-222222222222', '22222222-2222-4222-8222-222222222222', 'Project B', 'RB', 'ACTIVE', 'AE', 'AED', 'Asia/Dubai', NOW(), NOW());
+  ('a1111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111', 'Project A', 'RA', 'ACTIVE', 'AE', 'AED', 'Asia/Dubai', NOW(), NOW()),
+  ('a2222222-2222-4222-8222-222222222222', '22222222-2222-4222-8222-222222222222', 'Project B', 'RB', 'ACTIVE', 'AE', 'AED', 'Asia/Dubai', NOW(), NOW());
 SQL
 note_pass "multi_tenant_seed"
 TENANT_COUNT_BEFORE="$(psql "${MIGRATE_URL}" -Atc 'SELECT count(*) FROM tenant')"
 
-OBJ_A_KEY="tenants/11111111-1111-4111-8111-111111111111/projects/p1111111-1111-4111-8111-111111111111/originals/restore-a.txt"
-OBJ_B_KEY="tenants/22222222-2222-4222-8222-222222222222/projects/p2222222-2222-4222-8222-222222222222/originals/restore-b.txt"
+OBJ_A_KEY="tenants/11111111-1111-4111-8111-111111111111/projects/a1111111-1111-4111-8111-111111111111/originals/restore-a.txt"
+OBJ_B_KEY="tenants/22222222-2222-4222-8222-222222222222/projects/a2222222-2222-4222-8222-222222222222/originals/restore-b.txt"
 echo 'restore-object-a-bytes' > "${BACKUP_OUT_DIR}/object-a.txt"
 echo 'restore-object-b-bytes' > "${BACKUP_OUT_DIR}/object-b.txt"
 command -v mc >/dev/null || fail "minio_client_required"
@@ -99,6 +99,12 @@ mc rm "crrestore/${BUCKET}/${OBJ_B_KEY}" >/dev/null 2>&1 || true
 note_pass "objects_deleted_pre_restore"
 
 bash scripts/backup/pg-restore.sh "${DUMP_PATH}"
+# Ensure runtime grants exist even if a dump variant omitted ACLs.
+psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+GRANT USAGE ON SCHEMA public TO contractradar_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO contractradar_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO contractradar_app;
+SQL
 note_pass "postgres_restored"
 
 bash scripts/backup/object-restore.sh "${OBJ_MANIFEST}"
@@ -119,15 +125,13 @@ note_pass "missing_object_detected"
 echo 'tampered' > "${BACKUP_OUT_DIR}/object-a.tampered.txt"
 TAMPER_SHA="$(sha256sum "${BACKUP_OUT_DIR}/object-a.tampered.txt" | awk '{print $1}')"
 [[ "${TAMPER_SHA}" != "${SHA_A}" ]] || fail "tamper_sha_unexpectedly_equal"
-# Corrupt one file inside the backup data dir and ensure restore rejects it
 OBJ_DATA_DIR="$(python3 -c "import json; print('${BACKUP_OUT_DIR}/'+json.load(open('${OBJ_MANIFEST}'))['dataDir'])")"
+mkdir -p "$(dirname "${OBJ_DATA_DIR}/${OBJ_A_KEY}")"
 cp "${BACKUP_OUT_DIR}/object-a.tampered.txt" "${OBJ_DATA_DIR}/${OBJ_A_KEY}"
 if bash scripts/backup/object-restore.sh "${OBJ_MANIFEST}" >/dev/null 2>&1; then
   fail "tampered_object_should_reject_restore"
 fi
-# Restore pristine bytes back into backup dir for later checks
-mc cat "crrestore/${BUCKET}/${OBJ_A_KEY}" > "${OBJ_DATA_DIR}/${OBJ_A_KEY}" 2>/dev/null || \
-  cp "${BACKUP_OUT_DIR}/object-a.txt" "${OBJ_DATA_DIR}/${OBJ_A_KEY}"
+cp "${BACKUP_OUT_DIR}/object-a.txt" "${OBJ_DATA_DIR}/${OBJ_A_KEY}"
 note_pass "tampered_object_checksum_rejected"
 
 python3 - <<PY
@@ -176,7 +180,7 @@ psql "${APP_URL}" -v ON_ERROR_STOP=1 <<'SQL' > "${BACKUP_OUT_DIR}/isolation.txt"
 SELECT set_config('app.bypass_rls', 'off', false);
 SELECT set_config('app.current_user_id', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', false);
 SELECT set_config('app.current_tenant_id', '11111111-1111-4111-8111-111111111111', false);
-SELECT count(*) FROM project WHERE id = 'p2222222-2222-4222-8222-222222222222';
+SELECT count(*) FROM project WHERE id = 'a2222222-2222-4222-8222-222222222222';
 SELECT set_config('app.current_tenant_id', '', false);
 SELECT count(*) FROM project;
 SQL
