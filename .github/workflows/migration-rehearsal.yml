@@ -46,12 +46,13 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '22'
+      # pnpm must be on PATH before setup-node@v5 (packageManager field triggers pnpm cache).
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - run: pnpm install --frozen-lockfile
       - run: pnpm validate:prisma && pnpm db:generate
