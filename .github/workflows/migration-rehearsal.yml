@@ -9,7 +9,7 @@ on:
 env:
   NODE_ENV: test
   APP_ENV: test
-  DATABASE_URL: postgresql://contractradar:contractradar@localhost:5432/contractradar_test?schema=public
+  DATABASE_URL: postgresql://contractradar_app:contractradar@localhost:5432/contractradar_test?schema=public
   DATABASE_MIGRATE_URL: postgresql://contractradar:contractradar@localhost:5432/contractradar_test?schema=public
   BETTER_AUTH_SECRET: ci-test-secret-with-sufficient-length-32
   APP_URL: http://localhost:3000
@@ -25,10 +25,12 @@ env:
   S3_BUCKET: contractradar-documents
   S3_FORCE_PATH_STYLE: 'true'
   BETTER_AUTH_URL: http://localhost:3000
+  MIGRATION_OUT_DIR: ${{ github.workspace }}/artifacts/migration
+  REQUIRE_INTEGRATION_DB: 'true'
 
 jobs:
   migration-rehearsal:
-    name: Clean migrate + Slice 8 upgrade path
+    name: Slice 8→9 upgrade + drift + role separation
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -46,35 +48,47 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v5
-      # pnpm must be on PATH before setup-node@v5 (packageManager field triggers pnpm cache).
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
+      - name: Enable pnpm via Corepack
+        run: corepack enable && corepack prepare pnpm@9.15.0 --activate
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - run: pnpm install --frozen-lockfile
       - run: pnpm validate:prisma && pnpm db:generate
-      - name: Migrate from zero
+      - name: Clean migrate from zero
         env:
           DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
         run: |
-          chmod +x scripts/db/*.sh
+          mkdir -p artifacts/migration
+          chmod +x scripts/db/*.sh scripts/backup/lib.sh
           pnpm db:migrate:deploy
           bash scripts/db/migrate-verify.sh
-          # After deploy, status must be clean (no pending).
           (cd apps/web && pnpm exec prisma migrate status)
-      - name: Reset and remigrate
+      - name: Slice 8 → Slice 9 forward upgrade rehearsal
         env:
-          DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
-          pnpm db:reset
-          pnpm db:migrate:deploy
-          pnpm db:seed
-      - name: Assert Slice 9 tables exist
-        run: |
+          # Reset DB then rehearse hold-aside Slice 9 path without claiming migrate reset IS the upgrade.
           PSQL_URL="${DATABASE_MIGRATE_URL%%\?*}"
-          psql "$PSQL_URL" -v ON_ERROR_STOP=1 -c "\dt tenant_settings"
-          psql "$PSQL_URL" -v ON_ERROR_STOP=1 -c "\dt backup_run"
-          psql "$PSQL_URL" -v ON_ERROR_STOP=1 -c "\dt support_access_request"
+          psql "$PSQL_URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+          bash scripts/db/slice8-upgrade-rehearsal.sh
+          test -s artifacts/migration/slice8-to-slice9-report.json
+      - name: Drift detection
+        run: |
+          bash scripts/db/migration-drift-check.sh
+          test -s artifacts/migration/migration-drift-report.json
+      - name: Role separation
+        run: |
+          bash scripts/db/role-separation-check.sh
+          test -s artifacts/migration/role-separation-report.json
+          node scripts/ci/write-evidence-summary.mjs \
+            "Migration rehearsal" PASS artifacts/migration \
+            "checksExecuted=clean-migrate,slice8-to-slice9-upgrade,drift-detection,role-separation" \
+            "checksNotRun=" \
+            "knownGaps="
+      - uses: actions/upload-artifact@v6
+        with:
+          name: migration-rehearsal-artifacts
+          path: artifacts/migration/
+          if-no-files-found: error

@@ -25,10 +25,11 @@ env:
   S3_FORCE_PATH_STYLE: 'true'
   ALLOW_DEV_DEFAULTS: 'true'
   MALWARE_SCANNER: fake_test
+  BACKUP_OUT_DIR: ${{ github.workspace }}/artifacts/backup
 
 jobs:
   backup-restore:
-    name: PostgreSQL + object manifest restore test
+    name: PostgreSQL + object restore verification
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -44,15 +45,22 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7.4.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v5
-      # pnpm must be on PATH before setup-node@v5 (packageManager field triggers pnpm cache).
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
+      - name: Enable pnpm via Corepack
+        run: corepack enable && corepack prepare pnpm@9.15.0 --activate
       - name: Start MinIO
         env:
           START_CLAMAV: 'false'
@@ -64,21 +72,33 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
         run: |
-          # App role is created by the foundation RLS migration (same path as CI).
           pnpm db:migrate:deploy
           pnpm db:seed
       - name: Run restore test
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          DATABASE_MIGRATE_URL: ${{ env.DATABASE_MIGRATE_URL }}
         run: |
+          mkdir -p artifacts/backup
           chmod +x scripts/backup/*.sh
-          command -v pg_dump
-          command -v psql
+          command -v pg_dump && command -v psql && command -v mc
           bash scripts/backup/restore-test.sh
-      - uses: actions/upload-artifact@v4
+          test -s artifacts/backup/restore-test-report.json
+          test -s artifacts/backup/tenant-isolation-report.json
+          test -s artifacts/backup/rls-force-report.json
+          test -s artifacts/backup/object-checksum-summary.json
+          test -s artifacts/backup/object-manifest.json
+          test -s artifacts/backup/backup-manifest.json
+          test -s artifacts/backup/database-checksum.txt
+          test -s artifacts/backup/database-backup-metadata.json
+          test -s artifacts/backup/application-readiness-report.json
+          test -s artifacts/backup/object-restore-report.json
+          node scripts/ci/write-evidence-summary.mjs \
+            "Backup and restore test" PASS artifacts/backup \
+            "checksExecuted=pg-backup,object-byte-roundtrip,cross-tenant-isolation,tamper-rejection,readiness" \
+            "checksNotRun=production-cloud-restore" \
+            "knownGaps=labelled-synthetic-ci-only"
+      - uses: actions/upload-artifact@v6
         with:
           name: backup-restore-artifacts
-          path: .backup-artifacts/
+          path: artifacts/backup/
+          if-no-files-found: error
       - if: always()
         run: bash scripts/ci/stop-live-sidecars.sh || true
