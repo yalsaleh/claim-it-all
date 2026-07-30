@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Gate supply-chain advisories. Never exit 0 on unapproved critical/high.
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export SUPPLY_CHAIN_OUT_DIR="${SUPPLY_CHAIN_OUT_DIR:-${ROOT_DIR}/artifacts/supply-chain}"
 mkdir -p "${SUPPLY_CHAIN_OUT_DIR}"
-cd "${ROOT_DIR}"
-node scripts/supply-chain/security-audit.mjs
+node "${ROOT_DIR}/scripts/supply-chain/license-inventory.mjs"

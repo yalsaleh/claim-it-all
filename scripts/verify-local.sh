@@ -64,6 +64,8 @@ run env CONTRACTRADAR_ENV=TEST ALLOW_DEV_DEFAULTS=true MALWARE_SCANNER=fake_test
   "${PNPM[@]}" --filter @contractradar/web exec tsx scripts/production-validate.ts
 run bash scripts/supply-chain/secret-scan.sh
 run bash scripts/supply-chain/sbom.sh
+run env SUPPLY_CHAIN_OUT_DIR="${ROOT_DIR}/artifacts/supply-chain" "${PNPM[@]}" security:audit
+run "${PNPM[@]}" env:doctor
 # Match CI: fail if any non-live integration suite reports skips.
 set +e
 INTEGRATION_OUTPUT="$("${PNPM[@]}" test:integration:embedded 2>&1 | tee /tmp/verify-local-integration.out)"

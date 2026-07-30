@@ -1,0 +1,47 @@
+name: Dependency security scan
+
+on:
+  push:
+    branches: [main, cursor/**]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  security-scan:
+    name: SBOM + vulnerability policy + licenses + secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Enable pnpm via Corepack
+        run: corepack enable && corepack prepare pnpm@9.15.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - name: Supply-chain evidence
+        env:
+          SUPPLY_CHAIN_OUT_DIR: ${{ github.workspace }}/artifacts/supply-chain
+        run: |
+          mkdir -p "$SUPPLY_CHAIN_OUT_DIR"
+          chmod +x scripts/supply-chain/*.sh
+          bash scripts/supply-chain/secret-scan.sh
+          bash scripts/supply-chain/sbom.sh
+          bash scripts/supply-chain/license-inventory.sh
+          pnpm security:audit
+          node scripts/supply-chain/vulnerability-policy.unit.mjs
+          test -s artifacts/supply-chain/sbom.json
+          test -s artifacts/supply-chain/pnpm-audit.json
+          test -s artifacts/supply-chain/vulnerability-policy.json
+          test -s artifacts/supply-chain/license-inventory.json
+          test -s artifacts/supply-chain/secret-scan.txt
+          test -s artifacts/supply-chain/vulnerability-exceptions.snapshot.json
+          node scripts/ci/write-evidence-summary.mjs \
+            "Dependency security scan" PASS artifacts/supply-chain \
+            "checksExecuted=secret-scan,sbom,license-inventory,security-audit,policy-unit" \
+            "checksNotRun=container-image-cve-scan" \
+            "knownGaps=container-image-cve-scan-deferred"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dependency-security-evidence
+          path: artifacts/supply-chain/
+          if-no-files-found: error

@@ -10,6 +10,7 @@ env:
   NODE_ENV: test
   APP_ENV: test
   CONTRACTRADAR_ENV: CI
+  CI: 'true'
   APP_URL: http://localhost:3000
   DATABASE_URL: postgresql://contractradar_app:contractradar@localhost:5432/contractradar_test?schema=public
   INTEGRATION_DATABASE_URL: postgresql://contractradar_app:contractradar@localhost:5432/contractradar_test?schema=public
@@ -30,6 +31,9 @@ env:
   MALWARE_SCANNER: fake_test
   CONNECTOR_PROVIDER: fake
   NOTICE_DELIVERY_PROVIDER: fake
+  PROD_EVIDENCE_OUT_DIR: ${{ github.workspace }}/artifacts/production-readiness
+  SUPPLY_CHAIN_OUT_DIR: ${{ github.workspace }}/artifacts/supply-chain
+  REQUIRE_INTEGRATION_DB: 'true'
 
 jobs:
   production-readiness:
@@ -60,13 +64,11 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v5
-      # pnpm must be on PATH before setup-node@v5 (packageManager field triggers pnpm cache).
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
+      - name: Enable pnpm via Corepack
+        run: corepack enable && corepack prepare pnpm@9.15.0 --activate
       - name: Start MinIO sidecar
         env:
           START_CLAMAV: 'false'
@@ -76,7 +78,6 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - run: pnpm install --frozen-lockfile
       - run: pnpm validate:prisma && pnpm db:generate
-      # Runtime app role is created by the RLS migration; migrate with bootstrap URL.
       - env:
           DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
         run: pnpm db:migrate:deploy
@@ -85,7 +86,10 @@ jobs:
         run: pnpm db:seed
       - run: pnpm --filter @contractradar/platform build
       - name: Config validation (CI class)
-        run: pnpm --filter @contractradar/web exec tsx scripts/production-validate.ts
+        run: |
+          mkdir -p artifacts/production-readiness artifacts/supply-chain
+          pnpm --filter @contractradar/web exec tsx scripts/production-validate.ts \
+            | tee artifacts/production-readiness/config-validation.json
       - name: Reject fake providers in PRODUCTION class
         run: |
           set +e
@@ -100,24 +104,51 @@ jobs:
             pnpm --filter @contractradar/web exec tsx scripts/production-validate.ts)
           STATUS=$?
           set -e
-          echo "$OUT"
+          echo "$OUT" | tee artifacts/production-readiness/production-fake-provider-rejection.json
           echo "$OUT" | grep -q CFG_FAKE_PROVIDER
           test "$STATUS" -ne 0
-      - name: Secret scan + SBOM
+      - name: Supply-chain + vulnerability policy
         run: |
-          chmod +x scripts/supply-chain/*.sh
+          chmod +x scripts/supply-chain/*.sh scripts/ci/*.sh
           bash scripts/supply-chain/secret-scan.sh
           bash scripts/supply-chain/sbom.sh
-          bash scripts/supply-chain/audit.sh
-      - name: Integrity check
-        run: pnpm integrity:check
+          bash scripts/supply-chain/license-inventory.sh
+          pnpm security:audit
+      - name: Integrity + migration verify
+        run: |
+          pnpm integrity:check | tee artifacts/production-readiness/integrity-check.json
+          bash scripts/db/migrate-verify.sh | tee artifacts/production-readiness/migration-verify.txt
+      - name: Pilot readiness fixture
+        env:
+          DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
+        run: |
+          pnpm --filter @contractradar/web exec tsx scripts/pilot-readiness-fixture.ts \
+            | tee artifacts/production-readiness/pilot-readiness-fixture.json
+      - name: Container hardening
+        run: bash scripts/ci/container-hardening-check.sh
+      - name: Health/readiness gates (synthetic stack)
+        run: bash scripts/ci/health-readiness-check.sh
       - name: Production build
         run: pnpm build
-      - name: Upload evidence
-        uses: actions/upload-artifact@v4
+      - name: Evidence summary
+        run: |
+          test -s artifacts/supply-chain/sbom.json
+          test -s artifacts/supply-chain/vulnerability-policy.json
+          test -s artifacts/production-readiness/config-validation.json
+          test -s artifacts/production-readiness/container-hardening.json
+          test -s artifacts/production-readiness/pilot-readiness-fixture.json
+          test -s artifacts/production-readiness/health-readiness.json
+          node scripts/ci/write-evidence-summary.mjs \
+            "Production readiness" PASS artifacts/production-readiness \
+            "checksExecuted=config-validate,fake-provider-reject,integrity,migration-verify,pilot-fixture,container-hardening,health-readiness,build,supply-chain" \
+            "checksNotRun=live-external-apm,real-cloud-restore,kubernetes" \
+            "knownGaps=mfa-architecture-only,break-glass-documented-only"
+      - uses: actions/upload-artifact@v6
         with:
           name: production-readiness-evidence
           path: |
-            .supply-chain-artifacts/
+            artifacts/production-readiness/
+            artifacts/supply-chain/
+          if-no-files-found: error
       - if: always()
         run: bash scripts/ci/stop-live-sidecars.sh || true

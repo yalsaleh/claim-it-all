@@ -43,16 +43,20 @@ function createAuth() {
   });
 }
 
-export type Auth = ReturnType<typeof createAuth>;
+// better-auth@1.6+ types reference zod/v4; keep a portable surface for Next/tsc --noEmit.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AuthInstance = any;
 
-let authSingleton: Auth | null = null;
+let authSingleton: AuthInstance | null = null;
 
-export function getAuth(): Auth {
+export function getAuth(): AuthInstance {
   if (!authSingleton) {
     authSingleton = createAuth();
   }
   return authSingleton;
 }
+
+export type Auth = AuthInstance;
 
 export const auth = {
   get handler() {

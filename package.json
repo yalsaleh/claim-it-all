@@ -45,7 +45,10 @@
     "data-plane:up": "bash scripts/dev-data-plane.sh up",
     "data-plane:down": "bash scripts/dev-data-plane.sh down",
     "data-plane:ps": "bash scripts/dev-data-plane.sh ps",
-    "validate:prisma": "pnpm --filter @contractradar/web exec prisma validate"
+    "validate:prisma": "pnpm --filter @contractradar/web exec prisma validate",
+    "security:audit": "bash scripts/supply-chain/audit.sh",
+    "env:doctor": "node scripts/env-doctor.mjs",
+    "licenses:inventory": "bash scripts/supply-chain/license-inventory.sh"
   },
   "devDependencies": {
     "prettier": "3.4.2",
@@ -53,5 +56,13 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "pnpm": {
+    "overrides": {
+      "fast-xml-parser": "4.5.5",
+      "brace-expansion": "2.0.2",
+      "postcss": "8.5.18",
+      "vitest": "2.1.9"
+    }
   }
 }

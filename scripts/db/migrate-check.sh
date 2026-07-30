@@ -15,6 +15,16 @@ STATUS_CODE=$?
 set -e
 printf '%s\n' "${STATUS_OUT}"
 
+if printf '%s\n' "${STATUS_OUT}" | grep -qiE "Can't reach database server|P1001|ECONNREFUSED"; then
+  if [[ "${CI:-}" == "true" || "${GITHUB_ACTIONS:-}" == "true" || "${REQUIRE_INTEGRATION_DB:-}" == "true" ]]; then
+    echo "MIGRATE_CHECK_FAILED — PostgreSQL required in CI"
+    exit 1
+  fi
+  echo "NOT RUN — PostgreSQL unavailable"
+  echo "ENV_UNAVAILABLE"
+  exit 0
+fi
+
 if [[ "${STATUS_CODE}" -eq 0 ]]; then
   echo "MIGRATE_CHECK_OK (database up to date)"
   exit 0

@@ -149,11 +149,8 @@ jobs:
             echo "SEED_OWNER_PASSWORD=Ci-Owner-$(openssl rand -hex 8)!"
             echo "SEED_VIEWER_PASSWORD=Ci-Viewer-$(openssl rand -hex 8)!"
           } >> "$GITHUB_ENV"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
+      - name: Enable pnpm via Corepack
+        run: corepack enable && corepack prepare pnpm@9.15.0 --activate
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -161,7 +158,7 @@ jobs:
           node-version: "22"
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 

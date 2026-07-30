@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "allowedLicenses": [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "0BSD",
+    "CC0-1.0",
+    "Unlicense",
+    "Python-2.0",
+    "BlueOak-1.0.0"
+  ],
+  "deniedLicenses": ["GPL-3.0", "AGPL-3.0", "SSPL", "BUSL-1.1"],
+  "unknownLicenseSeverity": "warn",
+  "notes": "Pilot-oriented allowlist. UNKNOWN licenses warn; denied licenses fail CI."
+}

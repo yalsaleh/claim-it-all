@@ -70,9 +70,9 @@ Slice 8 adds `@contractradar/connectors` and `@contractradar/operations` unit te
 
 | Workflow | Purpose |
 |----------|---------|
-| `production-readiness` | Run `production:validate`-equivalent gates, platform unit tests, redacted readiness artifacts |
-| `backup-restore` | Backup + restore rehearsal against **ephemeral Postgres + MinIO** (not a real customer cloud) |
-| `migration-rehearsal` | Apply Prisma migrations on ephemeral DB; integrity / RLS smoke |
-| `dependency-scan` | Advisory scanning for JS/Python lockfiles (supply-chain, ADR-122) |
+| `production-readiness` | Config validation, fake-provider reject, integrity, pilot fixture, container hardening, DI health gates, downloadable evidence |
+| `backup-restore` | Synthetic CI Postgres + MinIO restore: cross-tenant isolation, object byte checksums, tamper rejection (**not** cloud DR) |
+| `migration-rehearsal` | Slice 8→9 forward upgrade (hold-aside), drift detection, runtime vs migration role separation |
+| `dependency-security` | SBOM, `pnpm security:audit` policy gate, license inventory, secret scan, exception register snapshot |
 
-These workflows support Slice 9 Mode A evidence. They do **not** perform a real deployment, onboard real providers, or prove multi-region DR. Fake providers remain CI/test-only and are rejected for PILOT/PRODUCTION policy checks.
+These workflows support Slice 9 / 9B Mode A evidence. They do **not** perform a real deployment, onboard real providers, or prove multi-region DR. Fake providers remain CI/test-only and are rejected for PILOT/PRODUCTION policy checks. Local Docker/Postgres absence is reported as **NOT RUN** via `pnpm env:doctor`, never as PASS.
