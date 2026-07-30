@@ -79,7 +79,8 @@ jobs:
         run: |
           mkdir -p artifacts/backup
           chmod +x scripts/backup/*.sh
-          command -v pg_dump && command -v psql && command -v mc
+          command -v pg_dump && command -v psql
+          command -v mc || command -v docker
           bash scripts/backup/restore-test.sh
           test -s artifacts/backup/restore-test-report.json
           test -s artifacts/backup/tenant-isolation-report.json

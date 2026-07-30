@@ -3,6 +3,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=lib.sh
+source "${ROOT_DIR}/scripts/backup/lib.sh"
 OUT_DIR="${BACKUP_OUT_DIR:-${ROOT_DIR}/artifacts/backup}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "${OUT_DIR}"
@@ -17,9 +19,8 @@ BUCKET="${S3_BUCKET:?S3_BUCKET required}"
 ACCESS="${S3_ACCESS_KEY_ID:?}"
 SECRET="${S3_SECRET_ACCESS_KEY:?}"
 
-command -v mc >/dev/null || { echo "mc (MinIO client) required"; exit 1; }
-mc alias set crbackup "${ENDPOINT}" "${ACCESS}" "${SECRET}" >/dev/null
-mc mirror --overwrite "crbackup/${BUCKET}" "${DATA_DIR}/" >/dev/null
+mc_run alias set crbackup "${ENDPOINT}" "${ACCESS}" "${SECRET}" >/dev/null
+mc_run mirror --overwrite "crbackup/${BUCKET}" "${DATA_DIR}/" >/dev/null
 
 python3 - <<PY
 import hashlib, json, pathlib

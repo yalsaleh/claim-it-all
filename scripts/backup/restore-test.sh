@@ -68,11 +68,11 @@ OBJ_A_KEY="tenants/11111111-1111-4111-8111-111111111111/projects/a1111111-1111-4
 OBJ_B_KEY="tenants/22222222-2222-4222-8222-222222222222/projects/a2222222-2222-4222-8222-222222222222/originals/restore-b.txt"
 echo 'restore-object-a-bytes' > "${BACKUP_OUT_DIR}/object-a.txt"
 echo 'restore-object-b-bytes' > "${BACKUP_OUT_DIR}/object-b.txt"
-command -v mc >/dev/null || fail "minio_client_required"
-mc alias set crrestore "${ENDPOINT}" "${ACCESS}" "${SECRET}" >/dev/null
-mc mb -p "crrestore/${BUCKET}" >/dev/null || true
-mc cp "${BACKUP_OUT_DIR}/object-a.txt" "crrestore/${BUCKET}/${OBJ_A_KEY}" >/dev/null
-mc cp "${BACKUP_OUT_DIR}/object-b.txt" "crrestore/${BUCKET}/${OBJ_B_KEY}" >/dev/null
+command -v mc >/dev/null || command -v docker >/dev/null || fail "minio_client_or_docker_required"
+mc_run alias set crrestore "${ENDPOINT}" "${ACCESS}" "${SECRET}" >/dev/null
+mc_run mb -p "crrestore/${BUCKET}" >/dev/null || true
+mc_run cp "${BACKUP_OUT_DIR}/object-a.txt" "crrestore/${BUCKET}/${OBJ_A_KEY}" >/dev/null
+mc_run cp "${BACKUP_OUT_DIR}/object-b.txt" "crrestore/${BUCKET}/${OBJ_B_KEY}" >/dev/null
 SHA_A="$(sha256sum "${BACKUP_OUT_DIR}/object-a.txt" | awk '{print $1}')"
 SHA_B="$(sha256sum "${BACKUP_OUT_DIR}/object-b.txt" | awk '{print $1}')"
 note_pass "object_seed_written"
@@ -93,9 +93,9 @@ test -s "${BACKUP_OUT_DIR}/database-backup-metadata.json" || fail "database_back
 cp "${MANIFEST}" "${BACKUP_OUT_DIR}/backup-manifest.json"
 note_pass "object_manifest_created"
 
-mc rm --recursive --force "crrestore/${BUCKET}/tenants" >/dev/null || true
-mc rm "crrestore/${BUCKET}/${OBJ_A_KEY}" >/dev/null 2>&1 || true
-mc rm "crrestore/${BUCKET}/${OBJ_B_KEY}" >/dev/null 2>&1 || true
+mc_run rm --recursive --force "crrestore/${BUCKET}/tenants" >/dev/null || true
+mc_run rm "crrestore/${BUCKET}/${OBJ_A_KEY}" >/dev/null 2>&1 || true
+mc_run rm "crrestore/${BUCKET}/${OBJ_B_KEY}" >/dev/null 2>&1 || true
 note_pass "objects_deleted_pre_restore"
 
 bash scripts/backup/pg-restore.sh "${DUMP_PATH}"
@@ -110,14 +110,14 @@ note_pass "postgres_restored"
 bash scripts/backup/object-restore.sh "${OBJ_MANIFEST}"
 note_pass "objects_restored_from_backup"
 
-mc cat "crrestore/${BUCKET}/${OBJ_A_KEY}" > "${BACKUP_OUT_DIR}/object-a.restored.txt"
-mc cat "crrestore/${BUCKET}/${OBJ_B_KEY}" > "${BACKUP_OUT_DIR}/object-b.restored.txt"
+mc_run cat "crrestore/${BUCKET}/${OBJ_A_KEY}" > "${BACKUP_OUT_DIR}/object-a.restored.txt"
+mc_run cat "crrestore/${BUCKET}/${OBJ_B_KEY}" > "${BACKUP_OUT_DIR}/object-b.restored.txt"
 SHA_A2="$(sha256sum "${BACKUP_OUT_DIR}/object-a.restored.txt" | awk '{print $1}')"
 SHA_B2="$(sha256sum "${BACKUP_OUT_DIR}/object-b.restored.txt" | awk '{print $1}')"
 [[ "${SHA_A}" == "${SHA_A2}" && "${SHA_B}" == "${SHA_B2}" ]] || fail "object_checksum_mismatch"
 note_pass "object_byte_checksum_round_trip"
 
-if mc cat "crrestore/${BUCKET}/tenants/missing/object.bin" >/dev/null 2>&1; then
+if mc_run cat "crrestore/${BUCKET}/tenants/missing/object.bin" >/dev/null 2>&1; then
   fail "missing_object_should_error"
 fi
 note_pass "missing_object_detected"

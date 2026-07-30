@@ -4,6 +4,8 @@ set -euo pipefail
 
 MANIFEST="${1:?Usage: object-restore.sh <objects.manifest.json>}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=lib.sh
+source "${ROOT_DIR}/scripts/backup/lib.sh"
 OUT_DIR="${BACKUP_OUT_DIR:-${ROOT_DIR}/artifacts/backup}"
 
 ENDPOINT="${S3_ENDPOINT:?}"
@@ -11,10 +13,8 @@ BUCKET="${S3_BUCKET:?}"
 ACCESS="${S3_ACCESS_KEY_ID:?}"
 SECRET="${S3_SECRET_ACCESS_KEY:?}"
 
-command -v mc >/dev/null || { echo "mc required"; exit 1; }
-
 DATA_DIR="$(python3 - <<PY
-import hashlib, json, pathlib, sys
+import hashlib, json, pathlib
 manifest_path = pathlib.Path("${MANIFEST}")
 doc = json.loads(manifest_path.read_text())
 if doc.get("type") != "object_storage_byte_backup":
@@ -36,7 +36,7 @@ print(str(data_dir))
 PY
 )"
 
-mc alias set crrestore "${ENDPOINT}" "${ACCESS}" "${SECRET}" >/dev/null
-mc mb -p "crrestore/${BUCKET}" >/dev/null || true
-mc mirror --overwrite "${DATA_DIR}/" "crrestore/${BUCKET}" >/dev/null
+mc_run alias set crrestore "${ENDPOINT}" "${ACCESS}" "${SECRET}" >/dev/null
+mc_run mb -p "crrestore/${BUCKET}" >/dev/null || true
+mc_run mirror --overwrite "${DATA_DIR}/" "crrestore/${BUCKET}" >/dev/null
 echo "Object restore completed from ${MANIFEST}"
