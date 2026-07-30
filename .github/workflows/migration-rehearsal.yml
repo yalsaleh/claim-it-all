@@ -74,6 +74,7 @@ jobs:
           pnpm db:seed
       - name: Assert Slice 9 tables exist
         run: |
-          psql "$DATABASE_MIGRATE_URL" -v ON_ERROR_STOP=1 -c "\dt tenant_settings"
-          psql "$DATABASE_MIGRATE_URL" -v ON_ERROR_STOP=1 -c "\dt backup_run"
-          psql "$DATABASE_MIGRATE_URL" -v ON_ERROR_STOP=1 -c "\dt support_access_request"
+          PSQL_URL="${DATABASE_MIGRATE_URL%%\?*}"
+          psql "$PSQL_URL" -v ON_ERROR_STOP=1 -c "\dt tenant_settings"
+          psql "$PSQL_URL" -v ON_ERROR_STOP=1 -c "\dt backup_run"
+          psql "$PSQL_URL" -v ON_ERROR_STOP=1 -c "\dt support_access_request"

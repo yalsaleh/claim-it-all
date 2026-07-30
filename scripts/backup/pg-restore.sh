@@ -2,8 +2,12 @@
 # Restore logical PostgreSQL dump into a target URL (destructive to target DB).
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=lib.sh
+source "${ROOT_DIR}/scripts/backup/lib.sh"
+
 DUMP_FILE="${1:?Usage: pg-restore.sh <dump.sql>}"
-TARGET_URL="${RESTORE_DATABASE_URL:-${DATABASE_MIGRATE_URL:?RESTORE_DATABASE_URL or DATABASE_MIGRATE_URL required}}"
+TARGET_URL="$(psql_url "${RESTORE_DATABASE_URL:-${DATABASE_MIGRATE_URL:?RESTORE_DATABASE_URL or DATABASE_MIGRATE_URL required}}")"
 
 echo "Restoring ${DUMP_FILE} → target"
 psql "${TARGET_URL}" -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"

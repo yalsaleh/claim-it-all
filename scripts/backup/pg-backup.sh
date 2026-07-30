@@ -3,9 +3,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=lib.sh
+source "${ROOT_DIR}/scripts/backup/lib.sh"
 OUT_DIR="${BACKUP_OUT_DIR:-${ROOT_DIR}/.backup-artifacts}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-MIGRATE_URL="${DATABASE_MIGRATE_URL:-${DATABASE_URL:?DATABASE_URL required}}"
+MIGRATE_URL="$(psql_url "${DATABASE_MIGRATE_URL:-${DATABASE_URL:?DATABASE_URL required}}")"
 mkdir -p "${OUT_DIR}"
 
 DUMP_FILE="${OUT_DIR}/pg-${STAMP}.sql"

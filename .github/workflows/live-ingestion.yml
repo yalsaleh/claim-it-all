@@ -13,10 +13,14 @@ on:
       - "packages/shared/**"
       - "packages/authz/**"
       - "packages/contract-rules/**"
+      - "packages/platform/**"
       - "infrastructure/docker/**"
       - ".github/workflows/live-ingestion.yml"
       - "scripts/test-live-ci.sh"
       - "scripts/ci/**"
+      - "scripts/backup/**"
+      - "scripts/db/**"
+      - "scripts/supply-chain/**"
       - "pnpm-lock.yaml"
   pull_request:
     paths:
@@ -25,10 +29,14 @@ on:
       - "packages/shared/**"
       - "packages/authz/**"
       - "packages/contract-rules/**"
+      - "packages/platform/**"
       - "infrastructure/docker/**"
       - ".github/workflows/live-ingestion.yml"
       - "scripts/test-live-ci.sh"
       - "scripts/ci/**"
+      - "scripts/backup/**"
+      - "scripts/db/**"
+      - "scripts/supply-chain/**"
       - "pnpm-lock.yaml"
 
 concurrency:
