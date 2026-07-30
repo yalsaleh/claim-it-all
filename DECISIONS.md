@@ -466,3 +466,31 @@ See `docs/adrs/ADR-074-controlled-delivery-boundary.md` through `ADR-086-no-auto
 | [ADR-102](./docs/adrs/ADR-102-no-autonomous-legal-state-mutation.md) | No autonomous legal mutation | Background jobs never confirm events/deadlines or send notices |
 
 Threat model: [docs/threat-models/connectors-and-operations.md](./docs/threat-models/connectors-and-operations.md)
+
+## Slice 9 — Production hardening (ADR-103–123)
+
+| ADR | Title | Decision (brief) |
+|-----|-------|------------------|
+| [ADR-103](./docs/adrs/ADR-103-environment-classification.md) | Environment classification | `LOCAL`/`TEST`/`CI`/`STAGING`/`PILOT`/`PRODUCTION` policies; fake blocked in PILOT/PROD |
+| [ADR-104](./docs/adrs/ADR-104-production-configuration-validation.md) | Production configuration validation | Redacted `validateProductionConfig`; role separation; strong secrets |
+| [ADR-105](./docs/adrs/ADR-105-secret-references-rotation.md) | Secret references / rotation | `env://` `file://` `vault://` `sm://` only; no raw secrets in DB |
+| [ADR-106](./docs/adrs/ADR-106-tenant-administration.md) | Tenant administration | Operator lifecycle ACTIVE→SUSPENDED→OFFBOARDING; audited |
+| [ADR-107](./docs/adrs/ADR-107-support-access.md) | Support access | Ticketed, time-boxed, dual-control grants; FORCE RLS retained |
+| [ADR-108](./docs/adrs/ADR-108-break-glass-policy.md) | Break-glass policy | Out-of-band only; **not in product UI** |
+| [ADR-109](./docs/adrs/ADR-109-session-hardening.md) | Session hardening | Secure cookies, TTLs, step-up for high-risk actions |
+| [ADR-110](./docs/adrs/ADR-110-structured-logging.md) | Structured logging | JSON + redaction; no notice/clause bodies at info |
+| [ADR-111](./docs/adrs/ADR-111-metrics-and-tracing.md) | Metrics and tracing | Low-cardinality safe labels; no PII in spans |
+| [ADR-112](./docs/adrs/ADR-112-health-readiness.md) | Health / readiness | Liveness ≠ readiness; config policy gated |
+| [ADR-113](./docs/adrs/ADR-113-backup-architecture.md) | Backup architecture | Postgres + objects; CI/MinIO evidence only |
+| [ADR-114](./docs/adrs/ADR-114-restore-testing.md) | Restore testing | Ephemeral restore + integrity + RLS probes |
+| [ADR-115](./docs/adrs/ADR-115-disaster-recovery.md) | Disaster recovery | Tiered RTO/RPO design; no live multi-region claim |
+| [ADR-116](./docs/adrs/ADR-116-migration-safety.md) | Migration safety | Expand/contract; migrate≠runtime role; CI rehearsal |
+| [ADR-117](./docs/adrs/ADR-117-provider-enablement.md) | Provider enablement | Checklist only; no real providers onboarded in Slice 9 |
+| [ADR-118](./docs/adrs/ADR-118-provider-kill-switches.md) | Provider kill switches | Global/tenant fail-closed capability stops |
+| [ADR-119](./docs/adrs/ADR-119-pilot-readiness.md) | Pilot readiness | Non-waivable evidence checklist; Mode A only |
+| [ADR-120](./docs/adrs/ADR-120-tenant-limits.md) | Tenant limits | Hard `LIMIT_EXCEEDED` on mutative quotas |
+| [ADR-121](./docs/adrs/ADR-121-retention-offboarding.md) | Retention / offboarding | Suspend→export→hold→purge→verify |
+| [ADR-122](./docs/adrs/ADR-122-supply-chain-security.md) | Supply-chain security | Lockfiles + `dependency-scan` workflow |
+| [ADR-123](./docs/adrs/ADR-123-deployment-hardening.md) | Deployment hardening | Hardening bar documented; **no real deploy claimed** |
+
+Threat models: [tenant-administration](./docs/threat-models/tenant-administration.md) · [support-access](./docs/threat-models/support-access.md) · [backups-restores](./docs/threat-models/backups-restores.md) · [provider-onboarding](./docs/threat-models/provider-onboarding.md) · [production-operations](./docs/threat-models/production-operations.md) · [pilot-deployment](./docs/threat-models/pilot-deployment.md)

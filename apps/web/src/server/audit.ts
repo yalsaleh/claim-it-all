@@ -42,11 +42,15 @@ export type AuditWriteInput = {
   tenantId?: string | null;
   projectId?: string | null;
   actorUserId?: string | null;
+  supportSessionId?: string | null;
   action: string;
   entityType: string;
   entityId?: string | null;
   metadata?: Prisma.InputJsonValue;
   correlationId?: string | null;
+  previousHash?: string | null;
+  integrityHash?: string | null;
+  schemaVersion?: number;
 };
 
 export async function writeAuditLog(
@@ -58,11 +62,15 @@ export async function writeAuditLog(
       tenantId: input.tenantId ?? null,
       projectId: input.projectId ?? null,
       actorUserId: input.actorUserId ?? null,
+      supportSessionId: input.supportSessionId ?? null,
       action: input.action,
       entityType: input.entityType,
       entityId: input.entityId ?? null,
       metadata: sanitizeMetadata(input.metadata),
       correlationId: input.correlationId ?? null,
+      schemaVersion: input.schemaVersion ?? 1,
+      previousHash: input.previousHash ?? null,
+      integrityHash: input.integrityHash ?? null,
     },
   });
 }

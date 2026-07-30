@@ -15,14 +15,17 @@ const webRoot = path.resolve(__dirname, '..');
 
 export const DEFAULT_INTEGRATION_SUITES = [
   'src/server/authz/isolation.integration.test.ts',
+  // Contracts before heavy ingestion/outbox suites: avoids embedded-PG pool stalls after
+  // many intentional trigger-abort tests when exercising configuration approval.
+  'src/server/contracts/contracts.integration.test.ts',
   'src/server/documents/ingestion.integration.test.ts',
   'src/server/queue/outbox.integration.test.ts',
-  'src/server/contracts/contracts.integration.test.ts',
   'src/server/detections/detections.integration.test.ts',
   'src/server/notices/notices.integration.test.ts',
   'src/server/notices/delivery.integration.test.ts',
   'src/server/deadlines/deadlines.integration.test.ts',
   'src/server/connectors/connectors.integration.test.ts',
+  'src/server/platform/platform.integration.test.ts',
 ];
 
 /**
@@ -44,6 +47,8 @@ export function runIntegrationSuites(opts) {
       `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${databaseName}' AND pid <> pg_backend_pid() AND backend_type = 'client backend'`,
       'SELECT pg_sleep(0.2)',
       'TRUNCATE TABLE "tenant" CASCADE',
+      'TRUNCATE TABLE "backup_run" CASCADE',
+      'TRUNCATE TABLE "operational_incident" CASCADE',
     ]) {
       const reset = spawnSync(
         'pnpm',

@@ -1,0 +1,81 @@
+name: Backup and restore test
+
+on:
+  push:
+    branches: [main, cursor/**]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  NODE_ENV: test
+  APP_ENV: test
+  DATABASE_URL: postgresql://contractradar_app:contractradar@localhost:5432/contractradar_test?schema=public
+  DATABASE_MIGRATE_URL: postgresql://contractradar:contractradar@localhost:5432/contractradar_test?schema=public
+  BETTER_AUTH_SECRET: ci-test-secret-with-sufficient-length-32
+  APP_URL: http://localhost:3000
+  BETTER_AUTH_URL: http://localhost:3000
+  DOCUMENT_INTELLIGENCE_URL: http://localhost:8000
+  DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN: ci-internal-token-32chars
+  REDIS_URL: redis://localhost:6379
+  S3_ENDPOINT: http://127.0.0.1:9000
+  S3_REGION: us-east-1
+  S3_ACCESS_KEY_ID: minioadmin
+  S3_SECRET_ACCESS_KEY: minioadmin
+  S3_BUCKET: contractradar-documents
+  S3_FORCE_PATH_STYLE: 'true'
+  ALLOW_DEV_DEFAULTS: 'true'
+  MALWARE_SCANNER: fake_test
+
+jobs:
+  backup-restore:
+    name: PostgreSQL + object manifest restore test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.6-alpine
+        env:
+          POSTGRES_USER: contractradar
+          POSTGRES_PASSWORD: contractradar
+          POSTGRES_DB: contractradar_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U contractradar -d contractradar_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - name: Start MinIO
+        env:
+          START_CLAMAV: 'false'
+        run: bash scripts/ci/start-live-sidecars.sh
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - name: Create app role + migrate + seed
+        env:
+          DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
+        run: |
+          psql "$DATABASE_MIGRATE_URL" -v ON_ERROR_STOP=1 -c "DO \$\$ BEGIN CREATE ROLE contractradar_app LOGIN PASSWORD 'contractradar' NOSUPERUSER NOBYPASSRLS; EXCEPTION WHEN duplicate_object THEN NULL; END \$\$;"
+          psql "$DATABASE_MIGRATE_URL" -v ON_ERROR_STOP=1 -c "GRANT ALL ON SCHEMA public TO contractradar_app;"
+          pnpm db:migrate:deploy
+          # Grant after migrate
+          psql "$DATABASE_MIGRATE_URL" -v ON_ERROR_STOP=1 -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO contractradar_app; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO contractradar_app;"
+          pnpm db:seed
+      - name: Run restore test
+        run: |
+          chmod +x scripts/backup/*.sh
+          bash scripts/backup/restore-test.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backup-restore-artifacts
+          path: .backup-artifacts/
+      - if: always()
+        run: bash scripts/ci/stop-live-sidecars.sh || true

@@ -97,6 +97,30 @@ const EVENT_DEADLINE: Capability[] = [
   'saved_view.manage',
 ];
 
+const TENANT_PLATFORM_ADMIN: Capability[] = [
+  'tenant_admin.read',
+  'tenant_admin.manage',
+  'tenant_invitation.manage',
+  'tenant_limits.manage',
+  'tenant_feature_flags.manage',
+  'support_access.request',
+  'support_access.approve',
+  'support_access.revoke',
+  'support_access.read',
+  'provider_enablement.manage',
+  'provider_enablement.approve',
+  'provider_kill_switch.manage',
+  'pilot_configuration.manage',
+  'pilot_readiness.manage',
+  'pilot_readiness.activate',
+  'backup.run.read',
+  'restore_test.read',
+  'platform_operations.read',
+  'incident.manage',
+  'audit.export',
+  'offboarding.manage',
+];
+
 const DOCUMENT_READ: Capability[] = [
   'document.read',
   'document.download',
@@ -170,6 +194,7 @@ const TENANT_ROLE_CAPABILITIES: Record<TenantRole, readonly Capability[]> = {
     ...DOCUMENT_MANAGE,
     ...DOCUMENT_QUARANTINE,
     ...CONTRACT_APPROVE,
+    ...TENANT_PLATFORM_ADMIN,
   ],
   TENANT_ADMIN: [
     'tenant.read',
@@ -186,6 +211,7 @@ const TENANT_ROLE_CAPABILITIES: Record<TenantRole, readonly Capability[]> = {
     ...DOCUMENT_MANAGE,
     ...DOCUMENT_QUARANTINE,
     ...CONTRACT_APPROVE,
+    ...TENANT_PLATFORM_ADMIN,
   ],
   COMMERCIAL_MANAGER: [
     'tenant.read',
@@ -401,6 +427,13 @@ const MUTATING_PROJECT_CAPABILITIES = new Set<Capability>([
   'operational_task.assign',
   'operational_task.complete',
   'saved_view.manage',
+  'tenant_admin.manage',
+  'tenant_invitation.manage',
+  'support_access.approve',
+  'provider_enablement.approve',
+  'provider_kill_switch.manage',
+  'pilot_readiness.activate',
+  'offboarding.manage',
 ]);
 
 export function capabilitiesForTenantRole(role: TenantRole): ReadonlySet<Capability> {

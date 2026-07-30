@@ -40,7 +40,8 @@
     "@contractradar/notice-drafting": "workspace:*",
     "@contractradar/notice-delivery": "workspace:*",
     "@contractradar/connectors": "workspace:*",
-    "@contractradar/operations": "workspace:*"
+    "@contractradar/operations": "workspace:*",
+    "@contractradar/platform": "workspace:*"
   },
   "devDependencies": {
     "@contractradar/typescript-config": "workspace:*",

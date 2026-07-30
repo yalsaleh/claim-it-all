@@ -1,0 +1,129 @@
+name: Production readiness
+
+on:
+  push:
+    branches: [main, cursor/**]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  NODE_ENV: test
+  APP_ENV: test
+  CONTRACTRADAR_ENV: CI
+  APP_URL: http://localhost:3000
+  DATABASE_URL: postgresql://contractradar_app:contractradar@localhost:5432/contractradar_test?schema=public
+  INTEGRATION_DATABASE_URL: postgresql://contractradar_app:contractradar@localhost:5432/contractradar_test?schema=public
+  DATABASE_MIGRATE_URL: postgresql://contractradar:contractradar@localhost:5432/contractradar_test?schema=public
+  BETTER_AUTH_SECRET: ci-test-secret-with-sufficient-length-32
+  BETTER_AUTH_URL: http://localhost:3000
+  DOCUMENT_INTELLIGENCE_URL: http://localhost:8000
+  DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN: ci-internal-token-32chars
+  REDIS_URL: redis://localhost:6379
+  S3_ENDPOINT: http://127.0.0.1:9000
+  S3_REGION: us-east-1
+  S3_ACCESS_KEY_ID: minioadmin
+  S3_SECRET_ACCESS_KEY: minioadmin
+  S3_BUCKET: contractradar-documents
+  S3_FORCE_PATH_STYLE: 'true'
+  LOG_LEVEL: info
+  ALLOW_DEV_DEFAULTS: 'true'
+  MALWARE_SCANNER: fake_test
+  CONNECTOR_PROVIDER: fake
+  NOTICE_DELIVERY_PROVIDER: fake
+
+jobs:
+  production-readiness:
+    name: Production readiness evidence
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.6-alpine
+        env:
+          POSTGRES_USER: contractradar
+          POSTGRES_PASSWORD: contractradar
+          POSTGRES_DB: contractradar_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U contractradar -d contractradar_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7.4.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - name: Start MinIO sidecar
+        env:
+          START_CLAMAV: 'false'
+        run: |
+          chmod +x scripts/ci/start-live-sidecars.sh scripts/ci/stop-live-sidecars.sh
+          bash scripts/ci/start-live-sidecars.sh
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm validate:prisma && pnpm db:generate
+      - name: Init app role
+        env:
+          DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
+        run: |
+          psql "$DATABASE_MIGRATE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$ BEGIN
+            CREATE ROLE contractradar_app LOGIN PASSWORD 'contractradar' NOSUPERUSER NOBYPASSRLS;
+          EXCEPTION WHEN duplicate_object THEN NULL;
+          END $$;
+          GRANT CONNECT ON DATABASE contractradar_test TO contractradar_app;
+          SQL
+          bash infrastructure/docker/postgres-init/01-app-role.sh || true
+      - env:
+          DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
+        run: pnpm db:migrate:deploy
+      - run: pnpm --filter @contractradar/platform build
+      - name: Config validation (CI class)
+        run: pnpm --filter @contractradar/web exec tsx scripts/production-validate.ts
+      - name: Reject fake providers in PRODUCTION class
+        run: |
+          set +e
+          OUT=$(CONTRACTRADAR_ENV=PRODUCTION ALLOW_DEV_DEFAULTS=false \
+            BETTER_AUTH_SECRET="$(python3 -c 'print("x"*48)')" \
+            S3_ACCESS_KEY_ID=notdefault S3_SECRET_ACCESS_KEY=notdefaultsecret \
+            DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN="$(python3 -c 'print("t"*40)')" \
+            MALWARE_SCANNER=clamav CLAMAV_HOST=clamav COOKIE_SECURE=true \
+            DATABASE_MIGRATE_URL=postgresql://migrator:x@localhost/db \
+            DATABASE_URL=postgresql://contractradar_app:x@localhost/db \
+            CONNECTOR_PROVIDER=fake \
+            pnpm --filter @contractradar/web exec tsx scripts/production-validate.ts)
+          STATUS=$?
+          set -e
+          echo "$OUT"
+          echo "$OUT" | grep -q CFG_FAKE_PROVIDER
+          test "$STATUS" -ne 0
+      - name: Secret scan + SBOM
+        run: |
+          chmod +x scripts/supply-chain/*.sh
+          bash scripts/supply-chain/secret-scan.sh
+          bash scripts/supply-chain/sbom.sh
+          bash scripts/supply-chain/audit.sh
+      - name: Integrity check
+        run: pnpm integrity:check
+      - name: Production build
+        run: pnpm build
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-readiness-evidence
+          path: |
+            .supply-chain-artifacts/
+      - if: always()
+        run: bash scripts/ci/stop-live-sidecars.sh || true

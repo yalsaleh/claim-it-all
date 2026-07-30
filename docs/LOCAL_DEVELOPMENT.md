@@ -31,6 +31,17 @@ Slice 4 local work covers human-confirmed project events, approved calendars, an
 
 Slice 8 local work uses **fake/local connector providers only** (`CONNECTOR_PROVIDER=fake` in tests). Fake providers are rejected outside test/dev. Imports create `SourceDocument`/`DocumentVersion` and outbox jobs through the existing ingestion path; they do not auto-confirm events or send notices. See [CONNECTOR_PRIVACY.md](./CONNECTOR_PRIVACY.md) and [OPERATIONS.md](./OPERATIONS.md).
 
+Slice 9 local/operator commands (Mode A — no real deploy):
+
+```bash
+pnpm production:validate   # redacted config policy report (ADR-104)
+pnpm integrity:check       # post-migrate / post-restore integrity smoke
+# Backup scripts (CI/MinIO evidence path; see docs/BACKUP.md)
+pnpm backup:run            # when wired; or scripts under scripts/backup/
+```
+
+Fake providers remain forbidden when validating as `PILOT` or `PRODUCTION`. Break-glass is not a local UI feature. See [ENVIRONMENT.md](./ENVIRONMENT.md), [PRODUCTION_VALIDATION.md](./PRODUCTION_VALIDATION.md), [PILOT_READINESS.md](./PILOT_READINESS.md).
+
 ### Install (no Docker)
 
 ```bash

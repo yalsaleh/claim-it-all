@@ -26,7 +26,7 @@ const pg = new EmbeddedPostgres({
 const migrateUrl = `postgresql://contractradar:contractradar@127.0.0.1:${port}/${databaseName}?schema=public`;
 // App/tests must use non-superuser role so FORCE RLS is enforced.
 // Keep the pool small so aborted interactive transactions cannot exhaust embedded Postgres.
-const appUrl = `postgresql://contractradar_app:contractradar@127.0.0.1:${port}/${databaseName}?schema=public&connection_limit=5`;
+const appUrl = `postgresql://contractradar_app:contractradar@127.0.0.1:${port}/${databaseName}?schema=public&connection_limit=10&pool_timeout=20&connect_timeout=10`;
 
 async function main() {
   if (!fs.existsSync(path.join(dataDir, 'data', 'PG_VERSION'))) {

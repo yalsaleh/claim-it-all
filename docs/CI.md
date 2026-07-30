@@ -65,3 +65,14 @@ Static + unit + Postgres/Redis/MinIO-backed integration with `MALWARE_SCANNER=fa
 Slice 6 adds `@contractradar/notice-drafting` unit tests and PostgreSQL notice workflow integration coverage in Mode A verify.
 
 Slice 8 adds `@contractradar/connectors` and `@contractradar/operations` unit tests, fake/local provider rejection tests, and the `connectors.integration.test.ts` suite (approve scope → sync → import → alerts → portfolio membership). CI never uses live mailbox/EDMS credentials and never sends real external notifications.
+
+## Slice 9 workflows (evidence-based)
+
+| Workflow | Purpose |
+|----------|---------|
+| `production-readiness` | Run `production:validate`-equivalent gates, platform unit tests, redacted readiness artifacts |
+| `backup-restore` | Backup + restore rehearsal against **ephemeral Postgres + MinIO** (not a real customer cloud) |
+| `migration-rehearsal` | Apply Prisma migrations on ephemeral DB; integrity / RLS smoke |
+| `dependency-scan` | Advisory scanning for JS/Python lockfiles (supply-chain, ADR-122) |
+
+These workflows support Slice 9 Mode A evidence. They do **not** perform a real deployment, onboard real providers, or prove multi-region DR. Fake providers remain CI/test-only and are rejected for PILOT/PRODUCTION policy checks.

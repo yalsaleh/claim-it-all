@@ -415,3 +415,19 @@ Runtime aggregate for evidence completion → approved NoticeFacts → structure
 ### Slice 8 connectors and operations
 
 `ConnectorAccount` (secret references only; statuses DRAFT→APPROVED/DISABLED/REVOKED), `ConnectorProjectScope` (`IMPORT_ONLY`; explicit approval), `ConnectorSyncRun`, `ExternalRecord` (provider identity + provenance; links to `SourceDocument`/`DocumentVersion`), `ConnectorProviderEvent` (append-only webhooks), `OperationalAlert` / `OperationalAlertEvent`, `EscalationPolicy` / `EscalationStep`, `OperationalTask`, `InternalNotification` (separate from contractual dispatch), `ProjectTimelineEvent`, `ProjectOperationsSummary`, `OperationalSavedView`. Imported records are evidence, not conclusions. Sync never confirms events, activates deadlines, or sends notices.
+
+### Slice 9 production-hardening entities (summary)
+
+Operational/policy concepts (documented + `@contractradar/platform` primitives; not a claim of live SaaS deploy):
+
+- **AppEnvironment / ProviderPolicy** — `LOCAL`|`TEST`|`CI`|`STAGING`|`PILOT`|`PRODUCTION` with fake/local-capture gates
+- **SecretReference** — `env://`|`file://`|`vault://`|`sm://` (+ optional `versionHint`); raw secrets never persisted
+- **ProductionValidateReport / ValidationFinding** — redacted readiness findings
+- **Tenant lifecycle** — `ACTIVE`|`SUSPENDED`|`OFFBOARDING`|`ARCHIVED` (operator-administered)
+- **SupportGrant** — ticketed, scoped, time-boxed, dual-controlled access (FORCE RLS retained)
+- **KillSwitchState** — global/tenant capability stops (`connector_ingestion`, `ai_calls`, `email_delivery`, …)
+- **PilotReadinessItem** — non-waivable checklist evidence for controlled pilot
+- **TenantLimitSnapshot** — quota evaluation (`LIMIT_EXCEEDED` fail-closed)
+- **BackupManifest** — checksummed backup metadata (CI/MinIO evidence path)
+
+Break-glass is **policy/runbook only** — not a product UI entity.

@@ -13,8 +13,11 @@ enum UserStatus {
 }
 
 enum TenantStatus {
+  PROVISIONING
   ACTIVE
   SUSPENDED
+  PILOT_ENDING
+  OFFBOARDING
   ARCHIVED
 }
 
@@ -68,6 +71,18 @@ model User {
   tenantMemberships               TenantMembership[]
   projectMemberships              ProjectMembership[]
   auditLogs                       AuditLog[]                      @relation("AuditActor")
+  tenantInvitationsCreated        TenantInvitation[]              @relation("TenantInvitationCreator")
+  supportAccessRequestsMade       SupportAccessRequest[]          @relation("SupportAccessRequester")
+  supportAccessRequestsApproved   SupportAccessRequest[]          @relation("SupportAccessApprover")
+  supportAccessSessions           SupportAccessAuditSession[]     @relation("SupportAccessOperator")
+  backupRunsInitiated             BackupRun[]                     @relation("BackupRunInitiator")
+  restoreTestsReviewed            RestoreTestRun[]                @relation("RestoreTestReviewer")
+  providerEnablementsConfigured   ProviderEnablement[]            @relation("ProviderEnablementConfigurer")
+  providerEnablementsApproved     ProviderEnablement[]            @relation("ProviderEnablementApprover")
+  killSwitchesConfigured          ProviderKillSwitch[]            @relation("KillSwitchConfigurer")
+  pilotConfigsCreated             PilotConfiguration[]            @relation("PilotConfigurationCreator")
+  incidentsCommanded              OperationalIncident[]           @relation("IncidentCommander")
+  offboardingRequested            TenantOffboardingRequest[]      @relation("OffboardingRequester")
   sourceDocumentsCreated          SourceDocument[]                @relation("SourceDocumentCreator")
   documentVersionsUploaded        DocumentVersion[]               @relation("DocumentVersionUploader")
   uploadSessionsInitiated         UploadSession[]                 @relation("UploadSessionInitiator")
@@ -318,6 +333,21 @@ model Tenant {
   operationalSavedViews              OperationalSavedView[]
   projectTimelineEvents              ProjectTimelineEvent[]
   projectOperationsSummaries         ProjectOperationsSummary[]
+  tenantSettings                     TenantSettings?
+  tenantFeatureFlags                 TenantFeatureFlag[]
+  tenantLimits                       TenantLimit[]
+  tenantInvitations                  TenantInvitation[]
+  supportAccessRequests              SupportAccessRequest[]
+  supportAccessAuditSessions         SupportAccessAuditSession[]
+  backupRuns                         BackupRun[]
+  restoreTestRuns                    RestoreTestRun[]
+  providerEnablements                ProviderEnablement[]
+  providerKillSwitches               ProviderKillSwitch[]
+  pilotConfigurations                PilotConfiguration[]
+  pilotReadinessAssessments          PilotReadinessAssessment[]
+  operationalIncidents               OperationalIncident[]
+  tenantOffboardingRequests          TenantOffboardingRequest[]
+  tenantStorageUsages                TenantStorageUsage[]
 
   @@map("tenant")
 }
@@ -480,16 +510,20 @@ model ProjectMembership {
 
 /// Append-only audit trail. Application code must not update or delete rows.
 model AuditLog {
-  id            String   @id @default(uuid())
-  tenantId      String?
-  projectId     String?
-  actorUserId   String?
-  action        String
-  entityType    String
-  entityId      String?
-  metadata      Json?
-  correlationId String?
-  createdAt     DateTime @default(now())
+  id               String   @id @default(uuid())
+  tenantId         String?
+  projectId        String?
+  actorUserId      String?
+  supportSessionId String?
+  action           String
+  entityType       String
+  entityId         String?
+  metadata         Json?
+  correlationId    String?
+  schemaVersion    Int      @default(1)
+  previousHash     String?
+  integrityHash    String?
+  createdAt        DateTime @default(now())
 
   tenant  Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
@@ -498,6 +532,7 @@ model AuditLog {
   @@index([tenantId, createdAt])
   @@index([actorUserId, createdAt])
   @@index([entityType, entityId])
+  @@index([tenantId, integrityHash])
   @@map("audit_log")
 }
 
@@ -5265,4 +5300,473 @@ model ProjectOperationsSummary {
 
   @@unique([tenantId, projectId])
   @@map("project_operations_summary")
+}
+
+// ---------------------------------------------------------------------------
+// Slice 9 — Production hardening, tenant admin, pilot readiness
+// ---------------------------------------------------------------------------
+
+enum TenantFeatureFlagKey {
+  CONNECTORS
+  CONTROLLED_DELIVERY
+  AI_ASSISTED_EXTRACTION
+  AI_ASSISTED_DETECTION
+  AI_ASSISTED_DRAFTING
+  PORTFOLIO_DASHBOARD
+  BILINGUAL_SUPPORT
+  PROVIDER_INTEGRATIONS
+  PILOT_ONLY_FEATURES
+}
+
+enum FeatureRolloutMode {
+  OFF
+  INTERNAL
+  PILOT
+  GA
+}
+
+enum SupportAccessStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum BackupRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  PARTIALLY_SUCCEEDED
+  CANCELLED
+}
+
+enum RestoreTestStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum ProviderEnablementStatus {
+  NOT_CONFIGURED
+  TECHNICAL_VALIDATION
+  SECURITY_REVIEW
+  APPROVED_FOR_STAGING
+  APPROVED_FOR_PILOT
+  ENABLED
+  DISABLED
+  REVOKED
+}
+
+enum PilotConfigurationStatus {
+  DRAFT
+  READY
+  ACTIVE
+  PAUSED
+  ENDED
+  EXTENDED
+}
+
+enum PilotAssessmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  BLOCKED
+  READY_WITH_EXCEPTIONS
+  READY
+  EXPIRED
+}
+
+enum IncidentSeverity {
+  SEV1
+  SEV2
+  SEV3
+  SEV4
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  CONTAINED
+  RECOVERING
+  RESOLVED
+  CLOSED
+}
+
+enum OffboardingStatus {
+  REQUESTED
+  IDENTITY_VERIFIED
+  SCOPE_CONFIRMED
+  LEGAL_HOLD_CHECK
+  EXPORT_GENERATING
+  CUSTOMER_CONFIRMED
+  CONNECTORS_REVOKED
+  USERS_DEACTIVATED
+  RETENTION_WINDOW
+  DELETION_PENDING
+  VERIFIED
+  CANCELLED
+}
+
+model TenantSettings {
+  id                      String   @id @default(uuid())
+  tenantId                String   @unique
+  legalDisplayName        String?
+  defaultTimezone         String   @default("Asia/Dubai")
+  defaultLanguage         String   @default("en")
+  enabledLanguages        Json     @default("[\"en\"]")
+  dateFormat              String   @default("yyyy-MM-dd")
+  numeralFormat           String   @default("latn")
+  defaultWorkingWeek      Json?
+  defaultProjectPolicy    Json?
+  defaultSodSettings      Json?
+  sessionPolicy           Json?
+  retentionPolicyRef      String?
+  dataResidencyMetadata   Json?
+  pilotStatus             String?
+  supportContact          String?
+  billingPlanPlaceholder  String?
+  incidentContacts        Json?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_settings")
+}
+
+model TenantFeatureFlag {
+  id              String               @id @default(uuid())
+  tenantId        String
+  flag            TenantFeatureFlagKey
+  enabled         Boolean              @default(false)
+  rolloutMode     FeatureRolloutMode   @default(OFF)
+  effectiveFrom   DateTime?
+  effectiveTo     DateTime?
+  configuredByUserId String
+  approvedByUserId   String?
+  reason          String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, flag])
+  @@index([tenantId, enabled])
+  @@map("tenant_feature_flag")
+}
+
+model TenantLimit {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  limitKey              String
+  limitValue            BigInt
+  usedValue             BigInt   @default(0)
+  warningThresholdRatio Float    @default(0.8)
+  updatedAt             DateTime @updatedAt
+  createdAt             DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, limitKey])
+  @@map("tenant_limit")
+}
+
+model TenantInvitation {
+  id              String           @id @default(uuid())
+  tenantId        String
+  email           String
+  role            TenantRole
+  status          MembershipStatus @default(INVITED)
+  tokenHash       String
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  createdByUserId String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User   @relation("TenantInvitationCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, email, tokenHash])
+  @@index([tenantId, email, status])
+  @@map("tenant_invitation")
+}
+
+model SupportAccessRequest {
+  id                    String              @id @default(uuid())
+  tenantId              String
+  projectId             String?
+  requestingOperatorId  String
+  reason                String              @db.Text
+  requestedCapabilities Json
+  requestedDurationMin  Int
+  status                SupportAccessStatus @default(REQUESTED)
+  approvedByUserId      String?
+  tenantApproverUserId  String?
+  approvedAt            DateTime?
+  expiresAt             DateTime?
+  revokedAt             DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  tenant     Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requester  User                       @relation("SupportAccessRequester", fields: [requestingOperatorId], references: [id], onDelete: Restrict)
+  approver   User?                      @relation("SupportAccessApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  sessions   SupportAccessAuditSession[]
+
+  @@index([tenantId, status])
+  @@map("support_access_request")
+}
+
+model SupportAccessAuditSession {
+  id             String    @id @default(uuid())
+  tenantId       String
+  requestId      String
+  operatorUserId String
+  startedAt      DateTime  @default(now())
+  endsAt         DateTime
+  endedAt        DateTime?
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  request  SupportAccessRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  operator User                 @relation("SupportAccessOperator", fields: [operatorUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, active])
+  @@map("support_access_audit_session")
+}
+
+model BackupRun {
+  id                    String          @id @default(uuid())
+  tenantId              String?
+  environment           String
+  backupType            String
+  status                BackupRunStatus @default(QUEUED)
+  startedAt             DateTime?
+  completedAt           DateTime?
+  manifestLocation      String?
+  checksum              String?
+  encryptionStatus      String          @default("encrypted_at_rest")
+  databaseMigrationVersion String?
+  objectCount           Int             @default(0)
+  databaseSizeBytes     BigInt          @default(0)
+  objectSizeBytes       BigInt          @default(0)
+  failureCode           String?
+  failureMessageSafe    String?
+  initiatedByUserId     String?
+  correlationId         String?
+  createdAt             DateTime        @default(now())
+
+  tenant      Tenant?          @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  initiatedBy User?            @relation("BackupRunInitiator", fields: [initiatedByUserId], references: [id], onDelete: SetNull)
+  restoreTests RestoreTestRun[]
+
+  @@index([environment, status, createdAt])
+  @@map("backup_run")
+}
+
+model RestoreTestRun {
+  id                        String            @id @default(uuid())
+  tenantId                  String?
+  backupRunId               String
+  targetEnvironment         String
+  status                    RestoreTestStatus @default(QUEUED)
+  startedAt                 DateTime?
+  completedAt               DateTime?
+  integrityChecks           Json?
+  tenantIsolationResult     String?
+  objectIntegrityResult     String?
+  applicationReadinessResult String?
+  failureCode               String?
+  failureMessageSafe        String?
+  reviewedByUserId          String?
+  createdAt                 DateTime          @default(now())
+
+  tenant     Tenant?    @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  backupRun  BackupRun  @relation(fields: [backupRunId], references: [id], onDelete: Cascade)
+  reviewedBy User?      @relation("RestoreTestReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([backupRunId, status])
+  @@map("restore_test_run")
+}
+
+model ProviderEnablement {
+  id                 String                   @id @default(uuid())
+  tenantId           String?
+  provider           String
+  environment        String
+  status             ProviderEnablementStatus @default(NOT_CONFIGURED)
+  approvedUseCases   Json?
+  approvedTenantIds  Json?
+  dataCategories     Json?
+  riskReview         String?
+  securityReview     String?
+  legalReviewPlaceholder String?
+  enabledAt          DateTime?
+  disabledAt         DateTime?
+  killSwitchReason   String?
+  configuredByUserId String
+  approvedByUserId   String?
+  secretReference    String?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  tenant       Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  configuredBy User    @relation("ProviderEnablementConfigurer", fields: [configuredByUserId], references: [id], onDelete: Restrict)
+  approvedBy   User?   @relation("ProviderEnablementApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([provider, environment, status])
+  @@map("provider_enablement")
+}
+
+model ProviderKillSwitch {
+  id                 String   @id @default(uuid())
+  tenantId           String?
+  key                String
+  enabled            Boolean  @default(false)
+  scope              String   @default("global")
+  reason             String?
+  configuredByUserId String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant       Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  configuredBy User    @relation("KillSwitchConfigurer", fields: [configuredByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, key, scope])
+  @@map("provider_kill_switch")
+}
+
+model PilotConfiguration {
+  id                   String                   @id @default(uuid())
+  tenantId             String
+  allowedProjectIds    Json?
+  startDate            DateTime?
+  endDate              DateTime?
+  userLimit            Int?
+  storageLimitBytes    BigInt?
+  connectorLimit       Int?
+  enabledProviders     Json?
+  enabledFeatures      Json?
+  supportHours         String?
+  escalationContacts   Json?
+  dataResidencyMetadata Json?
+  exportPolicy         Json?
+  dispatchPolicy       Json?
+  aiPolicy             Json?
+  status               PilotConfigurationStatus @default(DRAFT)
+  createdByUserId      String
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User   @relation("PilotConfigurationCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status])
+  @@map("pilot_configuration")
+}
+
+model PilotReadinessAssessment {
+  id        String                @id @default(uuid())
+  tenantId  String
+  status    PilotAssessmentStatus @default(NOT_STARTED)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  tenant Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items  PilotReadinessItemRow[]
+
+  @@index([tenantId, status])
+  @@map("pilot_readiness_assessment")
+}
+
+model PilotReadinessItemRow {
+  id             String                @id @default(uuid())
+  assessmentId   String
+  requirement    String
+  status         PilotAssessmentStatus @default(NOT_STARTED)
+  nonWaivable    Boolean               @default(true)
+  evidence       String?
+  ownerUserId    String?
+  reviewerUserId String?
+  approvedException Boolean            @default(false)
+  expiresAt      DateTime?
+  notes          String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  assessment PilotReadinessAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, requirement])
+  @@map("pilot_readiness_item")
+}
+
+model OperationalIncident {
+  id                    String           @id @default(uuid())
+  tenantId              String?
+  severity              IncidentSeverity
+  status                IncidentStatus   @default(OPEN)
+  affectedServices      Json
+  affectedTenantIds     Json?
+  commanderUserId       String?
+  detectedAt            DateTime
+  startedAt             DateTime         @default(now())
+  resolvedAt            DateTime?
+  customerImpactSummary String?          @db.Text
+  rootCause             String?          @db.Text
+  correctiveActions     String?          @db.Text
+  timeline              Json?
+  linkedAlertIds        Json?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  commander User?   @relation("IncidentCommander", fields: [commanderUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, severity, createdAt])
+  @@map("operational_incident")
+}
+
+model TenantOffboardingRequest {
+  id              String            @id @default(uuid())
+  tenantId        String
+  status          OffboardingStatus @default(REQUESTED)
+  requestedByUserId String
+  scopeConfirmed  Boolean           @default(false)
+  legalHoldClear  Boolean           @default(false)
+  exportManifest  Json?
+  notes           String?           @db.Text
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy User   @relation("OffboardingRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status])
+  @@map("tenant_offboarding_request")
+}
+
+model TenantStorageUsage {
+  id               String   @id @default(uuid())
+  tenantId         String
+  originalUploads  BigInt   @default(0)
+  extractedArtifacts BigInt @default(0)
+  exports          BigInt   @default(0)
+  attachments      BigInt   @default(0)
+  dispatchEvidence BigInt   @default(0)
+  connectorImports BigInt   @default(0)
+  rebuiltAt        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId])
+  @@map("tenant_storage_usage")
 }

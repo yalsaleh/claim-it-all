@@ -77,6 +77,22 @@ describe('environment validation', () => {
     expect(env.MALWARE_SCANNER).toBe('fake_test');
   });
 
+  it('rejects fake connector provider in PILOT', () => {
+    expect(() =>
+      validateEnvForTests({
+        ...valid,
+        CONTRACTRADAR_ENV: 'PILOT',
+        NODE_ENV: 'production',
+        BETTER_AUTH_SECRET: 'production-grade-secret-with-enough-length-32+',
+        DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN: 'production-internal-token-32chars',
+        S3_ACCESS_KEY_ID: 'not-minioadmin',
+        S3_SECRET_ACCESS_KEY: 'not-minioadmin',
+        MALWARE_SCANNER: 'clamav',
+        CONNECTOR_PROVIDER: 'fake',
+      }),
+    ).toThrow(/CONNECTOR_PROVIDER/);
+  });
+
   it('requires clamav in production', () => {
     expect(() =>
       validateEnvForTests({

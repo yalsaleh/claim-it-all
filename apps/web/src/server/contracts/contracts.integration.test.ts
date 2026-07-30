@@ -298,8 +298,9 @@ describe('contract package integration', () => {
         }),
       ),
     ).rejects.toThrow(/immutable/i);
-    await prisma.$disconnect();
-    await prisma.$connect();
+    // Do not disconnect the shared Prisma client mid-suite: under embedded PG with a
+    // small pool, $disconnect/$connect after a trigger-aborted transaction can hang the
+    // next beforeEach when prior suites have already stressed the database.
   });
 
   it('runs structure analysis → review → issue resolve → approve → immutable snapshot', async () => {

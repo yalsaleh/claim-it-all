@@ -213,38 +213,43 @@ describe('document ingestion RLS + immutability', () => {
   });
 
   it('blocks cross-project document version parent mismatch', async () => {
+    // Commit the parent first, then assert the parent-guard with a single-statement
+    // abort. Prefer $executeRaw over Prisma create(): after Slice 9 schema growth,
+    // interactive create()+trigger abort can hang the embedded Prisma pool.
+    const doc = await withBypass(async (tx) =>
+      tx.sourceDocument.create({
+        data: {
+          tenantId: tenantA,
+          projectId: projectA,
+          title: 'Doc',
+          documentType: 'LETTER',
+          createdByUserId: userId,
+        },
+      }),
+    );
+    const versionId = crypto.randomUUID();
     await expect(
       withBypass(async (tx) => {
-        const doc = await tx.sourceDocument.create({
-          data: {
-            tenantId: tenantA,
-            projectId: projectA,
-            title: 'Doc',
-            documentType: 'LETTER',
-            createdByUserId: userId,
-          },
-        });
-        await tx.documentVersion.create({
-          data: {
-            tenantId: tenantA,
-            projectId: projectB, // wrong project
-            sourceDocumentId: doc.id,
-            versionNumber: 1,
-            originalFilename: 'a.pdf',
-            normalizedFilename: 'a.pdf',
-            mediaType: 'application/pdf',
-            extension: 'pdf',
-            sizeBytes: 10n,
-            sha256: 'a'.repeat(64),
-            storageBucket: 'bucket',
-            storageKey: 'tenants/x/projects/y/quarantine/z/w',
-            uploadedByUserId: userId,
-          },
-        });
+        await tx.$executeRaw`
+          INSERT INTO "document_version" (
+            "id", "tenantId", "projectId", "sourceDocumentId", "versionNumber",
+            "originalFilename", "normalizedFilename", "mediaType", "extension",
+            "sizeBytes", "sha256", "storageProvider", "storageBucket", "storageKey",
+            "uploadStatus", "malwareScanStatus", "processingStatus",
+            "uploadedByUserId", "uploadedAt", "createdAt"
+          ) VALUES (
+            ${versionId}, ${tenantA}, ${projectB}, ${doc.id}, 1,
+            'a.pdf', 'a.pdf', 'application/pdf', 'pdf',
+            10, ${'a'.repeat(64)}, CAST('S3_COMPATIBLE' AS "StorageProvider"), 'bucket',
+            'tenants/x/projects/y/quarantine/z/w',
+            CAST('PENDING' AS "VersionUploadStatus"),
+            CAST('NOT_SCANNED' AS "MalwareScanStatus"),
+            CAST('NOT_STARTED' AS "VersionProcessingStatus"),
+            ${userId}, NOW(), NOW()
+          )
+        `;
       }),
     ).rejects.toThrow(/tenant\/project must match source_document/i);
-    await prisma.$disconnect();
-    await prisma.$connect();
   });
 
   it('creates accepted versions and append-only ingestion events', async () => {

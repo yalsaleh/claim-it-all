@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  isPilotOrProduction,
+  parseAppEnvironment,
+  policyForEnvironment,
+} from '@contractradar/platform';
 
 const WEAK_SECRETS = [
   'replace-with-a-long-random-secret',
@@ -7,11 +12,13 @@ const WEAK_SECRETS = [
 ];
 
 const WEAK_STORAGE = new Set(['minioadmin', 'changeme', 'password', 'secret']);
+const FAKE_PROVIDERS = new Set(['fake', 'fake_test', 'local_fixture', 'local_capture']);
 
 const serverSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     APP_ENV: z.enum(['development', 'test', 'staging', 'production']).optional(),
+    CONTRACTRADAR_ENV: z.enum(['LOCAL', 'TEST', 'CI', 'STAGING', 'PILOT', 'PRODUCTION']).optional(),
     APP_URL: z.string().url(),
     DATABASE_URL: z.string().min(1),
     BETTER_AUTH_SECRET: z.string().min(32),
@@ -40,15 +47,50 @@ const serverSchema = z
       .enum(['true', 'false'])
       .optional()
       .transform((value) => value === 'true'),
+    CONNECTOR_PROVIDER: z.string().optional(),
+    NOTICE_DELIVERY_PROVIDER: z.string().optional(),
+    CONTRACT_AI_PROVIDER: z.string().optional(),
   })
   .superRefine((env, ctx) => {
     const nextPhase = process.env.NEXT_PHASE;
     const isNextBuild = nextPhase === 'phase-production-build';
     const appEnv = env.APP_ENV ?? env.NODE_ENV;
+    let classified;
+    try {
+      classified = parseAppEnvironment(env.CONTRACTRADAR_ENV ?? env.APP_ENV ?? env.NODE_ENV);
+    } catch (error) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: error instanceof Error ? error.message : 'Invalid CONTRACTRADAR_ENV',
+        path: ['CONTRACTRADAR_ENV'],
+      });
+      return;
+    }
+    const policy = policyForEnvironment(classified);
     const isProdLike =
       !isNextBuild &&
-      (env.NODE_ENV === 'production' || appEnv === 'production' || appEnv === 'staging');
-    const isTest = env.NODE_ENV === 'test' || appEnv === 'test';
+      (env.NODE_ENV === 'production' ||
+        appEnv === 'production' ||
+        appEnv === 'staging' ||
+        isPilotOrProduction(classified));
+    const isTest =
+      env.NODE_ENV === 'test' || appEnv === 'test' || classified === 'TEST' || classified === 'CI';
+
+    if (!policy.allowFakeProviders) {
+      for (const [key, value] of [
+        ['CONNECTOR_PROVIDER', env.CONNECTOR_PROVIDER],
+        ['NOTICE_DELIVERY_PROVIDER', env.NOTICE_DELIVERY_PROVIDER],
+        ['CONTRACT_AI_PROVIDER', env.CONTRACT_AI_PROVIDER],
+      ] as const) {
+        if (value && FAKE_PROVIDERS.has(value)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `${key}=${value} is forbidden in ${classified}`,
+            path: [key],
+          });
+        }
+      }
+    }
 
     if (env.MALWARE_SCANNER === 'fake_test' && !isTest) {
       ctx.addIssue({

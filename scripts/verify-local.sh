@@ -55,8 +55,15 @@ run "${PNPM[@]}" --filter @contractradar/notice-drafting typecheck
 run "${PNPM[@]}" --filter @contractradar/notice-delivery typecheck
 run "${PNPM[@]}" --filter @contractradar/connectors typecheck
 run "${PNPM[@]}" --filter @contractradar/operations typecheck
+run "${PNPM[@]}" --filter @contractradar/platform typecheck
 run "${PNPM[@]}" --filter @contractradar/web typecheck
 run "${PNPM[@]}" test:unit
+run "${PNPM[@]}" --filter @contractradar/platform build
+run env CONTRACTRADAR_ENV=TEST ALLOW_DEV_DEFAULTS=true MALWARE_SCANNER=fake_test \
+  CONNECTOR_PROVIDER=fake NOTICE_DELIVERY_PROVIDER=fake \
+  "${PNPM[@]}" --filter @contractradar/web exec tsx scripts/production-validate.ts
+run bash scripts/supply-chain/secret-scan.sh
+run bash scripts/supply-chain/sbom.sh
 # Match CI: fail if any non-live integration suite reports skips.
 set +e
 INTEGRATION_OUTPUT="$("${PNPM[@]}" test:integration:embedded 2>&1 | tee /tmp/verify-local-integration.out)"

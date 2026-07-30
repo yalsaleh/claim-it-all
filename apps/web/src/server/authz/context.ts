@@ -53,7 +53,8 @@ export async function requireTenantMembership(tenantId?: string): Promise<Tenant
           tenantId: resolvedTenantId,
           userId: user.id,
           status: 'ACTIVE',
-          tenant: { status: 'ACTIVE' },
+          // PROVISIONING/PILOT_ENDING remain accessible for onboarding/admin; SUSPENDED/ARCHIVED/OFFBOARDING are not.
+          tenant: { status: { in: ['ACTIVE', 'PROVISIONING', 'PILOT_ENDING'] } },
         },
       }),
   );

@@ -276,3 +276,15 @@ Controlled notice delivery requires immutable dispatch snapshots, explicit human
 - Operational alerts are deterministic and deduplicated; `InternalNotification` is in-app only and never used for contractual notice dispatch.
 - Portfolio dashboard respects project membership — no cross-tenant or tenant-wide leakage for restricted roles.
 - Threat model: [docs/threat-models/connectors-and-operations.md](./docs/threat-models/connectors-and-operations.md)
+
+## Slice 9 production hardening
+
+- Environment classes `LOCAL`/`TEST`/`CI`/`STAGING`/`PILOT`/`PRODUCTION`; fake and local-capture providers **blocked in PILOT/PRODUCTION** (ADR-103/104).
+- Secret references only (`env://`, `file://`, `vault://`, `sm://`); rotation without storing secret bytes (ADR-105).
+- Support access is ticketed, time-boxed, dual-controlled; FORCE RLS retained (ADR-107).
+- Break-glass is **out-of-band policy only — not in the product UI** (ADR-108).
+- Structured log/metric redaction; readiness includes configuration policy (ADR-110–112).
+- Backups/restores evidenced in **CI/MinIO only**; no real customer DR claimed (ADR-113/114).
+- Kill switches fail closed; pilot readiness non-waivable checklist (ADR-118/119).
+- Supply-chain scanning + deployment hardening documented; **no real deployment claimed** (ADR-122/123).
+- Threat models: [tenant-administration](./docs/threat-models/tenant-administration.md), [support-access](./docs/threat-models/support-access.md), [backups-restores](./docs/threat-models/backups-restores.md), [provider-onboarding](./docs/threat-models/provider-onboarding.md), [production-operations](./docs/threat-models/production-operations.md), [pilot-deployment](./docs/threat-models/pilot-deployment.md).

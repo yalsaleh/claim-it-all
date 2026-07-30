@@ -49,10 +49,14 @@ describe('tenant role capabilities', () => {
     expect(hasCapability(owner, 'connector_account.approve')).toBe(true);
     expect(hasCapability(owner, 'portfolio.read')).toBe(true);
     expect(hasCapability(owner, 'operations_dashboard.read')).toBe(true);
+    expect(hasCapability(owner, 'platform_operations.read')).toBe(true);
+    expect(hasCapability(owner, 'pilot_readiness.activate')).toBe(true);
+    expect(hasCapability(owner, 'support_access.approve')).toBe(true);
 
     const admin = capabilitiesForTenantRole('TENANT_ADMIN');
     expect(hasCapability(admin, 'connector_account.approve')).toBe(true);
     expect(hasCapability(admin, 'portfolio.read')).toBe(true);
+    expect(hasCapability(admin, 'tenant_admin.manage')).toBe(true);
   });
 
   it('grants contracts managers package and approval capabilities', () => {

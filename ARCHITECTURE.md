@@ -427,6 +427,20 @@ Each connector implements: auth, incremental sync, document normalization, tenan
 
 ---
 
+## 18b. Slice 9 production controls
+
+`@contractradar/platform` provides evidence-based production-hardening primitives (Mode A — **no real deployment claimed**):
+
+- Environment classification and provider policy (fake blocked in PILOT/PRODUCTION)
+- Redacted production configuration validation and readiness gating
+- Secret-reference interface (values never returned from APIs)
+- Kill switches, pilot readiness checklist, tenant limit evaluation
+- Safe metric labels and secret-like redaction helpers
+
+Operational docs: [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md), [docs/ENVIRONMENT.md](./docs/ENVIRONMENT.md), [docs/OBSERVABILITY.md](./docs/OBSERVABILITY.md), [docs/PILOT_READINESS.md](./docs/PILOT_READINESS.md). Break-glass remains out-of-band (not in product UI). Backups/restores are proven in CI/MinIO only. ADRs 103–123.
+
+---
+
 ## 19. Deployment
 
 ### Local

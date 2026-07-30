@@ -44,6 +44,9 @@ importers:
       '@contractradar/operations':
         specifier: workspace:*
         version: link:../../packages/operations
+      '@contractradar/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
       '@contractradar/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -239,6 +242,21 @@ importers:
       zod:
         specifier: 3.24.1
         version: 3.24.1
+    devDependencies:
+      '@contractradar/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 22.10.2
+        version: 22.10.2
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@22.10.2)
+
+  packages/platform:
     devDependencies:
       '@contractradar/typescript-config':
         specifier: workspace:*

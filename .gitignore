@@ -30,6 +30,9 @@ credentials/
 
 # Local / CI diagnostic outputs
 artifacts/
+.backup-artifacts/
+.supply-chain-artifacts/
+.embedded-postgres/
 
 # Next.js / frontend
 apps/web/.next/
