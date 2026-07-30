@@ -67,6 +67,11 @@ jobs:
           START_CLAMAV: 'false'
         run: bash scripts/ci/start-live-sidecars.sh
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Install MinIO client (mc)
+        run: |
+          curl -fsSL "https://dl.min.io/client/mc/release/linux-amd64/mc" -o /usr/local/bin/mc
+          chmod +x /usr/local/bin/mc
+          mc --version
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:generate
       - name: Migrate + seed
@@ -79,8 +84,7 @@ jobs:
         run: |
           mkdir -p artifacts/backup
           chmod +x scripts/backup/*.sh
-          command -v pg_dump && command -v psql
-          command -v mc || command -v docker
+          command -v pg_dump && command -v psql && command -v mc
           bash scripts/backup/restore-test.sh
           test -s artifacts/backup/restore-test-report.json
           test -s artifacts/backup/tenant-isolation-report.json
@@ -98,9 +102,10 @@ jobs:
             "checksNotRun=production-cloud-restore" \
             "knownGaps=labelled-synthetic-ci-only"
       - uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: backup-restore-artifacts
           path: artifacts/backup/
-          if-no-files-found: error
+          if-no-files-found: warn
       - if: always()
         run: bash scripts/ci/stop-live-sidecars.sh || true

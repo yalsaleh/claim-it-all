@@ -23,8 +23,11 @@ ACCESS="${S3_ACCESS_KEY_ID:?}"
 SECRET="${S3_SECRET_ACCESS_KEY:?}"
 
 PASS_LIST=()
-note_pass() { PASS_LIST+=("$1"); echo "PASS: $1"; }
-fail() { echo "FAIL: $1"; exit 1; }
+PROGRESS="${BACKUP_OUT_DIR}/progress.log"
+: > "${PROGRESS}"
+note_pass() { PASS_LIST+=("$1"); echo "PASS: $1" | tee -a "${PROGRESS}"; }
+fail() { echo "FAIL: $1" | tee -a "${PROGRESS}"; exit 1; }
+trap 'echo "ERR at line $LINENO exit $?" | tee -a "${PROGRESS}"' ERR
 
 echo "==> Ensure migrations applied"
 pnpm db:migrate:deploy
