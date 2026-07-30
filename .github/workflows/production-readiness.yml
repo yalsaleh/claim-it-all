@@ -64,11 +64,12 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v5
+      - name: Enable pnpm via Corepack
+        run: corepack enable && corepack prepare pnpm@9.15.0 --activate
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
-      - name: Enable pnpm via Corepack
-        run: corepack enable && corepack prepare pnpm@9.15.0 --activate
+          package-manager-cache: false
       - name: Start MinIO sidecar
         env:
           START_CLAMAV: 'false'
