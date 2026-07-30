@@ -13,21 +13,26 @@ MANIFEST="${OUT_DIR}/pg-${STAMP}.manifest.json"
 
 echo "Creating logical backup → ${DUMP_FILE}"
 pg_dump --no-owner --no-acl --format=plain "${MIGRATE_URL}" > "${DUMP_FILE}"
-CHECKSUM="$(shasum -a 256 "${DUMP_FILE}" | awk '{print $1}')"
-MIGRATION_VERSION="$(cd "${ROOT_DIR}/apps/web" && pnpm exec prisma migrate status 2>/dev/null | tail -n 20 || true)"
+if command -v sha256sum >/dev/null 2>&1; then
+  CHECKSUM="$(sha256sum "${DUMP_FILE}" | awk '{print $1}')"
+else
+  CHECKSUM="$(shasum -a 256 "${DUMP_FILE}" | awk '{print $1}')"
+fi
 
-cat > "${MANIFEST}" <<EOF
-{
+python3 - "${MANIFEST}" "${STAMP}" "${DUMP_FILE}" "${CHECKSUM}" <<'PY'
+import json, pathlib, sys
+manifest = pathlib.Path(sys.argv[1])
+stamp, dump_file, checksum = sys.argv[2], sys.argv[3], sys.argv[4]
+doc = {
   "type": "postgresql_logical",
-  "createdAt": "${STAMP}",
-  "dumpFile": "$(basename "${DUMP_FILE}")",
-  "checksumSha256": "${CHECKSUM}",
+  "createdAt": stamp,
+  "dumpFile": pathlib.Path(dump_file).name,
+  "checksumSha256": checksum,
   "encryptionStatus": "plaintext_local_artifact",
-  "migrationStatusSnippet": $(python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' <<<"${MIGRATION_VERSION}"),
-  "note": "CI/test artifact only — not a production encrypted backup claim"
+  "note": "CI/test artifact only — not a production encrypted backup claim",
 }
-EOF
-
-echo "Manifest: ${MANIFEST}"
-echo "Checksum: ${CHECKSUM}"
-echo "${MANIFEST}"
+manifest.write_text(json.dumps(doc, indent=2) + "\n")
+print(f"Manifest: {manifest}")
+print(f"Checksum: {checksum}")
+print(str(manifest))
+PY

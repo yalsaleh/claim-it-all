@@ -68,8 +68,13 @@ jobs:
           pnpm db:migrate:deploy
           pnpm db:seed
       - name: Run restore test
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          DATABASE_MIGRATE_URL: ${{ env.DATABASE_MIGRATE_URL }}
         run: |
           chmod +x scripts/backup/*.sh
+          command -v pg_dump
+          command -v psql
           bash scripts/backup/restore-test.sh
       - uses: actions/upload-artifact@v4
         with:
