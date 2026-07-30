@@ -33,7 +33,9 @@ class _FakePgError(Exception):
 def test_utc_now_naive_has_no_tzinfo() -> None:
     now = utc_now_naive()
     assert now.tzinfo is None
-    assert abs((datetime.utcnow() - now).total_seconds()) < 2
+    # Compare against timezone-aware UTC wall clock converted to naive UTC.
+    wall = datetime.now(timezone.utc).replace(tzinfo=None)
+    assert abs((wall - now).total_seconds()) < 2
 
 
 def test_as_utc_naive_strips_aware() -> None:

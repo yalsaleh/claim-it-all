@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -20,11 +21,26 @@ from document_intelligence.storage import head_ok
 settings = get_settings()
 configure_logging(settings.log_level)
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> Any:
+    # Force settings validation at boot (refuses fake_test outside tests).
+    get_settings()
+    try:
+        await db.connect()
+    except Exception:
+        # Readiness will report DB down; process still starts for liveness.
+        pass
+    yield
+    await db.close()
+
+
 app = FastAPI(
     title="ContractRadar Document Intelligence",
     version=__version__,
     docs_url=None if settings.app_env == "production" else "/docs",
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 # Max clock skew for signed internal requests (seconds)
@@ -66,22 +82,6 @@ def _require_internal(
         ).hexdigest()
         if not hmac.compare_digest(expected, signature):
             raise HTTPException(status_code=401, detail="Invalid signature")
-
-
-@app.on_event("startup")
-async def on_startup() -> None:
-    # Force settings validation at boot (refuses fake_test outside tests).
-    get_settings()
-    try:
-        await db.connect()
-    except Exception:
-        # Readiness will report DB down; process still starts for liveness.
-        pass
-
-
-@app.on_event("shutdown")
-async def on_shutdown() -> None:
-    await db.close()
 
 
 @app.get("/health/live")
