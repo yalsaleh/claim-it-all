@@ -60,15 +60,12 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:generate
-      - name: Create app role + migrate + seed
+      - name: Migrate + seed
         env:
           DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
         run: |
-          psql "$DATABASE_MIGRATE_URL" -v ON_ERROR_STOP=1 -c "DO \$\$ BEGIN CREATE ROLE contractradar_app LOGIN PASSWORD 'contractradar' NOSUPERUSER NOBYPASSRLS; EXCEPTION WHEN duplicate_object THEN NULL; END \$\$;"
-          psql "$DATABASE_MIGRATE_URL" -v ON_ERROR_STOP=1 -c "GRANT ALL ON SCHEMA public TO contractradar_app;"
+          # App role is created by the foundation RLS migration (same path as CI).
           pnpm db:migrate:deploy
-          # Grant after migrate
-          psql "$DATABASE_MIGRATE_URL" -v ON_ERROR_STOP=1 -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO contractradar_app; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO contractradar_app;"
           pnpm db:seed
       - name: Run restore test
         run: |

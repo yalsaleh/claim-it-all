@@ -73,23 +73,16 @@ jobs:
         run: |
           chmod +x scripts/ci/start-live-sidecars.sh scripts/ci/stop-live-sidecars.sh
           bash scripts/ci/start-live-sidecars.sh
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - run: pnpm install --frozen-lockfile
       - run: pnpm validate:prisma && pnpm db:generate
-      - name: Init app role
-        env:
-          DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
-        run: |
-          psql "$DATABASE_MIGRATE_URL" -v ON_ERROR_STOP=1 <<'SQL'
-          DO $$ BEGIN
-            CREATE ROLE contractradar_app LOGIN PASSWORD 'contractradar' NOSUPERUSER NOBYPASSRLS;
-          EXCEPTION WHEN duplicate_object THEN NULL;
-          END $$;
-          GRANT CONNECT ON DATABASE contractradar_test TO contractradar_app;
-          SQL
-          bash infrastructure/docker/postgres-init/01-app-role.sh || true
+      # Runtime app role is created by the RLS migration; migrate with bootstrap URL.
       - env:
           DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
         run: pnpm db:migrate:deploy
+      - env:
+          DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
+        run: pnpm db:seed
       - run: pnpm --filter @contractradar/platform build
       - name: Config validation (CI class)
         run: pnpm --filter @contractradar/web exec tsx scripts/production-validate.ts

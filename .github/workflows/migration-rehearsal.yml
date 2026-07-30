@@ -57,12 +57,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm validate:prisma && pnpm db:generate
       - name: Migrate from zero
+        env:
+          DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
         run: |
           chmod +x scripts/db/*.sh
           bash scripts/db/migrate-check.sh
           pnpm db:migrate:deploy
           bash scripts/db/migrate-verify.sh
       - name: Reset and remigrate
+        env:
+          DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
         run: |
           pnpm db:reset
           pnpm db:migrate:deploy
