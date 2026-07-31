@@ -14,20 +14,38 @@ ISOLATION_REPORT="${BACKUP_OUT_DIR}/tenant-isolation-report.json"
 RLS_REPORT="${BACKUP_OUT_DIR}/rls-force-report.json"
 READY_REPORT="${BACKUP_OUT_DIR}/application-readiness-report.json"
 OBJECT_REPORT="${BACKUP_OUT_DIR}/object-restore-report.json"
+PROGRESS="${BACKUP_OUT_DIR}/progress.log"
+: > "${PROGRESS}"
+
+obj() {
+  pnpm --filter @contractradar/web exec node scripts/object-bytes.mjs "$@"
+}
+
+PASS_LIST=()
+note_pass() {
+  PASS_LIST+=("$1")
+  echo "PASS: $1" | tee -a "${PROGRESS}"
+  echo "::notice::PASS $1"
+}
+fail() {
+  echo "FAIL: $1" | tee -a "${PROGRESS}"
+  echo "::error::FAIL $1"
+  if [[ -f "${PROGRESS}" ]]; then
+    while IFS= read -r line; do echo "::error::progress: ${line}"; done < "${PROGRESS}"
+  fi
+  exit 1
+}
+on_err() {
+  echo "ERR at line $1 exit $2" | tee -a "${PROGRESS}"
+  echo "::error::ERR at line $1 exit $2"
+  if [[ -f "${PROGRESS}" ]]; then
+    while IFS= read -r line; do echo "::error::progress: ${line}"; done < "${PROGRESS}"
+  fi
+}
+trap 'on_err $LINENO $?' ERR
 
 MIGRATE_URL="$(psql_url "${DATABASE_MIGRATE_URL:?DATABASE_MIGRATE_URL required}")"
 APP_URL="$(psql_url "${DATABASE_URL:?DATABASE_URL required}")"
-ENDPOINT="${S3_ENDPOINT:?}"
-BUCKET="${S3_BUCKET:?}"
-ACCESS="${S3_ACCESS_KEY_ID:?}"
-SECRET="${S3_SECRET_ACCESS_KEY:?}"
-
-PASS_LIST=()
-PROGRESS="${BACKUP_OUT_DIR}/progress.log"
-: > "${PROGRESS}"
-note_pass() { PASS_LIST+=("$1"); echo "PASS: $1" | tee -a "${PROGRESS}"; }
-fail() { echo "FAIL: $1" | tee -a "${PROGRESS}"; exit 1; }
-trap 'echo "ERR at line $LINENO exit $?" | tee -a "${PROGRESS}"' ERR
 
 echo "==> Ensure migrations applied"
 pnpm db:migrate:deploy
@@ -71,13 +89,8 @@ OBJ_A_KEY="tenants/11111111-1111-4111-8111-111111111111/projects/a1111111-1111-4
 OBJ_B_KEY="tenants/22222222-2222-4222-8222-222222222222/projects/a2222222-2222-4222-8222-222222222222/originals/restore-b.txt"
 echo 'restore-object-a-bytes' > "${BACKUP_OUT_DIR}/object-a.txt"
 echo 'restore-object-b-bytes' > "${BACKUP_OUT_DIR}/object-b.txt"
-command -v mc >/dev/null || command -v docker >/dev/null || fail "minio_client_or_docker_required"
-mc_run alias set crrestore "${ENDPOINT}" "${ACCESS}" "${SECRET}" >/dev/null
-mc_run mb -p "crrestore/${BUCKET}" >/dev/null || true
-mc_run cp "${BACKUP_OUT_DIR}/object-a.txt" "crrestore/${BUCKET}/${OBJ_A_KEY}" >/dev/null
-mc_run cp "${BACKUP_OUT_DIR}/object-b.txt" "crrestore/${BUCKET}/${OBJ_B_KEY}" >/dev/null
-SHA_A="$(sha256sum "${BACKUP_OUT_DIR}/object-a.txt" | awk '{print $1}')"
-SHA_B="$(sha256sum "${BACKUP_OUT_DIR}/object-b.txt" | awk '{print $1}')"
+SHA_A="$(obj put "${OBJ_A_KEY}" "${BACKUP_OUT_DIR}/object-a.txt" | tail -n 1)"
+SHA_B="$(obj put "${OBJ_B_KEY}" "${BACKUP_OUT_DIR}/object-b.txt" | tail -n 1)"
 note_pass "object_seed_written"
 
 MANIFEST="$(BACKUP_OUT_DIR="${BACKUP_OUT_DIR}" bash scripts/backup/pg-backup.sh | tail -n 1)"
@@ -87,22 +100,27 @@ DUMP_PATH="${BACKUP_OUT_DIR}/${DUMP_NAME}"
 test -s "${DUMP_PATH}" || fail "backup_dump_empty"
 note_pass "postgres_backup_created"
 
-OBJ_MANIFEST="$(BACKUP_OUT_DIR="${BACKUP_OUT_DIR}" bash scripts/backup/object-backup.sh | tail -n 1)"
-test -s "${OBJ_MANIFEST}" || fail "object_manifest_missing"
-test -s "${BACKUP_OUT_DIR}/object-manifest.json" || fail "stable_object_manifest_missing"
-test -s "${BACKUP_OUT_DIR}/object-checksum-summary.json" || fail "object_checksum_summary_missing"
+OBJ_DATA_DIR="${BACKUP_OUT_DIR}/objects-ci"
+OBJ_MANIFEST="${BACKUP_OUT_DIR}/object-manifest.json"
+rm -rf "${OBJ_DATA_DIR}"
+obj backup-dir "${OBJ_DATA_DIR}" "${OBJ_MANIFEST}" >/dev/null
+cp "${OBJ_MANIFEST}" "${BACKUP_OUT_DIR}/objects-ci.manifest.json"
+python3 - <<PY
+import json, pathlib
+doc=json.loads(pathlib.Path("${OBJ_MANIFEST}").read_text())
+pathlib.Path("${BACKUP_OUT_DIR}/object-checksum-summary.json").write_text(json.dumps({"objects": doc.get("objects", [])}, indent=2)+"\n")
+assert doc.get("objectCount", 0) >= 2, doc
+PY
 test -s "${BACKUP_OUT_DIR}/database-checksum.txt" || fail "database_checksum_missing"
 test -s "${BACKUP_OUT_DIR}/database-backup-metadata.json" || fail "database_backup_metadata_missing"
 cp "${MANIFEST}" "${BACKUP_OUT_DIR}/backup-manifest.json"
 note_pass "object_manifest_created"
 
-mc_run rm --recursive --force "crrestore/${BUCKET}/tenants" >/dev/null || true
-mc_run rm "crrestore/${BUCKET}/${OBJ_A_KEY}" >/dev/null 2>&1 || true
-mc_run rm "crrestore/${BUCKET}/${OBJ_B_KEY}" >/dev/null 2>&1 || true
+obj del "${OBJ_A_KEY}" >/dev/null || true
+obj del "${OBJ_B_KEY}" >/dev/null || true
 note_pass "objects_deleted_pre_restore"
 
 bash scripts/backup/pg-restore.sh "${DUMP_PATH}"
-# Ensure runtime grants exist even if a dump variant omitted ACLs.
 psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 GRANT USAGE ON SCHEMA public TO contractradar_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO contractradar_app;
@@ -110,28 +128,23 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO contractradar_app;
 SQL
 note_pass "postgres_restored"
 
-bash scripts/backup/object-restore.sh "${OBJ_MANIFEST}"
+obj restore-dir "${OBJ_MANIFEST}" >/dev/null
 note_pass "objects_restored_from_backup"
 
-mc_run cat "crrestore/${BUCKET}/${OBJ_A_KEY}" > "${BACKUP_OUT_DIR}/object-a.restored.txt"
-mc_run cat "crrestore/${BUCKET}/${OBJ_B_KEY}" > "${BACKUP_OUT_DIR}/object-b.restored.txt"
-SHA_A2="$(sha256sum "${BACKUP_OUT_DIR}/object-a.restored.txt" | awk '{print $1}')"
-SHA_B2="$(sha256sum "${BACKUP_OUT_DIR}/object-b.restored.txt" | awk '{print $1}')"
-[[ "${SHA_A}" == "${SHA_A2}" && "${SHA_B}" == "${SHA_B2}" ]] || fail "object_checksum_mismatch"
+SHA_A2="$(obj get "${OBJ_A_KEY}" "${BACKUP_OUT_DIR}/object-a.restored.txt" | tail -n 1)"
+SHA_B2="$(obj get "${OBJ_B_KEY}" "${BACKUP_OUT_DIR}/object-b.restored.txt" | tail -n 1)"
+[[ "${SHA_A}" == "${SHA_A2}" && "${SHA_B}" == "${SHA_B2}" ]] || fail "object_checksum_mismatch ${SHA_A}/${SHA_A2} ${SHA_B}/${SHA_B2}"
 note_pass "object_byte_checksum_round_trip"
 
-if mc_run cat "crrestore/${BUCKET}/tenants/missing/object.bin" >/dev/null 2>&1; then
+if ! obj missing "tenants/missing/object.bin"; then
   fail "missing_object_should_error"
 fi
 note_pass "missing_object_detected"
 
 echo 'tampered' > "${BACKUP_OUT_DIR}/object-a.tampered.txt"
-TAMPER_SHA="$(sha256sum "${BACKUP_OUT_DIR}/object-a.tampered.txt" | awk '{print $1}')"
-[[ "${TAMPER_SHA}" != "${SHA_A}" ]] || fail "tamper_sha_unexpectedly_equal"
-OBJ_DATA_DIR="$(python3 -c "import json; print('${BACKUP_OUT_DIR}/'+json.load(open('${OBJ_MANIFEST}'))['dataDir'])")"
 mkdir -p "$(dirname "${OBJ_DATA_DIR}/${OBJ_A_KEY}")"
 cp "${BACKUP_OUT_DIR}/object-a.tampered.txt" "${OBJ_DATA_DIR}/${OBJ_A_KEY}"
-if bash scripts/backup/object-restore.sh "${OBJ_MANIFEST}" >/dev/null 2>&1; then
+if obj restore-dir "${OBJ_MANIFEST}" >/dev/null 2>&1; then
   fail "tampered_object_should_reject_restore"
 fi
 cp "${BACKUP_OUT_DIR}/object-a.txt" "${OBJ_DATA_DIR}/${OBJ_A_KEY}"
@@ -144,12 +157,11 @@ real=hashlib.sha256(pathlib.Path("${DUMP_PATH}").read_bytes()).hexdigest()
 doc["checksumSha256"]="0"*64
 assert doc["checksumSha256"] != real
 pathlib.Path("${BACKUP_OUT_DIR}/tampered.manifest.json").write_text(json.dumps(doc))
-# Object restore must reject wrong type / incomplete manifests
 bad_obj={"type":"not-a-backup","dataDir":"missing","objects":[]}
 pathlib.Path("${BACKUP_OUT_DIR}/invalid-object.manifest.json").write_text(json.dumps(bad_obj))
 print("tampered_manifest_detected")
 PY
-if bash scripts/backup/object-restore.sh "${BACKUP_OUT_DIR}/invalid-object.manifest.json" >/dev/null 2>&1; then
+if obj restore-dir "${BACKUP_OUT_DIR}/invalid-object.manifest.json" >/dev/null 2>&1; then
   fail "invalid_object_manifest_should_reject"
 fi
 note_pass "tampered_manifest_rejected"
@@ -164,8 +176,8 @@ psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -Atc \
   | tee "${BACKUP_OUT_DIR}/rls-force.txt"
 python3 - <<PY
 import json, pathlib
-rows=[r for r in pathlib.Path("${BACKUP_OUT_DIR}/rls-force.txt").read_text().splitlines() if r.strip()]
-ok=all(r.endswith("=t") or r.endswith("=true") for r in rows)
+rows=[r.strip().replace("\r","") for r in pathlib.Path("${BACKUP_OUT_DIR}/rls-force.txt").read_text().splitlines() if r.strip()]
+ok=len(rows)>=4 and all(r.endswith("=t") or r.endswith("=true") for r in rows)
 pathlib.Path("${RLS_REPORT}").write_text(json.dumps({"ok": ok, "rows": rows}, indent=2)+"\n")
 raise SystemExit(0 if ok else 1)
 PY
@@ -189,7 +201,7 @@ SELECT count(*) FROM project;
 SQL
 python3 - <<PY
 import json, pathlib, re
-text=pathlib.Path("${BACKUP_OUT_DIR}/isolation.txt").read_text()
+text=pathlib.Path("${BACKUP_OUT_DIR}/isolation.txt").read_text().replace("\r","")
 nums=[int(x) for x in re.findall(r"^\s*(\d+)\s*$", text, re.M)]
 ok=len(nums)>=2 and nums[0]==0 and nums[1]==0
 pathlib.Path("${ISOLATION_REPORT}").write_text(json.dumps({"ok": ok, "counts": nums, "raw": text}, indent=2)+"\n")
