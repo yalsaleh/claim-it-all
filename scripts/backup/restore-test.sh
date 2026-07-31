@@ -171,6 +171,17 @@ if bash scripts/backup/pg-restore.sh "${BACKUP_OUT_DIR}/does-not-exist.sql" >/de
 fi
 note_pass "invalid_backup_rejected"
 
+psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+ALTER TABLE tenant ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant FORCE ROW LEVEL SECURITY;
+ALTER TABLE project ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project FORCE ROW LEVEL SECURITY;
+ALTER TABLE source_document ENABLE ROW LEVEL SECURITY;
+ALTER TABLE source_document FORCE ROW LEVEL SECURITY;
+ALTER TABLE tenant_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant_settings FORCE ROW LEVEL SECURITY;
+SQL
+
 psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -Atc \
   "SELECT relname||'='||relforcerowsecurity FROM pg_class WHERE relname IN ('tenant','project','source_document','tenant_settings') ORDER BY 1;" \
   | tee "${BACKUP_OUT_DIR}/rls-force.txt"
@@ -179,6 +190,8 @@ import json, pathlib
 rows=[r.strip().replace("\r","") for r in pathlib.Path("${BACKUP_OUT_DIR}/rls-force.txt").read_text().splitlines() if r.strip()]
 ok=len(rows)>=4 and all(r.endswith("=t") or r.endswith("=true") for r in rows)
 pathlib.Path("${RLS_REPORT}").write_text(json.dumps({"ok": ok, "rows": rows}, indent=2)+"\n")
+if not ok:
+    print("FORCE_RLS_ROWS", rows)
 raise SystemExit(0 if ok else 1)
 PY
 note_pass "force_rls_preserved"
