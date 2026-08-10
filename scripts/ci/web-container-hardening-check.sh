@@ -11,6 +11,25 @@ DI_DOCKERFILE="${ROOT_DIR}/services/document-intelligence/Dockerfile"
 grep -qE '^USER 10001' "${WEB_DOCKERFILE}"
 grep -qE '^USER 10001' "${DI_DOCKERFILE}"
 
+fail_report() {
+  local stage="$1"
+  local detail="${2:-}"
+  python3 - <<PY
+import json, pathlib
+doc={
+  "ok": False,
+  "status": "FAIL",
+  "stage": """${stage}""",
+  "detail": """${detail}"""[:4000],
+  "notes": "Real production container build in synthetic CI. Not Kubernetes readiness.",
+}
+pathlib.Path("${OUT_DIR}/web-container-hardening-report.json").write_text(json.dumps(doc, indent=2)+"\n")
+pathlib.Path("${OUT_DIR}/container-hardening.json").write_text(json.dumps(doc, indent=2)+"\n")
+print(json.dumps(doc, indent=2))
+PY
+  exit 1
+}
+
 if ! command -v docker >/dev/null 2>&1; then
   if [[ "${CI:-}" == "true" || "${GITHUB_ACTIONS:-}" == "true" ]]; then
     echo "Docker required in CI for web/DI container hardening"; exit 1
@@ -31,79 +50,66 @@ IMG_DI="contractradar-di-hardening:local"
 
 echo "==> Build web production image"
 if ! docker build -t "${IMG_WEB}" -f "${WEB_DOCKERFILE}" "${ROOT_DIR}" 2>&1 | tee "${OUT_DIR}/web-docker-build.log"; then
-  python3 - <<PY
-import json, pathlib
-doc={"ok": False, "status": "FAIL", "stage": "web_docker_build", "log": "web-docker-build.log"}
-pathlib.Path("${OUT_DIR}/web-container-hardening-report.json").write_text(json.dumps(doc, indent=2)+"\n")
-pathlib.Path("${OUT_DIR}/container-hardening.json").write_text(json.dumps(doc, indent=2)+"\n")
-PY
-  exit 1
+  fail_report "web_docker_build" "see web-docker-build.log"
 fi
 echo "==> Build DI image"
 if ! docker build -t "${IMG_DI}" -f "${DI_DOCKERFILE}" "${ROOT_DIR}/services/document-intelligence" 2>&1 | tee "${OUT_DIR}/di-docker-build.log"; then
-  python3 - <<PY
-import json, pathlib
-doc={"ok": False, "status": "FAIL", "stage": "di_docker_build", "log": "di-docker-build.log"}
-pathlib.Path("${OUT_DIR}/di-container-hardening-report.json").write_text(json.dumps(doc, indent=2)+"\n")
-pathlib.Path("${OUT_DIR}/container-hardening.json").write_text(json.dumps({"ok": False, "stage": "di_docker_build"}, indent=2)+"\n")
-PY
-  exit 1
+  fail_report "di_docker_build" "see di-docker-build.log"
 fi
 
 WEB_USER="$(docker inspect --format '{{.Config.User}}' "${IMG_WEB}")"
 DI_USER="$(docker inspect --format '{{.Config.User}}' "${IMG_DI}")"
 WEB_SIZE="$(docker image inspect --format '{{.Size}}' "${IMG_WEB}")"
 DI_SIZE="$(docker image inspect --format '{{.Size}}' "${IMG_DI}")"
-WEB_DIGEST="$(docker image inspect --format '{{index .RepoDigests 0}}' "${IMG_WEB}" 2>/dev/null || echo "local-only")"
-DI_DIGEST="$(docker image inspect --format '{{index .RepoDigests 0}}' "${IMG_DI}" 2>/dev/null || echo "local-only")"
 WEB_ID="$(docker image inspect --format '{{.Id}}' "${IMG_WEB}")"
 DI_ID="$(docker image inspect --format '{{.Id}}' "${IMG_DI}")"
+WEB_DIGEST="${WEB_ID}"
+DI_DIGEST="${DI_ID}"
 
 # Inspect filesystem for .env / secrets / unnecessary source
+set +e
 WEB_FS_CHECK="$(docker run --rm --user 10001:10001 --entrypoint /bin/sh "${IMG_WEB}" -c '
 set -e
 test "$(id -u)" != "0"
-# no .env at common paths
 for f in /app/.env /app/apps/web/.env /app/.env.local /app/apps/web/.env.local; do
   if [ -f "$f" ]; then echo HAS_ENV; exit 1; fi
 done
-# no src tree / prisma schema in runner image
 if [ -d /app/apps/web/src ] || [ -d /app/apps/web/prisma ]; then echo HAS_SRC; exit 1; fi
-# production server entry must exist
-test -f /app/apps/web/server.js || test -f /app/server.js || { echo MISSING_SERVER; exit 1; }
-echo FS_OK
-' )"
+if [ -f /app/apps/web/server.js ] || [ -f /app/server.js ]; then
+  echo FS_OK
+  exit 0
+fi
+echo MISSING_SERVER
+exit 1
+' 2>&1)"
+FS_RC=$?
+set -e
+echo "${WEB_FS_CHECK}" | tee "${OUT_DIR}/web-fs-check.txt"
+[[ "${FS_RC}" -eq 0 && "${WEB_FS_CHECK}" == *FS_OK* ]] || fail_report "web_fs_check" "${WEB_FS_CHECK}"
 
-# Rewrite loopback hosts so the container can reach job/service deps.
-DB_URL_DOCKER="${DATABASE_URL//127.0.0.1/host.docker.internal}"
-DB_URL_DOCKER="${DB_URL_DOCKER//localhost/host.docker.internal}"
-MIG_URL_DOCKER="${DATABASE_MIGRATE_URL//127.0.0.1/host.docker.internal}"
-MIG_URL_DOCKER="${MIG_URL_DOCKER//localhost/host.docker.internal}"
-
-# Start web container against synthetic deps
-WEB_CID="$(docker run -d --user 10001:10001 \
-  --add-host=host.docker.internal:host-gateway \
+# Use host networking so the container can reach GHA service containers (Postgres/Redis)
+# and job-local sidecars (MinIO/DI) on localhost — more reliable than host.docker.internal here.
+WEB_CID="$(docker run -d --user 10001:10001 --network host \
   -e NODE_ENV=production \
   -e PORT=3000 \
   -e APP_URL=http://127.0.0.1:3000 \
   -e BETTER_AUTH_URL=http://127.0.0.1:3000 \
   -e BETTER_AUTH_SECRET=ci-container-secret-with-sufficient-length-32chars \
-  -e DATABASE_URL="${DB_URL_DOCKER}" \
-  -e DATABASE_MIGRATE_URL="${MIG_URL_DOCKER}" \
-  -e REDIS_URL=redis://host.docker.internal:6379 \
-  -e S3_ENDPOINT=http://host.docker.internal:9000 \
-  -e S3_REGION=us-east-1 \
+  -e DATABASE_URL="${DATABASE_URL}" \
+  -e DATABASE_MIGRATE_URL="${DATABASE_MIGRATE_URL}" \
+  -e REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}" \
+  -e S3_ENDPOINT="${S3_ENDPOINT:-http://127.0.0.1:9000}" \
+  -e S3_REGION="${S3_REGION:-us-east-1}" \
   -e S3_ACCESS_KEY_ID="${S3_ACCESS_KEY_ID}" \
   -e S3_SECRET_ACCESS_KEY="${S3_SECRET_ACCESS_KEY}" \
   -e S3_BUCKET="${S3_BUCKET}" \
   -e S3_FORCE_PATH_STYLE=true \
-  -e DOCUMENT_INTELLIGENCE_URL=http://host.docker.internal:8000 \
+  -e DOCUMENT_INTELLIGENCE_URL="${DOCUMENT_INTELLIGENCE_URL:-http://127.0.0.1:8000}" \
   -e DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN="${DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN}" \
-  -e MALWARE_SCANNER=fake_test \
+  -e MALWARE_SCANNER="${MALWARE_SCANNER:-fake_test}" \
   -e ALLOW_DEV_DEFAULTS=true \
   -e CONTRACTRADAR_ENV=CI \
-  -p 3000:3000 \
-  "${IMG_WEB}")"
+  "${IMG_WEB}")" || fail_report "web_container_start" "docker run failed"
 
 cleanup() {
   docker kill "${WEB_CID}" >/dev/null 2>&1 || true
@@ -111,31 +117,36 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Confirm non-root inside running container
-RUN_UID="$(docker exec "${WEB_CID}" id -u)"
-[[ "${RUN_UID}" != "0" ]] || { echo "FAIL: container runs as root"; exit 1; }
+sleep 2
+if ! docker ps --format '{{.ID}}' | grep -q "^${WEB_CID:0:12}"; then
+  docker logs "${WEB_CID}" 2>&1 | tee "${OUT_DIR}/web-container-logs.txt" || true
+  fail_report "web_container_exited" "container not running; see web-container-logs.txt"
+fi
 
-# Wait for liveness
+RUN_UID="$(docker exec "${WEB_CID}" id -u)"
+[[ "${RUN_UID}" != "0" ]] || fail_report "web_root_user" "runtime uid=${RUN_UID}"
+
 LIVE_OK=false
 for _ in $(seq 1 60); do
-  if curl -sf http://127.0.0.1:3000/api/health >/dev/null; then LIVE_OK=true; break; fi
+  if curl -sf --max-time 3 http://127.0.0.1:3000/api/health >/dev/null; then LIVE_OK=true; break; fi
+  if ! docker ps --format '{{.ID}}' | grep -q "^${WEB_CID:0:12}"; then
+    docker logs "${WEB_CID}" 2>&1 | tee "${OUT_DIR}/web-container-logs.txt" || true
+    fail_report "web_container_exited_during_health" "see web-container-logs.txt"
+  fi
   sleep 2
 done
-[[ "${LIVE_OK}" == "true" ]] || { docker logs "${WEB_CID}" | tail -n 80; echo "FAIL: web health"; exit 1; }
+if [[ "${LIVE_OK}" != "true" ]]; then
+  docker logs "${WEB_CID}" 2>&1 | tee "${OUT_DIR}/web-container-logs.txt" || true
+  fail_report "web_health" "health endpoint never became ready; see web-container-logs.txt"
+fi
 curl -sf http://127.0.0.1:3000/api/health | tee "${OUT_DIR}/web-health.json" >/dev/null
 
-# Readiness (may be 503 if DI not up yet — try DI briefly)
 set +e
-curl -sf http://127.0.0.1:8000/health/live >/dev/null 2>&1
-set -e
-set +e
-READY_HTTP="$(curl -s -o "${OUT_DIR}/web-ready.json" -w "%{http_code}" http://127.0.0.1:3000/api/health/ready || true)"
+READY_HTTP="$(curl -s -o "${OUT_DIR}/web-ready.json" -w "%{http_code}" --max-time 10 http://127.0.0.1:3000/api/health/ready || true)"
 set -e
 
-# Privileged check: Config.Privileged is host-level; ensure we did not pass --privileged
 docker inspect --format '{{.HostConfig.Privileged}}' "${WEB_CID}" | grep -qiE 'false|0|^$'
 
-# Graceful shutdown
 docker stop -t 15 "${WEB_CID}" >/dev/null
 trap - EXIT
 docker rm -f "${WEB_CID}" >/dev/null 2>&1 || true
@@ -163,6 +174,7 @@ web_doc = {
   "noEnvFiles": "FS_OK" in """${WEB_FS_CHECK}""",
   "noObviousSecrets": "FS_OK" in """${WEB_FS_CHECK}""",
   "noSourceTree": "FS_OK" in """${WEB_FS_CHECK}""",
+  "networkMode": "host",
   "privileged": False,
   "gracefulShutdown": True,
   "notes": "Real production container build in synthetic CI. Not Kubernetes readiness.",
@@ -178,7 +190,15 @@ di_doc = {
   "nonRoot": di_ok,
   "notes": "DI image built and inspected. Not Kubernetes readiness.",
 }
-combined = {"ok": web_ok and di_ok, "web": web_doc, "di": di_doc, "webDockerfileUser": "10001", "diDockerfileUser": "10001", "webImageBuilt": True, "diImageBuilt": True}
+combined = {
+  "ok": web_ok and di_ok,
+  "web": web_doc,
+  "di": di_doc,
+  "webDockerfileUser": "10001",
+  "diDockerfileUser": "10001",
+  "webImageBuilt": True,
+  "diImageBuilt": True,
+}
 (out / "web-container-hardening-report.json").write_text(json.dumps(web_doc, indent=2)+"\n")
 (out / "di-container-hardening-report.json").write_text(json.dumps(di_doc, indent=2)+"\n")
 (out / "container-hardening.json").write_text(json.dumps(combined, indent=2)+"\n")
