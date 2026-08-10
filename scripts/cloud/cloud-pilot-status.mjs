@@ -30,9 +30,14 @@ const doc = {
   realCustomerDataAccessed: false,
   realMessagesSent: false,
   sharpDecision:
-    'UPSTREAM_BLOCKED — real cloud deploy remains BLOCKED until PILOT_APPROVED_EXCEPTION artifact exists',
+    'REMEDIATED via pnpm override sharp@0.35.3 (EXC-2026-005 resolved) — AWS identity still required for apply',
   honesty:
     'Refuses to claim a cloud deploy without CLOUD_PILOT_DEPLOY=true, AWS identity, and human approval. No credentials are requested or fabricated.',
+  gitSha: process.env.GITHUB_SHA || process.env.RELEASE_SHA || null,
+  environment: 'PILOT',
+  awsAccountId: process.env.AWS_ACCOUNT_ID || null,
+  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || null,
+  timestamp: new Date().toISOString(),
   generatedAt: new Date().toISOString(),
 };
 

@@ -8,8 +8,9 @@ terraform {
     }
   }
 
-  # Backend intentionally unset for the pilot scaffold.
-  # Configure a remote state backend (S3 + DynamoDB lock) out-of-band before any apply.
+  # Partial S3 backend — configure via backend.hcl after bootstrap apply.
+  # CI/static validation uses: terraform init -backend=false
+  backend "s3" {}
 }
 
 # Human-approval gate: enable_deployment=true requires an explicit approval token.

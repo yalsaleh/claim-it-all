@@ -31,28 +31,40 @@ jobs:
           chmod +x scripts/cloud/*.sh
           mkdir -p artifacts/cloud-pilot
           bash scripts/cloud/network-security-check.sh
+          bash scripts/cloud/terraform-backend-security.sh
           bash scripts/cloud/terraform-validate.sh
           bash scripts/cloud/drift-check.sh
+          node scripts/cloud/aws-identity-gate.mjs
           node scripts/cloud/cloud-pilot-status.mjs
           node scripts/cloud/cloud-smoke.mjs
           node scripts/cloud/cloud-restore-rehearsal.mjs
           node scripts/cloud/cost-estimate.mjs
           node scripts/cloud/log-redaction-canary.mjs
+          # Real-cloud manifest must fail closed without digests (expected exit 2).
+          set +e
+          node scripts/cloud/real-cloud-release-manifest.mjs
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          grep -q 'FAILED\|REJECTED' artifacts/cloud-pilot/real-cloud-release-manifest.json
           test -s artifacts/cloud-pilot/network-security-report.json
+          test -s artifacts/cloud-pilot/terraform-backend-security-report.json
           test -s artifacts/cloud-pilot/terraform-validate-report.json
+          test -s artifacts/cloud-pilot/aws-identity-report.json
           test -s artifacts/cloud-pilot/cloud-pilot-status.json
           test -s artifacts/cloud-pilot/cloud-smoke-report.json
           test -s artifacts/cloud-pilot/cloud-restore-rehearsal-report.json
           test -s artifacts/cloud-pilot/pilot-cost-estimate.json
           grep -q 'NOT RUN' artifacts/cloud-pilot/cloud-pilot-status.json
+          grep -q 'NOT RUN' artifacts/cloud-pilot/aws-identity-report.json
           grep -q 'NOT RUN' artifacts/cloud-pilot/cloud-smoke-report.json
       - name: Evidence summary
         run: |
           node scripts/ci/write-evidence-summary.mjs \
             "Cloud pilot IaC" PASS artifacts/cloud-pilot \
-            "checksExecuted=network-security-static,terraform-validate-or-not-run,drift-static,cloud-status-not-run,cost-estimate,log-redaction-canary" \
-            "checksNotRun=terraform-apply,ecs-deploy,rds-restore,real-alb-smoke,live-cloudwatch-redaction" \
-            "knownGaps=no-aws-credentials-in-ci,sharp-pilot-decision-required-for-apply"
+            "checksExecuted=network-security-static,terraform-backend-static,terraform-validate-or-not-run,drift-static,aws-identity-gate,cloud-status-not-run,cost-estimate,log-redaction-canary,real-cloud-manifest-fail-closed" \
+            "checksNotRun=terraform-apply,ecs-deploy,rds-restore,real-alb-smoke,live-cloudwatch-redaction,ecr-push" \
+            "knownGaps=no-aws-identity-in-ci"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

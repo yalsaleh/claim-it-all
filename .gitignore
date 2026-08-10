@@ -84,10 +84,13 @@ apps/web/.env.test
 # Terraform
 infrastructure/terraform/.terraform/
 infrastructure/pilot/terraform/.terraform/
+infrastructure/pilot/terraform/bootstrap/.terraform/
 *.tfstate
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+infrastructure/pilot/terraform/backend.hcl
+infrastructure/pilot/terraform/**/crash.log
 
 # Docker volumes
 infrastructure/docker/volumes/

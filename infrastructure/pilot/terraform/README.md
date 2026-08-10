@@ -3,6 +3,13 @@
 Conservative **PILOT** architecture on AWS. This is a single-root Terraform module
 for a controlled pilot — not a multi-account landing zone.
 
+## Remote state
+
+Bootstrap first (separate local-state module): `bootstrap/`.
+Then `terraform init -backend-config=backend.hcl` using `backend.hcl.example`.
+
+Static check: `pnpm cloud:backend-security`.
+
 ## Human approval required
 
 **Do not run `terraform apply` without documented human approval.**

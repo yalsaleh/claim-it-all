@@ -33,6 +33,8 @@ if [[ ! -d "${TF_DIR}" ]]; then
   exit 1
 fi
 
+BOOT_DIR="${ROOT_DIR}/infrastructure/pilot/terraform/bootstrap"
+
 run_native() {
   command -v terraform >/dev/null 2>&1 || return 1
   (
@@ -41,25 +43,33 @@ run_native() {
     terraform init -backend=false -input=false
     terraform validate
   )
+  (
+    cd "${BOOT_DIR}"
+    terraform fmt -check -recursive
+    terraform init -backend=false -input=false
+    terraform validate
+  )
 }
 
 run_docker() {
   command -v docker >/dev/null 2>&1 || return 1
-  docker run --rm \
-    -v "${ROOT_DIR}:/work" \
-    -w /work/infrastructure/pilot/terraform \
-    hashicorp/terraform:1.9 \
-    init -backend=false -input=false
-  docker run --rm \
-    -v "${ROOT_DIR}:/work" \
-    -w /work/infrastructure/pilot/terraform \
-    hashicorp/terraform:1.9 \
-    fmt -check -recursive
-  docker run --rm \
-    -v "${ROOT_DIR}:/work" \
-    -w /work/infrastructure/pilot/terraform \
-    hashicorp/terraform:1.9 \
-    validate
+  for work in infrastructure/pilot/terraform infrastructure/pilot/terraform/bootstrap; do
+    docker run --rm \
+      -v "${ROOT_DIR}:/work" \
+      -w "/work/${work}" \
+      hashicorp/terraform:1.9 \
+      init -backend=false -input=false
+    docker run --rm \
+      -v "${ROOT_DIR}:/work" \
+      -w "/work/${work}" \
+      hashicorp/terraform:1.9 \
+      fmt -check -recursive
+    docker run --rm \
+      -v "${ROOT_DIR}:/work" \
+      -w "/work/${work}" \
+      hashicorp/terraform:1.9 \
+      validate
+  done
 }
 
 set +e

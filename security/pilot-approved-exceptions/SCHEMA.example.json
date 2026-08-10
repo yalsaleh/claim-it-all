@@ -1,0 +1,20 @@
+{
+  "exceptionId": "EXC-2026-005",
+  "advisoryId": "1124066",
+  "package": "sharp",
+  "packageVersion": "0.34.5",
+  "dependencyPath": "apps/web > better-auth@1.6.22 > next@15.5.21 > sharp@0.34.5",
+  "runtimeExposure": "Next.js image optimization path if untrusted remote images are enabled",
+  "exploitabilityAssessment": "Requires attacker-controlled image processing inputs; remotePatterns should remain restrictive",
+  "mitigation": "Disable untrusted remote image optimization; prefer static/local assets; monitor Next releases for sharp>=0.35",
+  "monitoring": "Dependency/security scan workflow + exception expiry review",
+  "securityOwner": "platform-security",
+  "approver": "REPLACE_WITH_HUMAN_APPROVER",
+  "approvalDate": "2026-08-10",
+  "expiresAt": "2026-09-30",
+  "remediationMilestone": "Upgrade to Next release that pins sharp>=0.35.0 or remove image optimization surface",
+  "pilotEnvironment": "PILOT",
+  "releaseSha": "REPLACE_WITH_40_CHAR_GIT_SHA",
+  "decision": "PILOT_APPROVED_EXCEPTION",
+  "honesty": "Example only — not a valid approval. Copy and complete with human signatures out-of-band."
+}

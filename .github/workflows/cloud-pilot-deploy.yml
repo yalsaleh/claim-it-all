@@ -44,14 +44,27 @@ jobs:
           mkdir -p artifacts/cloud-pilot
           node <<'NODE'
           const fs = require('fs');
+          const path = require('path');
           const doc = JSON.parse(fs.readFileSync('security/vulnerability-exceptions.json', 'utf8'));
-          const sharp = doc.exceptions.find((e) => e.id === 'EXC-2026-005' && e.status === 'active');
-          const decision = sharp?.pilotDecisionStatus;
+          const sharp = doc.exceptions.find((e) => e.id === 'EXC-2026-005');
+          const active = sharp?.status === 'active';
+          const decision = sharp?.pilotDecisionStatus ?? 'PENDING';
+          const sha = process.env.GITHUB_SHA || '';
+          const approvalPath = path.join(
+            'security/pilot-approved-exceptions',
+            `EXC-2026-005.${sha}.json`,
+          );
+          const shaBoundApproval = fs.existsSync(approvalPath);
+          const remediated = !active || decision === 'REMEDIATED' || sharp?.status === 'resolved';
+          const approved = decision === 'PILOT_APPROVED_EXCEPTION' && shaBoundApproval;
           const out = {
-            exceptionId: sharp?.id,
-            burndownClass: sharp?.burndownClass,
-            pilotDecisionStatus: decision ?? 'PENDING',
-            blocked: decision !== 'PILOT_APPROVED_EXCEPTION',
+            exceptionId: sharp?.id ?? null,
+            status: sharp?.status ?? null,
+            burndownClass: sharp?.burndownClass ?? null,
+            pilotDecisionStatus: decision,
+            shaBoundApprovalPresent: shaBoundApproval,
+            remediated,
+            blocked: active && !remediated && !approved,
             advisoryId: sharp?.advisoryId,
             packageVersion: sharp?.packageVersion,
             dependencyPath: sharp?.dependencyPath,
@@ -59,23 +72,27 @@ jobs:
           fs.writeFileSync('artifacts/cloud-pilot/sharp-decision.json', JSON.stringify(out, null, 2));
           console.log(JSON.stringify(out, null, 2));
           if (out.blocked) {
-            console.error('BLOCKED: sharp requires explicit PILOT_APPROVED_EXCEPTION before cloud apply');
+            console.error(
+              'BLOCKED: active sharp exception requires REMEDIATED status or SHA-bound PILOT_APPROVED_EXCEPTION',
+            );
             process.exit(2);
           }
           NODE
-      - name: Static IaC + policy gates
+      - name: Static IaC + identity gates
         run: |
           chmod +x scripts/cloud/*.sh
           bash scripts/cloud/network-security-check.sh
+          bash scripts/cloud/terraform-backend-security.sh
           bash scripts/cloud/terraform-validate.sh
           bash scripts/cloud/drift-check.sh
-          pnpm production:validate:pilot || true
+          node scripts/cloud/aws-identity-gate.mjs
           node scripts/cloud/cloud-pilot-status.mjs
       - name: AWS identity required
         run: |
-          if [[ -z "${AWS_ROLE_ARN:-}${AWS_ACCESS_KEY_ID:-}" ]]; then
-            echo "NOT RUN — cloud environment unavailable (no AWS identity on runner)"
-            echo '{"status":"NOT RUN — cloud environment unavailable","applyExecuted":false}' \
+          CLOUD_REQUIRE_AWS=true node scripts/cloud/aws-identity-gate.mjs
+          if [[ -z "${AWS_ROLE_ARN:-}${AWS_ACCESS_KEY_ID:-}" ]] && ! command -v aws >/dev/null; then
+            echo "NOT RUN — AWS identity unavailable"
+            echo '{"status":"NOT RUN — AWS identity unavailable","applyExecuted":false}' \
               > artifacts/cloud-pilot/deploy-result.json
             exit 1
           fi

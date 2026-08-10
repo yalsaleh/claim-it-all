@@ -187,4 +187,8 @@ Platform readiness, pilot preflight, release manifest scaffolding, deployment ap
 
 ## Slice 11 — Controlled cloud pilot deployment (IaC complete; cloud apply NOT RUN)
 
-AWS Terraform (ECS/Fargate, RDS, Redis, S3, ALB, ECR, Secrets Manager, CloudWatch, Budgets), `sm://` secret helpers, immutable digest wiring, Cloud pilot IaC / deploy / destroy workflows, network security static report, cost estimate, cloud security review. Real apply/smoke/restore remain **NOT RUN — cloud environment unavailable** until AWS identity + sharp `PILOT_APPROVED_EXCEPTION`. See [SLICE11_EVIDENCE.md](../SLICE11_EVIDENCE.md), [ADR-130](../adrs/ADR-130-aws-pilot-cloud-architecture.md). **No real providers / customer data.** **Next after full cloud verification: one approved provider, read-only/scoped first — not started here.**
+AWS Terraform (ECS/Fargate, RDS, Redis, S3, ALB, ECR, Secrets Manager, CloudWatch, Budgets), `sm://` secret helpers, immutable digest wiring, Cloud pilot IaC / deploy / destroy workflows, network security static report, cost estimate, cloud security review. See [SLICE11_EVIDENCE.md](../SLICE11_EVIDENCE.md), [ADR-130](../adrs/ADR-130-aws-pilot-cloud-architecture.md).
+
+## Slice 11B — Real AWS synthetic pilot (blocked on identity)
+
+Remote-state bootstrap IaC + backend security report; sharp remediated via `pnpm.overrides.sharp=0.35.3` (`EXC-2026-005` resolved); real-cloud release manifest fail-closed; SHA-bound approval schema. **AWS CLI/identity unavailable → real apply/smoke/restore STOPPED** (`NOT RUN — AWS identity unavailable`). See [SLICE11B_EVIDENCE.md](../SLICE11B_EVIDENCE.md). **No real providers / customer data.** **Next after full cloud verification: Slice 12 — one approved provider, read-only/scoped first — not started here.**
