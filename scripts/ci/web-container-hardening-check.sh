@@ -128,8 +128,16 @@ RUN_UID="$(docker exec "${WEB_CID}" id -u)"
 [[ "${RUN_UID}" != "0" ]] || fail_report "web_root_user" "runtime uid=${RUN_UID}"
 
 LIVE_OK=false
+READY_OK=false
+READY_HTTP="000"
 for _ in $(seq 1 60); do
-  if curl -sf --max-time 3 http://127.0.0.1:3000/api/health >/dev/null; then LIVE_OK=true; break; fi
+  if curl -sf --max-time 3 http://127.0.0.1:3000/health/live >/dev/null; then LIVE_OK=true; fi
+  READY_HTTP="$(curl -s -o "${OUT_DIR}/web-ready.json" -w "%{http_code}" --max-time 5 http://127.0.0.1:3000/health/ready || true)"
+  if [[ "${READY_HTTP}" == "200" ]]; then READY_OK=true; break; fi
+  if [[ "${READY_HTTP}" == "500" ]]; then
+    docker logs "${WEB_CID}" 2>&1 | tee "${OUT_DIR}/web-container-logs.txt" || true
+    fail_report "web_ready_500" "readiness must never 500; see web-container-logs.txt"
+  fi
   if ! docker ps --format '{{.ID}}' | grep -q "^${WEB_CID:0:12}"; then
     docker logs "${WEB_CID}" 2>&1 | tee "${OUT_DIR}/web-container-logs.txt" || true
     fail_report "web_container_exited_during_health" "see web-container-logs.txt"
@@ -138,13 +146,13 @@ for _ in $(seq 1 60); do
 done
 if [[ "${LIVE_OK}" != "true" ]]; then
   docker logs "${WEB_CID}" 2>&1 | tee "${OUT_DIR}/web-container-logs.txt" || true
-  fail_report "web_health" "health endpoint never became ready; see web-container-logs.txt"
+  fail_report "web_health" "liveness never became ready; see web-container-logs.txt"
 fi
-curl -sf http://127.0.0.1:3000/api/health | tee "${OUT_DIR}/web-health.json" >/dev/null
-
-set +e
-READY_HTTP="$(curl -s -o "${OUT_DIR}/web-ready.json" -w "%{http_code}" --max-time 10 http://127.0.0.1:3000/api/health/ready || true)"
-set -e
+if [[ "${READY_OK}" != "true" ]]; then
+  docker logs "${WEB_CID}" 2>&1 | tee "${OUT_DIR}/web-container-logs.txt" || true
+  fail_report "web_ready" "readiness never returned 200; last=${READY_HTTP}"
+fi
+curl -sf http://127.0.0.1:3000/health/live | tee "${OUT_DIR}/web-health.json" >/dev/null
 
 docker inspect --format '{{.HostConfig.Privileged}}' "${WEB_CID}" | grep -qiE 'false|0|^$'
 
@@ -158,7 +166,13 @@ out = pathlib.Path("${OUT_DIR}")
 web_user = "${WEB_USER}".strip()
 di_user = "${DI_USER}".strip()
 non_root = lambda u: u not in {"", "0", "0:0", "root"} and not u.startswith("0:")
-web_ok = non_root(web_user) and "${RUN_UID}" != "0" and "${LIVE_OK}" == "true" and "FS_OK" in """${WEB_FS_CHECK}"""
+web_ok = (
+  non_root(web_user)
+  and "${RUN_UID}" != "0"
+  and "${LIVE_OK}" == "true"
+  and "${READY_OK}" == "true"
+  and "FS_OK" in """${WEB_FS_CHECK}"""
+)
 di_ok = non_root(di_user)
 web_doc = {
   "status": "PASS" if web_ok else "FAIL",
@@ -171,6 +185,7 @@ web_doc = {
   "runtimeUid": "${RUN_UID}",
   "nonRoot": True,
   "healthOk": "${LIVE_OK}" == "true",
+  "readyOk": "${READY_OK}" == "true",
   "readinessHttpStatus": "${READY_HTTP}",
   "noEnvFiles": "FS_OK" in """${WEB_FS_CHECK}""",
   "noObviousSecrets": "FS_OK" in """${WEB_FS_CHECK}""",

@@ -3,7 +3,7 @@ import { evaluateWebReadiness } from '@/server/health/readiness';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** Backward-compatible readiness alias. Prefer `/health/ready`. */
+/** Application readiness — redacted public codes only; never throws. */
 export async function GET() {
   try {
     const result = await evaluateWebReadiness();

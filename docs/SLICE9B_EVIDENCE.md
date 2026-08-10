@@ -50,3 +50,10 @@ Mitigation applied: upgrade post-upload jobs to `actions/download-artifact@v8` a
 - Real provider connectors (fixture connectors only in CI)
 - Real cloud restore
 - Kubernetes deployment
+
+## Slice 10 follow-on
+
+Pilot deployment scaffolding (still **no** real cloud deploy) is tracked in
+[SLICE10_EVIDENCE.md](./SLICE10_EVIDENCE.md) and [PILOT_DEPLOYMENT.md](./PILOT_DEPLOYMENT.md).
+Active vulnerability burndown classes: vitest/vite `DEV_ONLY_ACCEPT_TEMPORARILY`; sharp
+`UPSTREAM_BLOCKED` (requires `PILOT_APPROVED_EXCEPTION` before real pilot).

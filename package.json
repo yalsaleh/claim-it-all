@@ -10,6 +10,7 @@
     "dev:di": "pnpm --filter @contractradar/document-intelligence --if-present start || (cd services/document-intelligence && .venv/bin/uvicorn document_intelligence.main:app --reload --port 8000)",
     "build": "pnpm -r --filter @contractradar/shared --filter @contractradar/authz --filter @contractradar/contract-rules --filter @contractradar/event-detection --filter @contractradar/notice-drafting --filter @contractradar/notice-delivery --filter @contractradar/connectors --filter @contractradar/operations --filter @contractradar/platform --filter @contractradar/web build",
     "production:validate": "pnpm --filter @contractradar/web exec tsx scripts/production-validate.ts",
+    "production:validate:pilot": "pnpm --filter @contractradar/web exec tsx scripts/production-validate.ts --env=pilot",
     "integrity:check": "pnpm --filter @contractradar/web exec tsx scripts/integrity-check.ts",
     "db:migrate:check": "bash scripts/db/migrate-check.sh",
     "db:migrate:verify": "bash scripts/db/migrate-verify.sh",
@@ -48,7 +49,13 @@
     "validate:prisma": "pnpm --filter @contractradar/web exec prisma validate",
     "security:audit": "bash scripts/supply-chain/audit.sh",
     "env:doctor": "node scripts/env-doctor.mjs",
-    "licenses:inventory": "bash scripts/supply-chain/license-inventory.sh"
+    "licenses:inventory": "bash scripts/supply-chain/license-inventory.sh",
+    "platform:ready": "node scripts/pilot/platform-ready.mjs",
+    "pilot:preflight": "node scripts/pilot/preflight.mjs",
+    "pilot:tenant:create": "node scripts/pilot/tenant-create.mjs",
+    "pilot:tenant:validate": "node scripts/pilot/tenant-validate.mjs",
+    "pilot:release-manifest": "node scripts/pilot/release-manifest.mjs",
+    "gh": "bash scripts/pilot/gh.sh"
   },
   "devDependencies": {
     "prettier": "3.4.2",

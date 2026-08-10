@@ -6,3 +6,8 @@ export * from './production-validate';
 export * from './metrics';
 export * from './pilot-readiness';
 export * from './tenant-limits';
+export * from './pilot-defaults';
+export * from './release-manifest';
+export * from './deployment-approval';
+export * from './pilot-burndown';
+export * from './pilot-monitoring';

@@ -1,0 +1,163 @@
+name: Pilot release candidate
+
+on:
+  push:
+    branches: [main, cursor/**]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  NODE_ENV: test
+  APP_ENV: test
+  CONTRACTRADAR_ENV: CI
+  CI: 'true'
+  PILOT_PREFLIGHT_SYNTHETIC: 'true'
+  PILOT_READY_OUT_DIR: ${{ github.workspace }}/artifacts/pilot-readiness
+  RELEASE_SHA: ${{ github.sha }}
+  DATABASE_URL: postgresql://contractradar_app:contractradar@localhost:5432/contractradar_test?schema=public
+  DATABASE_MIGRATE_URL: postgresql://contractradar:contractradar@localhost:5432/contractradar_test?schema=public
+  INTEGRATION_DATABASE_URL: postgresql://contractradar_app:contractradar@localhost:5432/contractradar_test?schema=public
+  REDIS_URL: redis://localhost:6379
+  APP_URL: http://localhost:3000
+  BETTER_AUTH_URL: http://localhost:3000
+  BETTER_AUTH_SECRET: ci-test-secret-with-sufficient-length-32
+  ALLOW_DEV_DEFAULTS: 'true'
+  MALWARE_SCANNER: fake_test
+  DOCUMENT_INTELLIGENCE_URL: http://localhost:8000
+  DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN: ci-internal-token-32chars
+  S3_ENDPOINT: http://127.0.0.1:9000
+  S3_REGION: us-east-1
+  S3_ACCESS_KEY_ID: minioadmin
+  S3_SECRET_ACCESS_KEY: minioadmin
+  S3_BUCKET: contractradar-documents
+  S3_FORCE_PATH_STYLE: 'true'
+  SUPPLY_CHAIN_OUT_DIR: ${{ github.workspace }}/artifacts/supply-chain
+
+jobs:
+  pilot-release-candidate:
+    name: Pilot release candidate (synthetic)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: postgres:16.6-alpine
+        env:
+          POSTGRES_USER: contractradar
+          POSTGRES_PASSWORD: contractradar
+          POSTGRES_DB: contractradar_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U contractradar -d contractradar_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7.4.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Enable pnpm via Corepack
+        run: corepack enable && corepack prepare pnpm@9.15.0 --activate
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm validate:prisma && pnpm db:generate
+      - name: Ensure app DB role
+        env:
+          PGPASSWORD: contractradar
+        run: |
+          psql -h localhost -U contractradar -d contractradar_test -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'contractradar_app') THEN
+              CREATE ROLE contractradar_app LOGIN PASSWORD 'contractradar'
+                NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+            END IF;
+            GRANT CONNECT ON DATABASE contractradar_test TO contractradar_app;
+            GRANT USAGE ON SCHEMA public TO contractradar_app;
+          END$$;
+          SQL
+      - env:
+          DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
+        run: pnpm db:migrate:deploy
+      - name: Platform unit tests
+        run: pnpm --filter @contractradar/platform test:unit
+      - name: Config validation + vulnerability policy
+        run: |
+          mkdir -p artifacts/pilot-readiness artifacts/supply-chain
+          pnpm --filter @contractradar/platform build
+          pnpm production:validate | tee artifacts/pilot-readiness/config-validation.json
+          chmod +x scripts/supply-chain/*.sh
+          bash scripts/supply-chain/sbom.sh
+          pnpm security:audit
+          cp artifacts/supply-chain/vulnerability-policy.json artifacts/pilot-readiness/ || true
+          cp artifacts/supply-chain/sbom.json artifacts/pilot-readiness/ || true
+      - name: Migration rehearsal (true Slice 8 upgrade)
+        run: |
+          chmod +x scripts/db/*.sh scripts/backup/lib.sh
+          MIGRATION_OUT_DIR="${{ github.workspace }}/artifacts/pilot-readiness/migration" \
+            bash scripts/db/slice8-upgrade-rehearsal.sh
+          test -s artifacts/pilot-readiness/migration/slice8-to-slice9-report.json
+      - name: Build production images + digests
+        run: |
+          chmod +x scripts/ci/web-container-runtime-check.sh
+          docker build -t contractradar-web-rc:local -f apps/web/Dockerfile . \
+            | tee artifacts/pilot-readiness/web-rc-build.log
+          docker build -t contractradar-di-rc:local -f services/document-intelligence/Dockerfile \
+            services/document-intelligence | tee artifacts/pilot-readiness/di-rc-build.log
+          python3 - <<'PY'
+          import json, pathlib, subprocess
+          out = pathlib.Path("artifacts/pilot-readiness")
+          def inspect(tag):
+            i = subprocess.check_output(["docker","image","inspect","--format","{{.Id}}|{{.Size}}", tag], text=True).strip()
+            image_id, size = i.split("|")
+            return {"tag": tag, "digest": image_id, "imageId": image_id, "sizeBytes": int(size)}
+          doc = {"web": inspect("contractradar-web-rc:local"), "di": inspect("contractradar-di-rc:local"), "mutableLatestRejected": True}
+          (out / "image-digest-report.json").write_text(json.dumps(doc, indent=2) + "\n")
+          print(json.dumps(doc, indent=2))
+          PY
+      - name: Start MinIO sidecar + platform ready + preflight
+        run: |
+          chmod +x scripts/ci/start-live-sidecars.sh scripts/ci/stop-live-sidecars.sh scripts/pilot/*.sh
+          START_CLAMAV=false bash scripts/ci/start-live-sidecars.sh
+          node scripts/pilot/platform-ready.mjs
+          PILOT_PREFLIGHT_SYNTHETIC=true node scripts/pilot/preflight.mjs
+          node scripts/pilot/release-manifest.mjs
+          node scripts/pilot/tenant-create.mjs
+          node scripts/pilot/tenant-validate.mjs
+          test -s artifacts/pilot-readiness/platform-readiness-report.json
+          test -s artifacts/pilot-readiness/pilot-preflight-report.json
+          test -s artifacts/pilot-readiness/release-manifest.json
+          test -s artifacts/pilot-readiness/image-digest-report.json
+      - name: Evidence summary
+        run: |
+          node scripts/ci/write-evidence-summary.mjs \
+            "Pilot release candidate" PASS artifacts/pilot-readiness \
+            "checksExecuted=platform-unit,config-validate,vuln-policy,slice8-upgrade,image-build-digests,platform-ready,preflight-synthetic,release-manifest,tenant-synthetic" \
+            "checksNotRun=cloud-deploy,real-providers,real-notices,backup-restore-full" \
+            "knownGaps=sharp-upstream-blocked-pending-pilot-decision"
+      - if: always()
+        run: bash scripts/ci/stop-live-sidecars.sh || true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: pilot-release-candidate-evidence
+          path: |
+            artifacts/pilot-readiness/
+            artifacts/supply-chain/
+          if-no-files-found: error

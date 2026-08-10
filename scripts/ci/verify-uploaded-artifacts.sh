@@ -36,7 +36,8 @@ REQUIRED = {
   ],
   "production-readiness": [
     "config-validation.json", "container-hardening.json",
-    "web-container-hardening-report.json", "test-purge-safety-report.json",
+    "web-container-hardening-report.json", "web-container-runtime-report.json",
+    "test-purge-safety-report.json",
     "full-service-readiness-report.json", "pilot-readiness-fixture.json",
   ],
 }

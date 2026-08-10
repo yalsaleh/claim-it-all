@@ -147,6 +147,15 @@ jobs:
           bash scripts/ci/web-container-hardening-check.sh
           test -s artifacts/production-readiness/web-container-hardening-report.json
           test -s artifacts/production-readiness/container-hardening.json
+      - name: Web container runtime contract (Slice 10)
+        run: |
+          chmod +x scripts/ci/web-container-runtime-check.sh
+          mkdir -p artifacts/pilot-readiness artifacts/production-readiness
+          PILOT_READY_OUT_DIR="${{ github.workspace }}/artifacts/pilot-readiness" \
+            bash scripts/ci/web-container-runtime-check.sh
+          test -s artifacts/pilot-readiness/web-container-runtime-report.json
+          cp artifacts/pilot-readiness/web-container-runtime-report.json \
+            artifacts/production-readiness/web-container-runtime-report.json
       - name: Production build
         run: NODE_ENV=production pnpm build
       - name: Evidence summary
@@ -156,12 +165,14 @@ jobs:
           test -s artifacts/production-readiness/config-validation.json
           test -s artifacts/production-readiness/container-hardening.json
           test -s artifacts/production-readiness/web-container-hardening-report.json
+          test -s artifacts/production-readiness/web-container-runtime-report.json
+          test -s artifacts/pilot-readiness/web-container-runtime-report.json
           test -s artifacts/production-readiness/test-purge-safety-report.json
           test -s artifacts/production-readiness/full-service-readiness-report.json
           test -s artifacts/production-readiness/pilot-readiness-fixture.json
           node scripts/ci/write-evidence-summary.mjs \
             "Production readiness" PASS artifacts/production-readiness \
-            "checksExecuted=config-validate,fake-provider-reject,test-purge-safety,integrity,migration-verify,pilot-fixture,full-service-readiness,web-container-hardening,build,supply-chain" \
+            "checksExecuted=config-validate,fake-provider-reject,test-purge-safety,integrity,migration-verify,pilot-fixture,full-service-readiness,web-container-hardening,web-container-runtime,build,supply-chain" \
             "checksNotRun=live-external-apm,real-cloud-restore,kubernetes" \
             "knownGaps=mfa-architecture-only,break-glass-documented-only"
       - uses: actions/upload-artifact@v7
@@ -170,6 +181,7 @@ jobs:
           name: production-readiness-evidence
           path: |
             artifacts/production-readiness/
+            artifacts/pilot-readiness/
             artifacts/supply-chain/
           if-no-files-found: warn
       - if: always()

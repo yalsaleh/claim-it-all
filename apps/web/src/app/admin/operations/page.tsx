@@ -41,6 +41,37 @@ export default async function AdminOperationsPage() {
       </dl>
 
       <section className="mt-10">
+        <h2 className="text-xl font-medium">Pilot readiness summary</h2>
+        <p className="mt-2 text-sm text-neutral-600">
+          Release identity from environment only. Does not claim cloud deploy health.
+        </p>
+        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <dt className="text-sm text-neutral-500">RELEASE_SHA</dt>
+            <dd className="font-mono text-sm">
+              {process.env.RELEASE_SHA ?? process.env.GITHUB_SHA ?? 'unset'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-sm text-neutral-500">RELEASE_ID</dt>
+            <dd className="font-mono text-sm">{process.env.RELEASE_ID ?? 'unset'}</dd>
+          </div>
+          <div>
+            <dt className="text-sm text-neutral-500">CONTRACTRADAR_ENV</dt>
+            <dd className="text-lg">{dashboard.environment}</dd>
+          </div>
+          <div>
+            <dt className="text-sm text-neutral-500">AI / delivery defaults</dt>
+            <dd className="text-sm text-neutral-700">
+              AI {process.env.FEATURE_AI_ENABLED === 'true' ? 'ON' : 'off'}; delivery{' '}
+              {process.env.FEATURE_NOTICE_DELIVERY_ENABLED === 'true' ? 'ON' : 'off'}; connectors{' '}
+              {process.env.FEATURE_REAL_CONNECTORS_ENABLED === 'true' ? 'ON' : 'off'}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="mt-10">
         <h2 className="text-xl font-medium">Kill switches</h2>
         <ul className="mt-3 space-y-2">
           {dashboard.killSwitches.length === 0 ? (

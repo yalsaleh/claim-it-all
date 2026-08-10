@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import {
-  isPilotOrProduction,
-  parseAppEnvironment,
-  policyForEnvironment,
-} from '@contractradar/platform';
+import { parseAppEnvironment, policyForEnvironment } from '@contractradar/platform';
 
 const WEAK_SECRETS = [
   'replace-with-a-long-random-secret',
@@ -67,14 +63,18 @@ const serverSchema = z
       return;
     }
     const policy = policyForEnvironment(classified);
-    const isProdLike =
+    // Restrict using CONTRACTRADAR_ENV class, not NODE_ENV alone.
+    // Production containers often set NODE_ENV=production while CONTRACTRADAR_ENV=CI
+    // for synthetic readiness; CI must still accept fake_test / ALLOW_DEV_DEFAULTS.
+    const isRestricted =
       !isNextBuild &&
-      (env.NODE_ENV === 'production' ||
-        appEnv === 'production' ||
-        appEnv === 'staging' ||
-        isPilotOrProduction(classified));
-    const isTest =
-      env.NODE_ENV === 'test' || appEnv === 'test' || classified === 'TEST' || classified === 'CI';
+      (classified === 'STAGING' || classified === 'PILOT' || classified === 'PRODUCTION');
+    const isTestClass =
+      classified === 'TEST' ||
+      classified === 'CI' ||
+      classified === 'LOCAL' ||
+      env.NODE_ENV === 'test' ||
+      appEnv === 'test';
 
     if (!policy.allowFakeProviders) {
       for (const [key, value] of [
@@ -92,18 +92,18 @@ const serverSchema = z
       }
     }
 
-    if (env.MALWARE_SCANNER === 'fake_test' && !isTest) {
+    if (env.MALWARE_SCANNER === 'fake_test' && !isTestClass) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'MALWARE_SCANNER=fake_test is only allowed when NODE_ENV/APP_ENV is test',
+        message: 'MALWARE_SCANNER=fake_test is only allowed in LOCAL/TEST/CI',
         path: ['MALWARE_SCANNER'],
       });
     }
 
-    if (isProdLike && env.MALWARE_SCANNER !== 'clamav') {
+    if (policy.requireClamav && env.MALWARE_SCANNER !== 'clamav') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Production/staging require MALWARE_SCANNER=clamav',
+        message: `${classified} requires MALWARE_SCANNER=clamav`,
         path: ['MALWARE_SCANNER'],
       });
     }
@@ -124,11 +124,11 @@ const serverSchema = z
       });
     }
 
-    if (isProdLike) {
+    if (isRestricted) {
       if (env.ALLOW_DEV_DEFAULTS) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'ALLOW_DEV_DEFAULTS cannot be enabled in production/staging',
+          message: 'ALLOW_DEV_DEFAULTS cannot be enabled in STAGING/PILOT/PRODUCTION',
           path: ['ALLOW_DEV_DEFAULTS'],
         });
       }
@@ -147,7 +147,7 @@ const serverSchema = z
       ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Production/staging must not use example storage or service credentials',
+          message: 'STAGING/PILOT/PRODUCTION must not use example storage or service credentials',
           path: ['S3_ACCESS_KEY_ID'],
         });
       }

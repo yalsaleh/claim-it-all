@@ -58,14 +58,29 @@ describe('environment validation', () => {
     ).toThrow(/ALLOW_DEV_DEFAULTS/);
   });
 
-  it('rejects fake_test malware scanner outside test', () => {
+  it('allows fake_test malware scanner in LOCAL/development class', () => {
+    const env = validateEnvForTests({
+      ...valid,
+      NODE_ENV: 'development',
+      MALWARE_SCANNER: 'fake_test',
+    });
+    expect(env.MALWARE_SCANNER).toBe('fake_test');
+  });
+
+  it('rejects fake_test malware scanner in PILOT', () => {
     expect(() =>
       validateEnvForTests({
         ...valid,
-        NODE_ENV: 'development',
+        CONTRACTRADAR_ENV: 'PILOT',
+        NODE_ENV: 'production',
+        BETTER_AUTH_SECRET: 'production-grade-secret-with-enough-length-32+',
+        DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN: 'production-internal-token-32chars',
+        S3_ACCESS_KEY_ID: 'not-minioadmin',
+        S3_SECRET_ACCESS_KEY: 'not-minioadmin',
+        ALLOW_DEV_DEFAULTS: 'false',
         MALWARE_SCANNER: 'fake_test',
       }),
-    ).toThrow(/fake_test/);
+    ).toThrow(/fake_test|clamav/);
   });
 
   it('allows fake_test malware scanner in test', () => {

@@ -3,10 +3,7 @@ import { livePayload } from '@/server/health/readiness';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/**
- * Backward-compatible liveness alias.
- * Prefer `/health/live` for new probes (process-only, no DB).
- */
+/** Process liveness — no external dependencies, no secrets. */
 export async function GET() {
   return Response.json(livePayload());
 }

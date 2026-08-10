@@ -119,4 +119,24 @@ Storage: private bucket `contractradar-documents` with `quarantine` / `originals
 
 Require **Live ingestion** to pass before merging changes to ingestion, storage, workers, migrations, scanner, queue, evidence, authz, or RLS. Configure in GitHub branch settings (not automatic from this repo).
 
+### Pilot scaffolding commands (no real deploy)
+
+```bash
+pnpm platform:ready
+PILOT_PREFLIGHT_SYNTHETIC=true pnpm pilot:preflight
+pnpm pilot:tenant:create && pnpm pilot:tenant:validate
+pnpm pilot:release-manifest
+pnpm gh workflow list   # prefers system gh, then .tools/gh
+```
+
+See [PILOT_DEPLOYMENT.md](./PILOT_DEPLOYMENT.md) and [SLICE10_EVIDENCE.md](./SLICE10_EVIDENCE.md).
+
+### EPERM / editor tooling notes
+
+If you see `EPERM` touching `node_modules/**/strnum` (or similar) while an IDE helper rewrites `.vscode/launch.json`:
+
+- Prefer fixing ownership on the specific path over broad recursive `chmod`/`chown` in scripts.
+- Do **not** add recursive `chmod -R` to repo scripts — it masks deeper permission problems and is unsafe on shared machines.
+- Recreate the local `node_modules` install (`pnpm install`) if a package directory lost user write bits after a tooling crash.
+
 Slice 6 adds `@contractradar/notice-drafting` unit tests and PostgreSQL notice workflow integration coverage in Mode A verify.

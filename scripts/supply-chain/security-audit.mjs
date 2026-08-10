@@ -100,10 +100,20 @@ function loadExceptions() {
       'upgradeTarget',
       'trackingIssue',
       'status',
+      'burndownClass',
     ]) {
       if (!ex[key] || String(ex[key]).trim() === '') {
         throw new Error(`Malformed exception ${ex.id || '?'}: missing ${key}`);
       }
+    }
+    const allowedBurndown = new Set([
+      'FIX_NOW',
+      'FIX_BEFORE_PILOT',
+      'DEV_ONLY_ACCEPT_TEMPORARILY',
+      'UPSTREAM_BLOCKED',
+    ]);
+    if (!allowedBurndown.has(ex.burndownClass)) {
+      throw new Error(`Malformed exception ${ex.id}: invalid burndownClass`);
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(ex.expiresAt)) {
       throw new Error(`Malformed exception ${ex.id}: expiresAt must be YYYY-MM-DD`);

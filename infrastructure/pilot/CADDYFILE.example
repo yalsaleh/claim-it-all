@@ -1,0 +1,29 @@
+# Example pilot edge assumptions (TLS termination + reverse proxy).
+# Replace hostnames. Do not commit real certificates or private keys.
+# This file is documentation/template only — not an active production config.
+
+{
+  # Pilot should fail closed on insecure defaults in real edge config.
+  admin off
+}
+
+pilot.example.invalid {
+  # TLS: terminate at edge with managed certificates (ACME or operator-provided).
+  # tls internal  # local synthetic only — never for shared pilot
+
+  encode gzip
+
+  # Security headers (minimum baseline)
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "no-referrer"
+    -Server
+  }
+
+  # App
+  reverse_proxy web:3000
+
+  # Optional: DI internal path never exposed publicly in real pilot.
+  # handle /internal/* { respond 404 }
+}

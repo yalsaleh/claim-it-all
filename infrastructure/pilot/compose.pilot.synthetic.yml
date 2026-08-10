@@ -1,0 +1,45 @@
+# Synthetic pilot Compose template — placeholders only.
+# Do not put real credentials here. Not a production topology.
+services:
+  postgres:
+    image: postgres:16.6-alpine
+    environment:
+      POSTGRES_USER: ${PILOT_POSTGRES_USER:-pilot}
+      POSTGRES_PASSWORD: ${PILOT_POSTGRES_PASSWORD_SECRET_REF:-REPLACE_VIA_SECRET_MANAGER}
+      POSTGRES_DB: ${PILOT_POSTGRES_DB:-contractradar_pilot}
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4.2-alpine
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${PILOT_S3_ACCESS_KEY_ID_SECRET_REF:-REPLACE_VIA_SECRET_MANAGER}
+      MINIO_ROOT_PASSWORD: ${PILOT_S3_SECRET_ACCESS_KEY_SECRET_REF:-REPLACE_VIA_SECRET_MANAGER}
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+
+  caddy:
+    image: caddy:2.8-alpine
+    volumes:
+      - ./CADDYFILE.example:/etc/caddy/Caddyfile:ro
+    ports:
+      - '8443:443'
+      - '8080:80'
+    profiles: ['edge']
