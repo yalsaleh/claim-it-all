@@ -76,3 +76,5 @@ Slice 8 adds `@contractradar/connectors` and `@contractradar/operations` unit te
 | `dependency-security` | SBOM, `pnpm security:audit` policy gate, license inventory, secret scan, exception register snapshot |
 
 These workflows support Slice 9 / 9B Mode A evidence. They do **not** perform a real deployment, onboard real providers, or prove multi-region DR. Fake providers remain CI/test-only and are rejected for PILOT/PRODUCTION policy checks. Local Docker/Postgres absence is reported as **NOT RUN** via `pnpm env:doctor`, never as PASS.
+
+Artifact verify jobs use `actions/download-artifact@v8` / `actions/upload-artifact@v7` so Node 20 deprecation banners are not left on the prior `@v6` download action (confirmed from run-page annotations, not inferred only from YAML).

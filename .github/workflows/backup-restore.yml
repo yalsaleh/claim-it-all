@@ -102,7 +102,7 @@ jobs:
             "checksExecuted=pg-backup,object-byte-roundtrip,db-object-reference-resolution,cross-tenant-isolation,tamper-rejection,readiness" \
             "checksNotRun=production-cloud-restore" \
             "knownGaps=labelled-synthetic-ci-only"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: backup-restore-artifacts
@@ -117,7 +117,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: backup-restore-artifacts
           path: downloaded/backup
@@ -129,7 +129,7 @@ jobs:
             bash scripts/ci/verify-uploaded-artifacts.sh \
               downloaded/backup backup-restore "${{ github.sha }}"
           test -s artifacts/artifact-verification/artifact-verification-report.json
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: backup-artifact-verification
           path: artifacts/artifact-verification/

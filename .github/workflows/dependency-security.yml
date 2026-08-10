@@ -41,7 +41,7 @@ jobs:
             "checksExecuted=secret-scan,sbom,license-inventory,security-audit,policy-unit" \
             "checksNotRun=container-image-cve-scan" \
             "knownGaps=container-image-cve-scan-deferred"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: dependency-security-evidence
           path: artifacts/supply-chain/
@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: dependency-security-evidence
           path: downloaded/supply-chain
@@ -65,7 +65,7 @@ jobs:
             bash scripts/ci/verify-uploaded-artifacts.sh \
               downloaded/supply-chain dependency-security "${{ github.sha }}"
           test -s artifacts/artifact-verification/artifact-verification-report.json
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: dependency-security-artifact-verification
           path: artifacts/artifact-verification/

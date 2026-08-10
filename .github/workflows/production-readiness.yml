@@ -164,7 +164,7 @@ jobs:
             "checksExecuted=config-validate,fake-provider-reject,test-purge-safety,integrity,migration-verify,pilot-fixture,full-service-readiness,web-container-hardening,build,supply-chain" \
             "checksNotRun=live-external-apm,real-cloud-restore,kubernetes" \
             "knownGaps=mfa-architecture-only,break-glass-documented-only"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: production-readiness-evidence
@@ -185,7 +185,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: production-readiness-evidence
           path: downloaded/production-readiness
@@ -197,7 +197,7 @@ jobs:
             bash scripts/ci/verify-uploaded-artifacts.sh \
               downloaded/production-readiness production-readiness "${{ github.sha }}"
           test -s artifacts/artifact-verification/artifact-verification-report.json
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: production-readiness-artifact-verification
           path: artifacts/artifact-verification/

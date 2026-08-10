@@ -31,6 +31,16 @@
 - First-party `datetime.utcnow()` / FastAPI `on_event`: removed (count **0**)
 - Third-party botocore: upgraded via `boto3==1.40.2` (botocore ≥ 1.40.2 includes utcnow fix). If any residual third-party warning remains, it is documented as third-party-only and not globally suppressed.
 
+## Node.js Actions runtime warnings (from workflow run pages, not YAML inference)
+
+On commit verification runs that still used `actions/download-artifact@v6`, GitHub run pages showed:
+
+> Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: `actions/download-artifact@v6`
+
+Observed on Migration rehearsal, Backup/restore, Production readiness, and Dependency/security verify jobs. CI and Live ingestion run pages on the same commit showed **no** Node 20 banner (they do not use download-artifact).
+
+Mitigation applied: upgrade post-upload jobs to `actions/download-artifact@v8` and `actions/upload-artifact@v7` (Node 24 runtimes). Re-confirm absence/presence of banners from the final green commit’s run pages after push.
+
 ## Documented only / deferred
 
 - Break-glass infrastructure access UI

@@ -85,7 +85,7 @@ jobs:
             "checksExecuted=true-0e6ff4e-checkout-upgrade,drift-detection,role-separation" \
             "checksNotRun=" \
             "knownGaps="
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: migration-rehearsal-artifacts
@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: migration-rehearsal-artifacts
           path: downloaded/migration
@@ -110,7 +110,7 @@ jobs:
             bash scripts/ci/verify-uploaded-artifacts.sh \
               downloaded/migration migration-rehearsal "${{ github.sha }}"
           test -s artifacts/artifact-verification/artifact-verification-report.json
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: migration-artifact-verification
           path: artifacts/artifact-verification/
