@@ -30,9 +30,25 @@ IMG_WEB="contractradar-web-hardening:local"
 IMG_DI="contractradar-di-hardening:local"
 
 echo "==> Build web production image"
-docker build -t "${IMG_WEB}" -f "${WEB_DOCKERFILE}" "${ROOT_DIR}"
+if ! docker build -t "${IMG_WEB}" -f "${WEB_DOCKERFILE}" "${ROOT_DIR}" 2>&1 | tee "${OUT_DIR}/web-docker-build.log"; then
+  python3 - <<PY
+import json, pathlib
+doc={"ok": False, "status": "FAIL", "stage": "web_docker_build", "log": "web-docker-build.log"}
+pathlib.Path("${OUT_DIR}/web-container-hardening-report.json").write_text(json.dumps(doc, indent=2)+"\n")
+pathlib.Path("${OUT_DIR}/container-hardening.json").write_text(json.dumps(doc, indent=2)+"\n")
+PY
+  exit 1
+fi
 echo "==> Build DI image"
-docker build -t "${IMG_DI}" -f "${DI_DOCKERFILE}" "${ROOT_DIR}/services/document-intelligence"
+if ! docker build -t "${IMG_DI}" -f "${DI_DOCKERFILE}" "${ROOT_DIR}/services/document-intelligence" 2>&1 | tee "${OUT_DIR}/di-docker-build.log"; then
+  python3 - <<PY
+import json, pathlib
+doc={"ok": False, "status": "FAIL", "stage": "di_docker_build", "log": "di-docker-build.log"}
+pathlib.Path("${OUT_DIR}/di-container-hardening-report.json").write_text(json.dumps(doc, indent=2)+"\n")
+pathlib.Path("${OUT_DIR}/container-hardening.json").write_text(json.dumps({"ok": False, "stage": "di_docker_build"}, indent=2)+"\n")
+PY
+  exit 1
+fi
 
 WEB_USER="$(docker inspect --format '{{.Config.User}}' "${IMG_WEB}")"
 DI_USER="$(docker inspect --format '{{.Config.User}}' "${IMG_DI}")"

@@ -45,7 +45,15 @@ git -C "${ROOT_DIR}" ls-tree -d --name-only "${BASELINE_FULL}:apps/web/prisma/mi
 echo "BASELINE_COMMIT_OK" | tee "${OUT_DIR}/baseline-verification.txt" | tee -a "${LOG_FILE}"
 
 log "==> Reset database schema (clean prior-version start; not the upgrade step)"
-psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;"
+# Recreate public without GRANT ALL TO PUBLIC — that would reintroduce CREATE for
+# contractradar_app and break runtime/migration role separation (PG15+ default).
+psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+GRANT USAGE ON SCHEMA public TO PUBLIC;
+GRANT ALL ON SCHEMA public TO CURRENT_USER;
+SQL
 
 log "==> Checkout baseline ${BASELINE_FULL} into worktree ${WORKTREE}"
 rm -rf "${WORKTREE}"
@@ -182,6 +190,9 @@ raise SystemExit(0 if ok else 1)
 PY
 
 log "==> Runtime role restricted; migration role can DDL"
+# Defense in depth after schema recreate + forward migrate.
+psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -c \
+  "REVOKE CREATE ON SCHEMA public FROM PUBLIC; REVOKE CREATE ON SCHEMA public FROM contractradar_app;"
 IS_SUPER="$(psql "${APP_URL}" -Atc 'SHOW is_superuser')"
 echo "app_is_superuser=${IS_SUPER}" | tee "${OUT_DIR}/runtime-role.txt"
 echo "${IS_SUPER}" | grep -qiE 'off|false|no'
