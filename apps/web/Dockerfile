@@ -20,9 +20,26 @@ RUN apt-get update \
   && corepack prepare pnpm@9.15.0 --activate
 COPY --from=deps /app /app
 COPY . .
+# Build-time placeholders only (builder stage). Runtime values are injected at container start.
+# Required so Next.js page data collection does not fail env validation without a host .env.
 ENV NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production \
-    DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build?schema=public
+    CONTRACTRADAR_ENV=CI \
+    ALLOW_DEV_DEFAULTS=true \
+    APP_URL=http://127.0.0.1:3000 \
+    BETTER_AUTH_URL=http://127.0.0.1:3000 \
+    BETTER_AUTH_SECRET=build-time-placeholder-secret-not-for-runtime \
+    DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build?schema=public \
+    DOCUMENT_INTELLIGENCE_URL=http://127.0.0.1:8000 \
+    DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN=build-time-placeholder-token-32ch \
+    REDIS_URL=redis://127.0.0.1:6379 \
+    S3_ENDPOINT=http://127.0.0.1:9000 \
+    S3_REGION=us-east-1 \
+    S3_ACCESS_KEY_ID=build \
+    S3_SECRET_ACCESS_KEY=build-secret \
+    S3_BUCKET=build \
+    S3_FORCE_PATH_STYLE=true \
+    MALWARE_SCANNER=fake_test
 # Build workspace dependencies then the web app (standalone).
 RUN pnpm --filter @contractradar/web... build
 
