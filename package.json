@@ -75,7 +75,7 @@
   "engines": {
     "node": ">=20"
   },
-    "pnpm": {
+  "pnpm": {
     "overrides": {
       "fast-xml-parser": "4.5.5",
       "brace-expansion": "2.1.4",

@@ -121,10 +121,11 @@ const infrastructureRevision = `sha256:${createHash('sha256')
   .digest('hex')}`;
 
 const exceptions = readJson(path.join(root, 'security/vulnerability-exceptions.json'));
-const sharp = (exceptions?.exceptions || []).find(
-  (e) => e.id === 'EXC-2026-005' && e.status === 'active',
-);
-const sharpDecision = sharp?.pilotDecisionStatus || 'PENDING';
+const sharp = (exceptions?.exceptions || []).find((e) => e.id === 'EXC-2026-005');
+const sharpDecision =
+  sharp?.status === 'resolved'
+    ? 'REMEDIATED'
+    : sharp?.pilotDecisionStatus || (sharp?.status === 'active' ? 'PENDING' : 'ABSENT');
 
 const approvalPath = path.join(
   root,
