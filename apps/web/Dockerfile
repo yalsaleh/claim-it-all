@@ -48,7 +48,11 @@ WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000
-RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser
+# OpenSSL is required at runtime so Prisma can select debian-openssl-3.0.x engines.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/* \
+  && useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser
 COPY --from=builder --chown=appuser:appuser /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=appuser:appuser /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=appuser:appuser /app/apps/web/public ./apps/web/public
