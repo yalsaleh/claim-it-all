@@ -92,6 +92,7 @@ echo "${WEB_FS_CHECK}" | tee "${OUT_DIR}/web-fs-check.txt"
 WEB_CID="$(docker run -d --user 10001:10001 --network host \
   -e NODE_ENV=production \
   -e PORT=3000 \
+  -e HOSTNAME=0.0.0.0 \
   -e APP_URL=http://127.0.0.1:3000 \
   -e BETTER_AUTH_URL=http://127.0.0.1:3000 \
   -e BETTER_AUTH_SECRET=ci-container-secret-with-sufficient-length-32chars \

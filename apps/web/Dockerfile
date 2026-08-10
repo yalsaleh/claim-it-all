@@ -47,7 +47,8 @@ FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
-    PORT=3000
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
 # OpenSSL is required at runtime so Prisma can select debian-openssl-3.0.x engines.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
