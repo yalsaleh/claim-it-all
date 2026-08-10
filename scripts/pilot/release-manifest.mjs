@@ -80,9 +80,9 @@ const vulnPath = findFirst([
   path.join(root, 'artifacts/pilot-readiness/vulnerability-policy.json'),
 ]);
 
-const sbomDigest = process.env.SBOM_DIGEST || (sbomPath ? fileDigest(sbomPath) : '');
-const vulnDigest = process.env.VULN_POLICY_DIGEST || (vulnPath ? fileDigest(vulnPath) : '');
-const migrationVersion = process.env.MIGRATION_VERSION || latestMigrationVersion() || '';
+let sbomDigest = process.env.SBOM_DIGEST || (sbomPath ? fileDigest(sbomPath) : '');
+let vulnDigest = process.env.VULN_POLICY_DIGEST || (vulnPath ? fileDigest(vulnPath) : '');
+let migrationVersion = process.env.MIGRATION_VERSION || latestMigrationVersion() || '';
 
 const infraRevisionPath = path.join(root, 'infrastructure/pilot/terraform');
 const infrastructureRevision =
