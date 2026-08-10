@@ -44,7 +44,7 @@ INSERT INTO upload_session (
   'd1111111-1111-4111-8111-111111111111',
   'v1111111-1111-4111-8111-111111111111',
   'original-upload.bin', 'application/octet-stream', 32, '__SHA_ORIG__',
-  '__OBJ_ORIG_KEY__', 'contractradar-documents', 'COMPLETED', NOW() + interval '1 day', NOW(), NOW()
+  '__OBJ_ORIG_KEY__', 'contractradar-documents', 'ACCEPTED', NOW() + interval '1 day', NOW(), NOW()
 ) ON CONFLICT (id) DO UPDATE SET "storageKey" = EXCLUDED."storageKey", "expectedSha256" = EXCLUDED."expectedSha256";
 
 INSERT INTO document_processing_run (
@@ -68,7 +68,7 @@ INSERT INTO extracted_artifact (
   'a1111111-1111-4111-8111-111111111111',
   'v1111111-1111-4111-8111-111111111111',
   'r1111111-1111-4111-8111-111111111111',
-  'TEXT', 'text/plain', 'contractradar-documents', '__OBJ_ARTIFACT_KEY__',
+  'PLAIN_TEXT', 'text/plain', 'contractradar-documents', '__OBJ_ARTIFACT_KEY__',
   '__SHA_ARTIFACT__', 64, 'restore-seed', 'v1', NOW()
 ) ON CONFLICT (id) DO UPDATE SET "storageKey" = EXCLUDED."storageKey", sha256 = EXCLUDED.sha256;
 

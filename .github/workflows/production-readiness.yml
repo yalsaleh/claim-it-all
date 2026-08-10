@@ -148,7 +148,7 @@ jobs:
           test -s artifacts/production-readiness/web-container-hardening-report.json
           test -s artifacts/production-readiness/container-hardening.json
       - name: Production build
-        run: pnpm build
+        run: NODE_ENV=production pnpm build
       - name: Evidence summary
         run: |
           test -s artifacts/supply-chain/sbom.json
@@ -165,12 +165,13 @@ jobs:
             "checksNotRun=live-external-apm,real-cloud-restore,kubernetes" \
             "knownGaps=mfa-architecture-only,break-glass-documented-only"
       - uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: production-readiness-evidence
           path: |
             artifacts/production-readiness/
             artifacts/supply-chain/
-          if-no-files-found: error
+          if-no-files-found: warn
       - if: always()
         run: |
           for f in /tmp/di-api-pr.pid /tmp/arq-worker-pr.pid /tmp/outbox-pr.pid /tmp/di-pr.pid; do

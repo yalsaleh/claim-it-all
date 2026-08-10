@@ -14,8 +14,12 @@ APP_URL="$(psql_url "${DATABASE_URL:?}")"
 
 BASELINE_COMMIT="${SLICE8_BASELINE_COMMIT:-0e6ff4e0c529b23ad7bde881b029079ef60e3ff4}"
 TARGET_COMMIT="$(git -C "${ROOT_DIR}" rev-parse HEAD)"
-WORKTREE="${OUT_DIR}/slice8-worktree"
+# Keep worktree outside gitignored artifacts/ for cleaner git/pnpm behavior.
+WORKTREE="${RUNNER_TEMP:-/tmp}/slice8-worktree-${TARGET_COMMIT:0:12}"
 SLICE9="20260729220000_production_hardening_slice9"
+LOG_FILE="${OUT_DIR}/slice8-upgrade-rehearsal.log"
+: > "${LOG_FILE}"
+echo "WORKTREE=${WORKTREE}" | tee -a "${LOG_FILE}"
 
 cleanup() {
   if git -C "${ROOT_DIR}" worktree list 2>/dev/null | grep -q "${WORKTREE}"; then
@@ -53,7 +57,8 @@ echo "==> Install baseline dependencies + apply Slice 8 migrations"
   cd "${WORKTREE}"
   corepack enable >/dev/null 2>&1 || true
   corepack prepare pnpm@9.15.0 --activate >/dev/null 2>&1 || true
-  pnpm install --frozen-lockfile
+  # Prefer offline store populated by the job's earlier pnpm install.
+  pnpm install --frozen-lockfile --prefer-offline
   pnpm validate:prisma
   pnpm db:generate
   DATABASE_URL="${DATABASE_MIGRATE_URL}" DATABASE_MIGRATE_URL="${DATABASE_MIGRATE_URL}" pnpm db:migrate:deploy

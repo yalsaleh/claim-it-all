@@ -12,7 +12,9 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 COPY --from=deps /app /app
 COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NODE_ENV=production \
+    DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build?schema=public
 RUN pnpm --filter @contractradar/web exec prisma generate \
   && pnpm --filter @contractradar/web build
 

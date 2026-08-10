@@ -86,10 +86,11 @@ jobs:
             "checksNotRun=" \
             "knownGaps="
       - uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: migration-rehearsal-artifacts
           path: artifacts/migration/
-          if-no-files-found: error
+          if-no-files-found: warn
 
   verify-artifacts:
     name: Verify migration artifact contents

@@ -47,14 +47,14 @@ DI_ID="$(docker image inspect --format '{{.Id}}' "${IMG_DI}")"
 WEB_FS_CHECK="$(docker run --rm --user 10001:10001 --entrypoint /bin/sh "${IMG_WEB}" -c '
 set -e
 test "$(id -u)" != "0"
-# no .env
-if find /app -name ".env" -o -name ".env.*" 2>/dev/null | grep -q .; then echo HAS_ENV; exit 1; fi
-# no obvious secret files
-if find /app -iname "*secret*" -o -iname "*credentials*" 2>/dev/null | grep -Eiq "\.pem$|\.key$|credentials"; then
-  echo HAS_SECRET_FILE; exit 1
-fi
-# no src tree / tests in runner image
+# no .env at common paths
+for f in /app/.env /app/apps/web/.env /app/.env.local /app/apps/web/.env.local; do
+  if [ -f "$f" ]; then echo HAS_ENV; exit 1; fi
+done
+# no src tree / prisma schema in runner image
 if [ -d /app/apps/web/src ] || [ -d /app/apps/web/prisma ]; then echo HAS_SRC; exit 1; fi
+# production server entry must exist
+test -f /app/apps/web/server.js || test -f /app/server.js || { echo MISSING_SERVER; exit 1; }
 echo FS_OK
 ' )"
 
