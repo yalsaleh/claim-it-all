@@ -38,3 +38,23 @@
 
 `EXC-2026-005` remains `UPSTREAM_BLOCKED` / `pilotDecisionStatus: PENDING`.
 Real deploy workflow fails closed until a human sets `PILOT_APPROVED_EXCEPTION` with full approval metadata — **not auto-set**.
+
+## CI evidence (final SHA)
+
+Starting SHA: `42325e05bc09ed0ef9c13e353174db9e2a4460f5`  
+Final SHA: `28867897bb69311d1b11877665619f4eaa854720`
+
+| Workflow | Result |
+|----------|--------|
+| CI | success |
+| Live ingestion | success on `3b2ad14` (path-filtered; fix commit only touched `scripts/pilot/`) |
+| Migration rehearsal | success |
+| Backup and restore | success |
+| Production readiness | success |
+| Dependency/security scan | success |
+| Pilot release candidate | success |
+| Pilot deployment rehearsal | success |
+| Cloud pilot IaC | success |
+| Cloud pilot deploy | **NOT RUN** (manual / no AWS identity) |
+
+Slice 11 **not** fully verified: real cloud apply / smoke / restore remain NOT RUN.
