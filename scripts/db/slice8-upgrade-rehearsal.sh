@@ -9,17 +9,17 @@ cd "${ROOT_DIR}"
 
 OUT_DIR="${MIGRATION_OUT_DIR:-${ROOT_DIR}/artifacts/migration}"
 mkdir -p "${OUT_DIR}"
+LOG_FILE="${OUT_DIR}/slice8-upgrade-rehearsal.log"
+: > "${LOG_FILE}"
+log() { echo "$@" | tee -a "${LOG_FILE}"; }
+
 MIGRATE_URL="$(psql_url "${DATABASE_MIGRATE_URL:?}")"
 APP_URL="$(psql_url "${DATABASE_URL:?}")"
 
 BASELINE_COMMIT="${SLICE8_BASELINE_COMMIT:-0e6ff4e0c529b23ad7bde881b029079ef60e3ff4}"
 TARGET_COMMIT="$(git -C "${ROOT_DIR}" rev-parse HEAD)"
-# Keep worktree outside gitignored artifacts/ for cleaner git/pnpm behavior.
 WORKTREE="${RUNNER_TEMP:-/tmp}/slice8-worktree-${TARGET_COMMIT:0:12}"
 SLICE9="20260729220000_production_hardening_slice9"
-LOG_FILE="${OUT_DIR}/slice8-upgrade-rehearsal.log"
-: > "${LOG_FILE}"
-echo "WORKTREE=${WORKTREE}" | tee -a "${LOG_FILE}"
 
 cleanup() {
   if git -C "${ROOT_DIR}" worktree list 2>/dev/null | grep -q "${WORKTREE}"; then
@@ -29,53 +29,54 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "==> Verify baseline commit ${BASELINE_COMMIT}"
+log "==> Verify baseline commit ${BASELINE_COMMIT}"
 git -C "${ROOT_DIR}" cat-file -t "${BASELINE_COMMIT}" >/dev/null
 BASELINE_FULL="$(git -C "${ROOT_DIR}" rev-parse "${BASELINE_COMMIT}")"
-echo "${BASELINE_FULL}" | tee "${OUT_DIR}/baseline-commit.txt"
-echo "${TARGET_COMMIT}" | tee "${OUT_DIR}/target-commit.txt"
+echo "${BASELINE_FULL}" | tee "${OUT_DIR}/baseline-commit.txt" | tee -a "${LOG_FILE}"
+echo "${TARGET_COMMIT}" | tee "${OUT_DIR}/target-commit.txt" | tee -a "${LOG_FILE}"
 
-# Ensure baseline is true Slice 8 (no Slice 9 migration directory).
 if git -C "${ROOT_DIR}" ls-tree -d --name-only "${BASELINE_FULL}:apps/web/prisma/migrations" \
   | grep -qx "${SLICE9}"; then
-  echo "FAIL: baseline ${BASELINE_FULL} unexpectedly contains ${SLICE9}"; exit 1
+  log "FAIL: baseline ${BASELINE_FULL} unexpectedly contains ${SLICE9}"; exit 1
 fi
 git -C "${ROOT_DIR}" ls-tree -d --name-only "${BASELINE_FULL}:apps/web/prisma/migrations" \
   | grep -qx "20260729210000_connectors_operations_slice8" \
-  || { echo "FAIL: baseline missing Slice 8 migration"; exit 1; }
-echo "BASELINE_COMMIT_OK" | tee "${OUT_DIR}/baseline-verification.txt"
+  || { log "FAIL: baseline missing Slice 8 migration"; exit 1; }
+echo "BASELINE_COMMIT_OK" | tee "${OUT_DIR}/baseline-verification.txt" | tee -a "${LOG_FILE}"
 
-echo "==> Reset database schema (clean prior-version start; not the upgrade step)"
+log "==> Reset database schema (clean prior-version start; not the upgrade step)"
 psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;"
 
-echo "==> Checkout baseline ${BASELINE_FULL} into worktree"
+log "==> Checkout baseline ${BASELINE_FULL} into worktree ${WORKTREE}"
 rm -rf "${WORKTREE}"
 git -C "${ROOT_DIR}" worktree add --detach "${WORKTREE}" "${BASELINE_FULL}"
+test -f "${WORKTREE}/package.json"
+test -d "${WORKTREE}/apps/web/prisma/migrations/20260729210000_connectors_operations_slice8"
 
-echo "==> Install baseline dependencies + apply Slice 8 migrations"
+log "==> Install baseline dependencies + apply Slice 8 migrations"
 (
   cd "${WORKTREE}"
   corepack enable >/dev/null 2>&1 || true
   corepack prepare pnpm@9.15.0 --activate >/dev/null 2>&1 || true
-  # Prefer offline store populated by the job's earlier pnpm install.
-  pnpm install --frozen-lockfile --prefer-offline
+  # Do not use --prefer-offline: Slice 8 lockfile may need store fetches.
+  pnpm install --frozen-lockfile
   pnpm validate:prisma
   pnpm db:generate
   DATABASE_URL="${DATABASE_MIGRATE_URL}" DATABASE_MIGRATE_URL="${DATABASE_MIGRATE_URL}" pnpm db:migrate:deploy
-)
+) 2>&1 | tee -a "${LOG_FILE}"
 
 psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -c "SELECT migration_name FROM _prisma_migrations ORDER BY finished_at NULLS LAST, migration_name" \
-  | tee "${OUT_DIR}/slice8-migrations.txt"
+  | tee "${OUT_DIR}/slice8-migrations.txt" | tee -a "${LOG_FILE}"
 if grep -q "${SLICE9}" "${OUT_DIR}/slice8-migrations.txt"; then
-  echo "FAIL: Slice 9 applied during baseline stage"; exit 1
+  log "FAIL: Slice 9 applied during baseline stage"; exit 1
 fi
 grep -q "20260729210000_connectors_operations_slice8" "${OUT_DIR}/slice8-migrations.txt"
 
-echo "==> Seed representative Slice 8 data"
-# Seed SQL lives on current tree (schema-compatible with Slice 8 tables).
-psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -f "${ROOT_DIR}/scripts/db/slice8-seed-representative.sql"
+log "==> Seed representative Slice 8 data"
+psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -f "${ROOT_DIR}/scripts/db/slice8-seed-representative.sql" \
+  2>&1 | tee -a "${LOG_FILE}"
 
-MIGRATE_URL="${MIGRATE_URL}" OUT_DIR="${OUT_DIR}" python3 - <<'PY'
+MIGRATE_URL="${MIGRATE_URL}" OUT_DIR="${OUT_DIR}" python3 - <<'PY' 2>&1 | tee -a "${OUT_DIR}/slice8-upgrade-rehearsal.log"
 import json, os, pathlib, subprocess
 url = os.environ["MIGRATE_URL"]
 out_dir = pathlib.Path(os.environ["OUT_DIR"])
@@ -107,22 +108,22 @@ assert counts["notice_dispatch_attempt"] >= 1
 print("SEED_OK", counts)
 PY
 
-echo "==> Switch to current commit tooling and apply forward migrations (no reset)"
+log "==> Switch to current commit tooling and apply forward migrations (no reset)"
 cleanup
 trap - EXIT
 cd "${ROOT_DIR}"
-pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile 2>&1 | tee -a "${LOG_FILE}"
 pnpm validate:prisma
 pnpm db:generate
-DATABASE_URL="${DATABASE_MIGRATE_URL}" pnpm db:migrate:deploy
+DATABASE_URL="${DATABASE_MIGRATE_URL}" pnpm db:migrate:deploy 2>&1 | tee -a "${LOG_FILE}"
 
 psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -c "SELECT migration_name FROM _prisma_migrations WHERE migration_name='${SLICE9}'" \
-  | tee "${OUT_DIR}/slice9-applied.txt"
+  | tee "${OUT_DIR}/slice9-applied.txt" | tee -a "${LOG_FILE}"
 grep -q "${SLICE9}" "${OUT_DIR}/slice9-applied.txt"
 psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -c "SELECT migration_name FROM _prisma_migrations ORDER BY finished_at NULLS LAST, migration_name" \
-  | tee "${OUT_DIR}/migrations-after.txt"
+  | tee "${OUT_DIR}/migrations-after.txt" | tee -a "${LOG_FILE}"
 
-echo "==> Verify baseline records remain readable"
+log "==> Verify baseline records remain readable"
 MIGRATE_URL="${MIGRATE_URL}" OUT_DIR="${OUT_DIR}" python3 - <<'PY'
 import json, os, pathlib, subprocess
 url = os.environ["MIGRATE_URL"]
@@ -148,7 +149,7 @@ for key, oid in before["ids"].items():
 print("BASELINE_DATA_PRESERVED")
 PY
 
-echo "==> Verify Slice 9 tables + RLS/FORCE RLS"
+log "==> Verify Slice 9 tables + RLS/FORCE RLS"
 psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -c "\dt tenant_settings" | tee "${OUT_DIR}/slice9-tables.txt"
 psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -c "\dt backup_run" | tee -a "${OUT_DIR}/slice9-tables.txt"
 psql "${MIGRATE_URL}" -Atc \
@@ -156,15 +157,13 @@ psql "${MIGRATE_URL}" -Atc \
   | tee "${OUT_DIR}/rls-after-upgrade.txt"
 python3 - <<PY
 rows=open("${OUT_DIR}/rls-after-upgrade.txt").read().splitlines()
-ok=any(r.startswith("tenant:") and ":t:t" in r.replace("true","t") for r in rows) or any("tenant:t:t" in r.replace("true","t") for r in rows)
-# Accept t/t or true/true
 norm=[r.replace("true","t").replace("false","f") for r in rows]
 ok=all(any(n.startswith(name+":") and n.endswith(":t:t") for n in norm) for name in ("tenant","project"))
 open("${OUT_DIR}/rls-result.json","w").write(__import__("json").dumps({"ok": ok, "rows": rows}, indent=2)+"\n")
 raise SystemExit(0 if ok else 1)
 PY
 
-echo "==> Cross-tenant isolation after upgrade"
+log "==> Cross-tenant isolation after upgrade"
 psql "${APP_URL}" -v ON_ERROR_STOP=1 <<'SQL' > "${OUT_DIR}/isolation.txt"
 SELECT set_config('app.bypass_rls', 'off', false);
 SELECT set_config('app.current_user_id', '88000000-0000-4000-8000-0000000000aa', false);
@@ -182,12 +181,12 @@ pathlib.Path("${OUT_DIR}/tenant-isolation-result.json").write_text(json.dumps({"
 raise SystemExit(0 if ok else 1)
 PY
 
-echo "==> Runtime role restricted; migration role can DDL"
+log "==> Runtime role restricted; migration role can DDL"
 IS_SUPER="$(psql "${APP_URL}" -Atc 'SHOW is_superuser')"
 echo "app_is_superuser=${IS_SUPER}" | tee "${OUT_DIR}/runtime-role.txt"
 echo "${IS_SUPER}" | grep -qiE 'off|false|no'
 if psql "${APP_URL}" -v ON_ERROR_STOP=1 -c 'CREATE TABLE runtime_upgrade_probe(id int);' >/dev/null 2>&1; then
-  echo "FAIL: runtime created table"; exit 1
+  log "FAIL: runtime created table"; exit 1
 fi
 psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -c 'CREATE TABLE IF NOT EXISTS migrator_upgrade_probe(id int); DROP TABLE migrator_upgrade_probe;'
 echo '{"runtimeRestricted":true,"migrationRoleCanDDL":true}' > "${OUT_DIR}/role-result.json"
