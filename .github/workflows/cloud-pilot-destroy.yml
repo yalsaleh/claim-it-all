@@ -1,0 +1,69 @@
+name: Cloud pilot destroy
+
+# Separately protected manual workflow. Destroys only synthetic pilot infrastructure.
+# Refuses wildcard deletion and customer/production environments.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_environment:
+        description: 'Type SYNTHETIC-PILOT-DESTROY'
+        required: true
+        type: string
+      aws_account_id:
+        description: 'Exact AWS account ID expected for pilot'
+        required: true
+        type: string
+
+env:
+  CONTRACTRADAR_ENV: PILOT
+
+jobs:
+  destroy:
+    name: Destroy synthetic pilot infra (gated)
+    runs-on: ubuntu-latest
+    environment: pilot-cloud-destroy
+    steps:
+      - name: Confirm typed intent
+        run: |
+          test "${{ inputs.confirm_environment }}" = "SYNTHETIC-PILOT-DESTROY"
+      - uses: actions/checkout@v5
+      - name: Refuse customer/production names
+        run: |
+          mkdir -p artifacts/cloud-pilot
+          node <<'NODE'
+          const fs = require('fs');
+          const account = process.env.ACCOUNT || '';
+          const doc = {
+            ok: false,
+            status: 'NOT RUN — cloud environment unavailable or destroy not auto-executed',
+            requestedAccountId: account,
+            wildcardDeletion: false,
+            productionSupported: false,
+            customerEnvironmentSupported: false,
+            procedure: 'docs/runbooks/CLOUD_PILOT_DESTROY.md',
+            applyDestroyExecuted: false,
+          };
+          if (!/^\d{12}$/.test(account)) {
+            doc.status = 'FAILED — aws_account_id must be a 12-digit account id';
+            fs.writeFileSync('artifacts/cloud-pilot/destroy-result.json', JSON.stringify(doc, null, 2));
+            process.exit(1);
+          }
+          fs.writeFileSync('artifacts/cloud-pilot/destroy-result.json', JSON.stringify(doc, null, 2));
+          console.log(JSON.stringify(doc, null, 2));
+          NODE
+        env:
+          ACCOUNT: ${{ inputs.aws_account_id }}
+      - name: AWS identity + backup confirmation required
+        run: |
+          if [[ -z "${AWS_ROLE_ARN:-}${AWS_ACCESS_KEY_ID:-}" ]]; then
+            echo "NOT RUN — no AWS identity; see docs/runbooks/CLOUD_PILOT_DESTROY.md"
+            exit 1
+          fi
+          echo "Destroy apply is intentionally not automated in this scaffold."
+          exit 1
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: cloud-pilot-destroy-evidence
+          path: artifacts/cloud-pilot/
+          if-no-files-found: warn

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertImmutableImageRef,
   createReleaseManifestDraft,
+  looksLikePlaceholderDigest,
   validateReleaseManifest,
 } from './release-manifest';
 
@@ -16,6 +17,22 @@ describe('release manifest', () => {
     expect(() => assertImmutableImageRef({ name: 'web', digest: 'latest' })).toThrow(/sha256/);
   });
 
+  it('rejects placeholder digests for cloud deploy', () => {
+    expect(looksLikePlaceholderDigest('SYNTHETIC_MIGRATION_VERSION')).toBe(true);
+    const result = validateReleaseManifest({
+      schemaVersion: 1,
+      releaseId: 'x',
+      state: 'RELEASE_CANDIDATE',
+      gitSha: 'abc1234',
+      createdAt: new Date().toISOString(),
+      migrationVersion: 'SYNTHETIC_MIGRATION_VERSION',
+      images: [{ name: 'web', digest }],
+      sbomDigest: digest,
+      vulnerabilityPolicyDigest: digest,
+    });
+    expect(result.ok).toBe(false);
+  });
+
   it('validates a complete draft schema', () => {
     const manifest = createReleaseManifestDraft({
       releaseId: 'rc-1',
@@ -25,7 +42,7 @@ describe('release manifest', () => {
       sbomDigest: digest,
       vulnerabilityPolicyDigest: digest,
     });
-    expect(manifest.state).toBe('DRAFT');
+    expect(manifest.state).toBe('RELEASE_CANDIDATE');
     expect(validateReleaseManifest(manifest).ok).toBe(true);
   });
 

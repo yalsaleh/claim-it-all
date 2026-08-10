@@ -1,55 +1,42 @@
-# Pilot deployment (architecture)
+# Pilot deployment
 
-Honesty label: **architecture + rehearsal scaffolding**. This document does **not**
-claim a real customer pilot deploy, cloud cutover, or live provider enablement.
+## Honesty labels
 
-## Architecture (target pilot)
+| Mode | Meaning |
+|------|---------|
+| CI synthetic pilot | GitHub Actions + local containers; no AWS account |
+| Real cloud synthetic/internal pilot | AWS apply with synthetic tenants only (Slice 11 target) |
+| Future customer pilot | Out of scope until provider integration approval |
+| Future provider integration | Explicit next phase after Slice 11 |
 
-```
-[Edge TLS / Caddy] -> [Web (Next.js, non-root)] -> [Postgres + Redis + Objects + DI]
-                              |
-                              +-> workers (ARQ / outbox) behind kill switches
-```
+## Architecture (ADR-130)
 
-- Environment class: `CONTRACTRADAR_ENV=PILOT`
-- Fake providers forbidden; AI / real connectors / notice delivery **OFF by default**
-- Secrets via references (see `.env.pilot.example`) — never committed
-- Templates: `infrastructure/pilot/`
+AWS: VPC → ALB (TLS) → ECS Fargate (web) + private workers/DI/ClamAV → RDS PostgreSQL + ElastiCache Redis + private S3 + Secrets Manager.
 
-## TLS / edge
+IaC: `infrastructure/pilot/terraform/` (`enable_deployment=false` by default).
 
-- Terminate TLS at edge (`CADDYFILE.example`)
-- HSTS and hardened headers assumed
-- No public exposure of internal DI admin or migrate endpoints
-
-## Release model
-
-- Immutable image digests only (`sha256:…`); tag `latest` rejected
-- Release manifest schema in `@contractradar/platform` `release-manifest`
-- Generator: `pnpm pilot:release-manifest` → `artifacts/pilot-readiness/release-manifest.json`
-- States: DRAFT → CANDIDATE → APPROVED → DEPLOYING → DEPLOYED (or ROLLED_BACK / REJECTED)
-
-## Approval model
-
-- Deployment requires a validated `DeploymentApproval` (`APPROVED`, unexpired, matching `releaseId`)
-- Types/validation: `@contractradar/platform` `deployment-approval`
-- Security review checklist: [PILOT_SECURITY_REVIEW.md](./PILOT_SECURITY_REVIEW.md)
-- Vulnerability burndown: [security/VULNERABILITY_BURNDOWN.md](./security/VULNERABILITY_BURNDOWN.md)
-
-## Operator commands (local / CI synthetic)
+## Operator commands
 
 ```bash
-pnpm platform:ready
+pnpm cloud:network-check
+pnpm cloud:terraform-validate   # uses terraform or docker hashicorp/terraform
+pnpm cloud:status               # never fabricates deploy success
+pnpm production:validate:pilot
 PILOT_PREFLIGHT_SYNTHETIC=true pnpm pilot:preflight
-pnpm pilot:tenant:create && pnpm pilot:tenant:validate
-pnpm pilot:release-manifest
-bash scripts/pilot/deployment-rehearsal.sh
-pnpm gh  # prefers system gh, then .tools/gh
+REQUIRE_REAL_DIGESTS=true pnpm pilot:release-manifest   # after image digests exist
 ```
 
-## What this does **not** do
+## Cloud deploy workflow
 
-- Deploy to a real cloud account
-- Send real notices or enable live commercial AI
-- Waive non-waivable readiness controls
-- Replace production change management
+- `Cloud pilot IaC` — push/PR static checks
+- `Cloud pilot deploy` — **manual only**, protected `pilot-cloud` environment
+  - typed confirmation `DEPLOY-SYNTHETIC-PILOT`
+  - sharp must be `PILOT_APPROVED_EXCEPTION` (not auto-set)
+  - AWS identity required; apply not silent
+
+## What this does not do
+
+- Connect real mailboxes/EDMS/SMTP/AI
+- Onboard customers
+- Auto-apply Terraform on push
+- Waive FORCE RLS / SoD / approval controls

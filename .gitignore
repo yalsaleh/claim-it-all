@@ -83,6 +83,7 @@ apps/web/.env.test
 
 # Terraform
 infrastructure/terraform/.terraform/
+infrastructure/pilot/terraform/.terraform/
 *.tfstate
 *.tfstate.*
 *.tfvars

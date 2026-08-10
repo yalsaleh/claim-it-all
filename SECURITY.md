@@ -287,4 +287,5 @@ Controlled notice delivery requires immutable dispatch snapshots, explicit human
 - Backups/restores evidenced in **CI/MinIO only**; no real customer DR claimed (ADR-113/114).
 - Kill switches fail closed; pilot readiness non-waivable checklist (ADR-118/119).
 - Supply-chain scanning + deployment hardening documented; **no real deployment claimed** (ADR-122/123).
+- Slice 11 cloud pilot security review: [docs/security/CLOUD_PILOT_SECURITY_REVIEW.md](./docs/security/CLOUD_PILOT_SECURITY_REVIEW.md). Real AWS apply remains blocked without sharp `PILOT_APPROVED_EXCEPTION` + protected environment approval.
 - Threat models: [tenant-administration](./docs/threat-models/tenant-administration.md), [support-access](./docs/threat-models/support-access.md), [backups-restores](./docs/threat-models/backups-restores.md), [provider-onboarding](./docs/threat-models/provider-onboarding.md), [production-operations](./docs/threat-models/production-operations.md), [pilot-deployment](./docs/threat-models/pilot-deployment.md).

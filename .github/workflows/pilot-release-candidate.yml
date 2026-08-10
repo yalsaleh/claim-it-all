@@ -137,13 +137,22 @@ jobs:
           START_CLAMAV=false bash scripts/ci/start-live-sidecars.sh
           node scripts/pilot/platform-ready.mjs
           PILOT_PREFLIGHT_SYNTHETIC=true node scripts/pilot/preflight.mjs
-          node scripts/pilot/release-manifest.mjs
+          # Wire release manifest AFTER image digests + SBOM/vuln policy exist.
+          REQUIRE_REAL_DIGESTS=true node scripts/pilot/release-manifest.mjs
           node scripts/pilot/tenant-create.mjs
           node scripts/pilot/tenant-validate.mjs
           test -s artifacts/pilot-readiness/platform-readiness-report.json
           test -s artifacts/pilot-readiness/pilot-preflight-report.json
           test -s artifacts/pilot-readiness/release-manifest.json
           test -s artifacts/pilot-readiness/image-digest-report.json
+          # Guard: manifest digests must match image report
+          node -e "
+            const m=require('./artifacts/pilot-readiness/release-manifest.json');
+            const d=require('./artifacts/pilot-readiness/image-digest-report.json');
+            const web=m.images.find(i=>i.name.includes('web'));
+            if(web.digest!==d.web.digest) { console.error('web digest mismatch'); process.exit(1); }
+            console.log('release-manifest digests wired');
+          "
       - name: Evidence summary
         run: |
           node scripts/ci/write-evidence-summary.mjs \

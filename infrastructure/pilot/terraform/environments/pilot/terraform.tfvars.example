@@ -1,0 +1,38 @@
+# Copy to terraform.tfvars (gitignored / private) before planning against a real account.
+# NEVER commit real credentials, secret values, or production account IDs.
+
+aws_region     = "eu-west-2"
+aws_account_id = "" # optional provider guard — set privately if required
+
+# SAFE DEFAULT: keep false so plans do not start workloads.
+# Applying with enable_deployment=true REQUIRES human approval and the token below.
+enable_deployment          = false
+deployment_approval_token  = "" # set to I-APPROVE-PILOT-APPLY only after review
+
+# ACM certificate ARN for ALB HTTPS (required when enable_deployment=true).
+certificate_arn = "" # arn:aws:acm:REGION:ACCOUNT:certificate/UUID
+
+vpc_cidr             = "10.40.0.0/16"
+public_subnet_cidrs  = ["10.40.0.0/24", "10.40.1.0/24"]
+private_subnet_cidrs = ["10.40.10.0/24", "10.40.11.0/24"]
+# availability_zones = ["eu-west-2a", "eu-west-2b"]
+
+db_instance_class        = "db.t4g.medium"
+db_allocated_storage_gb  = 50
+db_backup_retention_days = 7
+redis_node_type          = "cache.t4g.micro"
+
+# Immutable image digests only for go-live (never :latest).
+web_image                    = "" # ACCOUNT.dkr.ecr.REGION.amazonaws.com/contractradar-pilot-web@sha256:...
+document_intelligence_image  = "" # ACCOUNT.dkr.ecr.REGION.amazonaws.com/contractradar-pilot-document-intelligence@sha256:...
+clamav_image                 = "clamav/clamav:1.4"
+
+web_desired_count    = 1
+worker_desired_count = 1
+
+budget_limit_usd   = 500
+budget_alert_email = "" # operator email for AWS Budgets notifications
+cost_center        = "contractradar-pilot"
+alarm_actions      = [] # optional SNS topic ARNs
+
+log_retention_days = 30

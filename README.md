@@ -4,7 +4,7 @@
 
 > We continuously monitor construction project records and warn contractors before they miss a contractual entitlement, evidence requirement, or notice deadline.
 
-Phase 1: secure multi-tenant platform + immutable document ingestion (Slice 2B). **Slices 3–7 done (Mode A)** — contract configuration, deadlines, detection, notice drafting, and controlled delivery. **Slice 8 done (Mode A)** — approved connector scopes, fake/local import through the existing ingestion pipeline, deterministic operational alerts/escalations/tasks, and membership-filtered project/portfolio dashboards. **Slice 9 done (Mode A / evidence-based)** — production hardening: environment classification, config validation, secret references, tenant/support/break-glass policy (break-glass not in product UI), observability, backup/restore (CI/MinIO only), kill switches, and pilot readiness. **No real deployment or real providers claimed**; fake blocked in PILOT/PRODUCTION. Live ingestion verification remains Mode B.
+Phase 1: secure multi-tenant platform + immutable document ingestion (Slice 2B). **Slices 3–7 done (Mode A)** — contract configuration, deadlines, detection, notice drafting, and controlled delivery. **Slice 8 done (Mode A)** — approved connector scopes, fake/local import through the existing ingestion pipeline, deterministic operational alerts/escalations/tasks, and membership-filtered project/portfolio dashboards. **Slice 9 done (Mode A / evidence-based)** — production hardening. **Slice 10 done** — controlled pilot deployment preparation (synthetic). **Slice 11 in progress** — AWS IaC + cloud pilot workflows for synthetic/internal data only; **real cloud apply is NOT claimed** until AWS credentials/account + sharp `PILOT_APPROVED_EXCEPTION` exist. Fake providers blocked in PILOT/PRODUCTION.
 
 ---
 
@@ -36,7 +36,7 @@ Implemented: auth/tenancy/RLS, document upload custody, transactional outbox, Cl
 
 **Slice 2B** live ingestion remains Mode B (not claimed verified here). **Slices 3–9** are implemented for Mode A (including fake/local connectors, operational dashboards, and Slice 9 production-hardening primitives/docs). Live-ingestion GitHub regression still requires a push after commit.
 
-Not implemented / not claimed done: real cloud/pilot deployment, live commercial mailbox/EDMS providers, entitlement conclusions, autonomous legal-state mutation, electronic signatures, claim valuation, product UI break-glass.
+Not implemented / not claimed done: real AWS pilot apply (Slice 11 scaffolding only until credentials), live commercial mailbox/EDMS providers, entitlement conclusions, autonomous legal-state mutation, electronic signatures, claim valuation, product UI break-glass.
 
 ---
 
@@ -56,6 +56,9 @@ Not implemented / not claimed done: real cloud/pilot deployment, live commercial
 | [docs/OPERATIONS.md](./docs/OPERATIONS.md) | Operational monitoring guide |
 | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Slice 9 deployment hardening (no real deploy claimed) |
 | [docs/PILOT_READINESS.md](./docs/PILOT_READINESS.md) | Evidence-based pilot gate |
+| [docs/PILOT_DEPLOYMENT.md](./docs/PILOT_DEPLOYMENT.md) | CI vs real cloud synthetic pilot |
+| [docs/SLICE11_EVIDENCE.md](./docs/SLICE11_EVIDENCE.md) | Slice 11 honesty / evidence labels |
+| [docs/COST_CONTROLS.md](./docs/COST_CONTROLS.md) | Pilot cost guardrails |
 | [docs/INCIDENT_RESPONSE.md](./docs/INCIDENT_RESPONSE.md) | Incident + runbook index |
 
 ## Operating principles

@@ -11,3 +11,4 @@ export * from './release-manifest';
 export * from './deployment-approval';
 export * from './pilot-burndown';
 export * from './pilot-monitoring';
+export * from './aws-secrets';

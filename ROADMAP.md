@@ -74,9 +74,13 @@ Detailed backlog: [docs/backlog/phase-1.md](./docs/backlog/phase-1.md)
 
 ---
 
-## Phase 3 — Live monitoring
+## Phase 3 — Controlled cloud pilot (Slice 11) then live monitoring
 
-**Objective:** Move from batch historical scan to continuous monitoring without changing the review philosophy.
+**Slice 11 objective:** Deploy ContractRadar into an isolated AWS pilot with **synthetic/internal data only**, providers disabled. Fully verified only after real cloud apply + smoke + restore. IaC/workflows may land before credentials exist; do not claim verification early.
+
+**After Slice 11 verification:** Integrate exactly one explicitly approved real provider (read-only/scoped ingestion first), then prepare a very limited first customer pilot.
+
+**Later Phase 3 objective:** Move from batch historical scan to continuous monitoring without changing the review philosophy.
 
 **Capabilities**
 

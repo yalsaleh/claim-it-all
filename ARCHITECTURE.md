@@ -435,9 +435,10 @@ Each connector implements: auth, incremental sync, document normalization, tenan
 - Redacted production configuration validation and readiness gating
 - Secret-reference interface (values never returned from APIs)
 - Kill switches, pilot readiness checklist, tenant limit evaluation
+- Slice 11 AWS pilot target (ADR-130): ALB → ECS Fargate (web) + private workers/DI/ClamAV → RDS + Redis + private S3 + Secrets Manager; apply human-gated (`enable_deployment=false` by default). CI synthetic pilot ≠ real cloud synthetic pilot ≠ future customer pilot.
 - Safe metric labels and secret-like redaction helpers
 
-Operational docs: [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md), [docs/ENVIRONMENT.md](./docs/ENVIRONMENT.md), [docs/OBSERVABILITY.md](./docs/OBSERVABILITY.md), [docs/PILOT_READINESS.md](./docs/PILOT_READINESS.md). Break-glass remains out-of-band (not in product UI). Backups/restores are proven in CI/MinIO only. ADRs 103–123.
+Operational docs: [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md), [docs/ENVIRONMENT.md](./docs/ENVIRONMENT.md), [docs/OBSERVABILITY.md](./docs/OBSERVABILITY.md), [docs/PILOT_READINESS.md](./docs/PILOT_READINESS.md), [docs/PILOT_DEPLOYMENT.md](./docs/PILOT_DEPLOYMENT.md). Break-glass remains out-of-band (not in product UI). Backups/restores are proven in CI/MinIO; cloud restore evidence is separate (ADR-134). ADRs 103–135.
 
 ---
 

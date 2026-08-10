@@ -1,0 +1,93 @@
+name: Cloud pilot deploy
+
+# Manual + protected environment only. Never runs on push.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY-SYNTHETIC-PILOT to proceed'
+        required: true
+        type: string
+      release_sha:
+        description: 'Exact commit SHA to deploy'
+        required: true
+        type: string
+
+env:
+  CONTRACTRADAR_ENV: PILOT
+  CLOUD_PILOT_OUT_DIR: ${{ github.workspace }}/artifacts/cloud-pilot
+  PILOT_READY_OUT_DIR: ${{ github.workspace }}/artifacts/pilot-readiness
+  REQUIRE_REAL_DIGESTS: 'true'
+
+jobs:
+  deploy:
+    name: Approved synthetic cloud pilot deploy
+    runs-on: ubuntu-latest
+    environment: pilot-cloud
+    steps:
+      - name: Confirm typed intent
+        run: |
+          test "${{ inputs.confirm }}" = "DEPLOY-SYNTHETIC-PILOT"
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_sha }}
+          fetch-depth: 0
+      - name: Enable pnpm via Corepack
+        run: corepack enable && corepack prepare pnpm@9.15.0 --activate
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      - name: Sharp + burndown gate (non-synthetic)
+        run: |
+          mkdir -p artifacts/cloud-pilot
+          node <<'NODE'
+          const fs = require('fs');
+          const doc = JSON.parse(fs.readFileSync('security/vulnerability-exceptions.json', 'utf8'));
+          const sharp = doc.exceptions.find((e) => e.id === 'EXC-2026-005' && e.status === 'active');
+          const decision = sharp?.pilotDecisionStatus;
+          const out = {
+            exceptionId: sharp?.id,
+            burndownClass: sharp?.burndownClass,
+            pilotDecisionStatus: decision ?? 'PENDING',
+            blocked: decision !== 'PILOT_APPROVED_EXCEPTION',
+            advisoryId: sharp?.advisoryId,
+            packageVersion: sharp?.packageVersion,
+            dependencyPath: sharp?.dependencyPath,
+          };
+          fs.writeFileSync('artifacts/cloud-pilot/sharp-decision.json', JSON.stringify(out, null, 2));
+          console.log(JSON.stringify(out, null, 2));
+          if (out.blocked) {
+            console.error('BLOCKED: sharp requires explicit PILOT_APPROVED_EXCEPTION before cloud apply');
+            process.exit(2);
+          }
+          NODE
+      - name: Static IaC + policy gates
+        run: |
+          chmod +x scripts/cloud/*.sh
+          bash scripts/cloud/network-security-check.sh
+          bash scripts/cloud/terraform-validate.sh
+          bash scripts/cloud/drift-check.sh
+          pnpm production:validate:pilot || true
+          node scripts/cloud/cloud-pilot-status.mjs
+      - name: AWS identity required
+        run: |
+          if [[ -z "${AWS_ROLE_ARN:-}${AWS_ACCESS_KEY_ID:-}" ]]; then
+            echo "NOT RUN — cloud environment unavailable (no AWS identity on runner)"
+            echo '{"status":"NOT RUN — cloud environment unavailable","applyExecuted":false}' \
+              > artifacts/cloud-pilot/deploy-result.json
+            exit 1
+          fi
+      - name: Terraform apply (human-gated)
+        run: |
+          echo "Configure OIDC role + terraform apply via docs/PILOT_DEPLOYMENT.md — not auto-applied in this scaffold."
+          echo '{"status":"BLOCKED — apply not automated without operator runbook","applyExecuted":false}' \
+            > artifacts/cloud-pilot/deploy-result.json
+          exit 1
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: cloud-pilot-evidence
+          path: artifacts/cloud-pilot/
+          if-no-files-found: warn

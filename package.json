@@ -55,7 +55,15 @@
     "pilot:tenant:create": "node scripts/pilot/tenant-create.mjs",
     "pilot:tenant:validate": "node scripts/pilot/tenant-validate.mjs",
     "pilot:release-manifest": "node scripts/pilot/release-manifest.mjs",
-    "gh": "bash scripts/pilot/gh.sh"
+    "gh": "bash scripts/pilot/gh.sh",
+    "cloud:network-check": "bash scripts/cloud/network-security-check.sh",
+    "cloud:terraform-validate": "bash scripts/cloud/terraform-validate.sh",
+    "cloud:status": "node scripts/cloud/cloud-pilot-status.mjs",
+    "cloud:smoke": "node scripts/cloud/cloud-smoke.mjs",
+    "cloud:restore-rehearsal": "node scripts/cloud/cloud-restore-rehearsal.mjs",
+    "cloud:drift": "bash scripts/cloud/drift-check.sh",
+    "cloud:cost-estimate": "node scripts/cloud/cost-estimate.mjs",
+    "cloud:log-redaction": "node scripts/cloud/log-redaction-canary.mjs"
   },
   "devDependencies": {
     "prettier": "3.4.2",

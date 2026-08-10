@@ -1,0 +1,61 @@
+name: Cloud pilot IaC
+
+# Static AWS pilot IaC verification on every push. Does NOT deploy.
+on:
+  push:
+    branches: [main, cursor/**]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CLOUD_PILOT_OUT_DIR: ${{ github.workspace }}/artifacts/cloud-pilot
+
+jobs:
+  iac-static:
+    name: Terraform static + network security + status
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Enable pnpm via Corepack
+        run: corepack enable && corepack prepare pnpm@9.15.0 --activate
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @contractradar/platform test:unit
+      - name: IaC checks
+        env:
+          CLOUD_PILOT_OUT_DIR: ${{ github.workspace }}/artifacts/cloud-pilot
+        run: |
+          chmod +x scripts/cloud/*.sh
+          mkdir -p artifacts/cloud-pilot
+          bash scripts/cloud/network-security-check.sh
+          bash scripts/cloud/terraform-validate.sh
+          bash scripts/cloud/drift-check.sh
+          node scripts/cloud/cloud-pilot-status.mjs
+          node scripts/cloud/cloud-smoke.mjs
+          node scripts/cloud/cloud-restore-rehearsal.mjs
+          node scripts/cloud/cost-estimate.mjs
+          node scripts/cloud/log-redaction-canary.mjs
+          test -s artifacts/cloud-pilot/network-security-report.json
+          test -s artifacts/cloud-pilot/terraform-validate-report.json
+          test -s artifacts/cloud-pilot/cloud-pilot-status.json
+          test -s artifacts/cloud-pilot/cloud-smoke-report.json
+          test -s artifacts/cloud-pilot/cloud-restore-rehearsal-report.json
+          test -s artifacts/cloud-pilot/pilot-cost-estimate.json
+          grep -q 'NOT RUN' artifacts/cloud-pilot/cloud-pilot-status.json
+          grep -q 'NOT RUN' artifacts/cloud-pilot/cloud-smoke-report.json
+      - name: Evidence summary
+        run: |
+          node scripts/ci/write-evidence-summary.mjs \
+            "Cloud pilot IaC" PASS artifacts/cloud-pilot \
+            "checksExecuted=network-security-static,terraform-validate-or-not-run,drift-static,cloud-status-not-run,cost-estimate,log-redaction-canary" \
+            "checksNotRun=terraform-apply,ecs-deploy,rds-restore,real-alb-smoke,live-cloudwatch-redaction" \
+            "knownGaps=no-aws-credentials-in-ci,sharp-pilot-decision-required-for-apply"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: cloud-pilot-iac-evidence
+          path: artifacts/cloud-pilot/
+          if-no-files-found: error
