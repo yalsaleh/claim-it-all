@@ -87,14 +87,18 @@ function loadExceptions() {
       'id',
       'advisoryId',
       'package',
+      'packageVersion',
       'dependencyPath',
       'severity',
       'classification',
+      'exploitability',
       'owner',
       'reason',
       'mitigation',
       'approvedBy',
       'expiresAt',
+      'upgradeTarget',
+      'trackingIssue',
       'status',
     ]) {
       if (!ex[key] || String(ex[key]).trim() === '') {
@@ -128,12 +132,20 @@ function matchException(finding, exceptions, now) {
   return { matched: true, exception: ex, expired };
 }
 
+function packageVersionFromPath(pkg, depPath) {
+  const re = new RegExp(`${pkg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}@([^\\s>]+)`);
+  const m = String(depPath || '').match(re);
+  return m ? m[1] : null;
+}
+
 function evaluate(findings, doc) {
   const now = new Date();
+  const today = now.toISOString().slice(0, 10);
   const policy = doc.policy || {};
   const failures = [];
   const approved = [];
   const ignored = [];
+  const usedExceptionIds = new Set();
 
   for (const finding of findings) {
     const sev = finding.severity;
@@ -159,13 +171,48 @@ function evaluate(findings, doc) {
       });
       continue;
     }
-    approved.push({ finding, exceptionId: m.exception.id, expiresAt: m.exception.expiresAt });
+    // Stale package version / dependency path precision checks
+    if (policy.failOnStalePackageVersion !== false) {
+      const foundVer = packageVersionFromPath(finding.package, finding.dependencyPath);
+      if (m.exception.packageVersion && foundVer && foundVer !== m.exception.packageVersion) {
+        failures.push({
+          code: 'STALE_EXCEPTION_VERSION',
+          finding,
+          exceptionId: m.exception.id,
+          message: `Exception ${m.exception.id} packageVersion ${m.exception.packageVersion} != audit ${foundVer}`,
+        });
+        continue;
+      }
+    }
+    if (policy.failOnStaleDependencyPath !== false) {
+      if (
+        finding.dependencyPath !== m.exception.dependencyPath &&
+        !finding.dependencyPath.startsWith(m.exception.dependencyPath)
+      ) {
+        failures.push({
+          code: 'STALE_EXCEPTION_PATH',
+          finding,
+          exceptionId: m.exception.id,
+          message: `Exception ${m.exception.id} dependencyPath no longer matches audit path`,
+        });
+        continue;
+      }
+    }
+    usedExceptionIds.add(m.exception.id);
+    approved.push({
+      finding,
+      exceptionId: m.exception.id,
+      expiresAt: m.exception.expiresAt,
+      packageVersion: m.exception.packageVersion,
+      dependencyPath: m.exception.dependencyPath,
+      classification: m.exception.classification,
+      upgradeTarget: m.exception.upgradeTarget,
+      trackingIssue: m.exception.trackingIssue,
+    });
   }
 
-  // Expired active exceptions fail even if unused? Policy: expire fails when matched above.
-  // Also fail register entries that claim active but are past expiry (hygiene).
   for (const ex of doc.exceptions) {
-    if (ex.status === 'active' && ex.expiresAt < now.toISOString().slice(0, 10)) {
+    if (ex.status === 'active' && ex.expiresAt < today) {
       if (!failures.some((f) => f.exceptionId === ex.id)) {
         failures.push({
           code: 'EXPIRED_EXCEPTION',
@@ -176,10 +223,44 @@ function evaluate(findings, doc) {
     }
   }
 
-  const ok =
-    failures.length === 0 &&
-    policy.failOnUnapprovedCritical !== false &&
-    policy.failOnUnapprovedHigh !== false;
+  // Unused active exceptions: advisory gone but register entry remains beyond grace.
+  const graceDays = Number(policy.unusedExceptionGraceDays ?? 14);
+  const advisoryIds = new Set(findings.map((f) => String(f.advisoryId)));
+  for (const ex of doc.exceptions) {
+    if (ex.status !== 'active') continue;
+    if (usedExceptionIds.has(ex.id)) continue;
+    if (advisoryIds.has(String(ex.advisoryId))) {
+      // Advisory still present but path/version mismatch prevented use — already failed above or path-only.
+      continue;
+    }
+    // Advisory absent: require explicit retainedUntil or fail after grace from expiresAt window start.
+    // Use expiresAt as outer bound; if advisory missing, fail immediately when grace is 0, else require retainedUntil.
+    const retainedUntil = ex.retainedUntil || null;
+    if (retainedUntil && retainedUntil >= today) continue;
+    if (graceDays <= 0) {
+      failures.push({
+        code: 'UNUSED_EXCEPTION',
+        exceptionId: ex.id,
+        message: `Active exception ${ex.id} unused and advisory ${ex.advisoryId} no longer present`,
+      });
+    } else if (!retainedUntil) {
+      // Soft: record in report but fail to force cleanup when advisory disappears.
+      failures.push({
+        code: 'UNUSED_EXCEPTION',
+        exceptionId: ex.id,
+        message: `Active exception ${ex.id} unused; advisory ${ex.advisoryId} absent (set retainedUntil within ${graceDays}d grace or remove)`,
+      });
+    } else if (retainedUntil < today) {
+      failures.push({
+        code: 'UNUSED_EXCEPTION',
+        exceptionId: ex.id,
+        message: `Active exception ${ex.id} unused past retainedUntil ${retainedUntil}`,
+      });
+    }
+  }
+
+  const criticalExceptions = approved.filter((a) => a.finding.severity === 'critical');
+  const highExceptions = approved.filter((a) => a.finding.severity === 'high');
 
   return {
     ok: failures.length === 0,
@@ -189,8 +270,29 @@ function evaluate(findings, doc) {
       critical: findings.filter((f) => f.severity === 'critical').length,
       high: findings.filter((f) => f.severity === 'high').length,
       approvedExceptionsUsed: approved.length,
+      criticalExceptionsUsed: criticalExceptions.length,
+      highExceptionsUsed: highExceptions.length,
       failures: failures.length,
     },
+    activeExceptions: doc.exceptions
+      .filter((e) => e.status === 'active')
+      .map((e) => ({
+        id: e.id,
+        advisoryId: e.advisoryId,
+        package: e.package,
+        packageVersion: e.packageVersion,
+        dependencyPath: e.dependencyPath,
+        severity: e.severity,
+        classification: e.classification,
+        exploitability: e.exploitability,
+        mitigation: e.mitigation,
+        owner: e.owner,
+        approvedBy: e.approvedBy,
+        expiresAt: e.expiresAt,
+        upgradeTarget: e.upgradeTarget,
+        trackingIssue: e.trackingIssue,
+        used: usedExceptionIds.has(e.id),
+      })),
     failures,
     approved,
     ignoredSample: ignored.slice(0, 20),

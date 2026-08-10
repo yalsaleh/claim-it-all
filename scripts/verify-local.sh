@@ -86,14 +86,23 @@ fi
 (
   cd services/document-intelligence
   DI_PYTHON="python3"
-  if command -v python3.12 >/dev/null 2>&1; then
-    DI_PYTHON="python3.12"
-  fi
-  if [[ ! -x .venv-ci/bin/python ]] || ! .venv-ci/bin/python -c 'import sys; raise SystemExit(0 if sys.version_info[:2]==(3,12) else 1)' 2>/dev/null; then
+  for candidate in \
+    "$(command -v python3.12 2>/dev/null || true)" \
+    "${HOME}/.local/bin/python3.12" \
+    "${HOME}/.local/share/uv/python/cpython-3.12.13-macos-x86_64-none/bin/python3.12"; do
+    if [[ -n "${candidate}" && -x "${candidate}" ]]; then
+      DI_PYTHON="${candidate}"
+      break
+    fi
+  done
+  # Detect broken venvs (symlink exists but shebang target missing) and wrong versions.
+  if [[ ! -x .venv-ci/bin/python ]] \
+    || ! .venv-ci/bin/python -c 'import sys; raise SystemExit(0 if sys.version_info[:2]==(3,12) else 1)' 2>/dev/null; then
     echo "==> Recreating services/document-intelligence/.venv-ci with ${DI_PYTHON} (CI parity)"
     rm -rf .venv-ci
     "${DI_PYTHON}" -m venv .venv-ci
     .venv-ci/bin/python -m pip install --upgrade pip
+    .venv-ci/bin/pip install --only-binary=:all: cryptography || true
     .venv-ci/bin/pip install --only-binary=:all: -e ".[dev]" || .venv-ci/bin/pip install -e ".[dev]"
   fi
   run .venv-ci/bin/ruff check src tests
@@ -104,7 +113,8 @@ fi
     .venv-ci/bin/pytest -q -k "not live"
 )
 
-run "${PNPM[@]}" build
+# Next.js production build requires NODE_ENV=production (job defaults to test above).
+run env NODE_ENV=production "${PNPM[@]}" build
 
 echo ""
 echo "============================================================"

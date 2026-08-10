@@ -28,17 +28,22 @@ env:
   S3_FORCE_PATH_STYLE: 'true'
   LOG_LEVEL: info
   ALLOW_DEV_DEFAULTS: 'true'
-  MALWARE_SCANNER: fake_test
+  MALWARE_SCANNER: clamav
+  CLAMAV_HOST: 127.0.0.1
+  CLAMAV_PORT: '3310'
   CONNECTOR_PROVIDER: fake
   NOTICE_DELIVERY_PROVIDER: fake
   PROD_EVIDENCE_OUT_DIR: ${{ github.workspace }}/artifacts/production-readiness
   SUPPLY_CHAIN_OUT_DIR: ${{ github.workspace }}/artifacts/supply-chain
   REQUIRE_INTEGRATION_DB: 'true'
+  ARQ_QUEUE_NAME: contractradar:document-processing
+  START_CLAMAV: 'true'
 
 jobs:
   production-readiness:
     name: Production readiness evidence
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     services:
       postgres:
         image: postgres:16.6-alpine
@@ -70,11 +75,12 @@ jobs:
         with:
           node-version: '22'
           package-manager-cache: false
-      - name: Start MinIO sidecar
-        env:
-          START_CLAMAV: 'false'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Start MinIO + ClamAV sidecars
         run: |
-          chmod +x scripts/ci/start-live-sidecars.sh scripts/ci/stop-live-sidecars.sh
+          chmod +x scripts/ci/start-live-sidecars.sh scripts/ci/stop-live-sidecars.sh scripts/ci/sidecar-helpers.sh
           bash scripts/ci/start-live-sidecars.sh
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - run: pnpm install --frozen-lockfile
@@ -108,6 +114,11 @@ jobs:
           echo "$OUT" | tee artifacts/production-readiness/production-fake-provider-rejection.json
           echo "$OUT" | grep -q CFG_FAKE_PROVIDER
           test "$STATUS" -ne 0
+      - name: Test-purge safety (STAGING/PILOT/PRODUCTION fail closed)
+        run: |
+          chmod +x scripts/ci/test-purge-safety-check.sh
+          bash scripts/ci/test-purge-safety-check.sh
+          test -s artifacts/production-readiness/test-purge-safety-report.json
       - name: Supply-chain + vulnerability policy
         run: |
           chmod +x scripts/supply-chain/*.sh scripts/ci/*.sh
@@ -125,10 +136,17 @@ jobs:
         run: |
           pnpm --filter @contractradar/web exec tsx scripts/pilot-readiness-fixture.ts \
             | tee artifacts/production-readiness/pilot-readiness-fixture.json
-      - name: Container hardening
-        run: bash scripts/ci/container-hardening-check.sh
-      - name: Health/readiness gates (synthetic stack)
-        run: bash scripts/ci/health-readiness-check.sh
+      - name: Full synthetic service readiness (ClamAV/worker/dispatcher)
+        run: |
+          chmod +x scripts/ci/full-service-readiness-check.sh
+          bash scripts/ci/full-service-readiness-check.sh
+          test -s artifacts/production-readiness/full-service-readiness-report.json
+      - name: Web + DI production container build/inspect
+        run: |
+          chmod +x scripts/ci/web-container-hardening-check.sh
+          bash scripts/ci/web-container-hardening-check.sh
+          test -s artifacts/production-readiness/web-container-hardening-report.json
+          test -s artifacts/production-readiness/container-hardening.json
       - name: Production build
         run: pnpm build
       - name: Evidence summary
@@ -137,11 +155,13 @@ jobs:
           test -s artifacts/supply-chain/vulnerability-policy.json
           test -s artifacts/production-readiness/config-validation.json
           test -s artifacts/production-readiness/container-hardening.json
+          test -s artifacts/production-readiness/web-container-hardening-report.json
+          test -s artifacts/production-readiness/test-purge-safety-report.json
+          test -s artifacts/production-readiness/full-service-readiness-report.json
           test -s artifacts/production-readiness/pilot-readiness-fixture.json
-          test -s artifacts/production-readiness/health-readiness.json
           node scripts/ci/write-evidence-summary.mjs \
             "Production readiness" PASS artifacts/production-readiness \
-            "checksExecuted=config-validate,fake-provider-reject,integrity,migration-verify,pilot-fixture,container-hardening,health-readiness,build,supply-chain" \
+            "checksExecuted=config-validate,fake-provider-reject,test-purge-safety,integrity,migration-verify,pilot-fixture,full-service-readiness,web-container-hardening,build,supply-chain" \
             "checksNotRun=live-external-apm,real-cloud-restore,kubernetes" \
             "knownGaps=mfa-architecture-only,break-glass-documented-only"
       - uses: actions/upload-artifact@v6
@@ -152,4 +172,32 @@ jobs:
             artifacts/supply-chain/
           if-no-files-found: error
       - if: always()
-        run: bash scripts/ci/stop-live-sidecars.sh || true
+        run: |
+          for f in /tmp/di-api-pr.pid /tmp/arq-worker-pr.pid /tmp/outbox-pr.pid /tmp/di-pr.pid; do
+            if [[ -f "$f" ]]; then kill "$(cat "$f")" 2>/dev/null || true; fi
+          done
+          bash scripts/ci/stop-live-sidecars.sh || true
+
+  verify-artifacts:
+    name: Verify production-readiness artifact contents
+    needs: production-readiness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v6
+        with:
+          name: production-readiness-evidence
+          path: downloaded/production-readiness
+      - name: Validate archive contents
+        run: |
+          chmod +x scripts/ci/verify-uploaded-artifacts.sh
+          mkdir -p artifacts/artifact-verification
+          ARTIFACT_VERIFY_OUT_DIR="${{ github.workspace }}/artifacts/artifact-verification" \
+            bash scripts/ci/verify-uploaded-artifacts.sh \
+              downloaded/production-readiness production-readiness "${{ github.sha }}"
+          test -s artifacts/artifact-verification/artifact-verification-report.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: production-readiness-artifact-verification
+          path: artifacts/artifact-verification/
+          if-no-files-found: error

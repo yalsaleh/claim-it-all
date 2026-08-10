@@ -13,6 +13,7 @@ const report = validateProductionConfig({
   documentIntelligenceToken: process.env.DOCUMENT_INTELLIGENCE_INTERNAL_TOKEN,
   malwareScanner: process.env.MALWARE_SCANNER,
   allowDevDefaults: process.env.ALLOW_DEV_DEFAULTS === 'true',
+  allowTestPurge: process.env.ALLOW_TEST_PURGE === 'true',
   connectorProvider: process.env.CONNECTOR_PROVIDER,
   noticeDeliveryProvider: process.env.NOTICE_DELIVERY_PROVIDER,
   contractAiProvider: process.env.CONTRACT_AI_PROVIDER,

@@ -46,3 +46,27 @@ jobs:
           name: dependency-security-evidence
           path: artifacts/supply-chain/
           if-no-files-found: error
+
+  verify-artifacts:
+    name: Verify dependency-security artifact contents
+    needs: security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v6
+        with:
+          name: dependency-security-evidence
+          path: downloaded/supply-chain
+      - name: Validate archive contents
+        run: |
+          chmod +x scripts/ci/verify-uploaded-artifacts.sh
+          mkdir -p artifacts/artifact-verification
+          ARTIFACT_VERIFY_OUT_DIR="${{ github.workspace }}/artifacts/artifact-verification" \
+            bash scripts/ci/verify-uploaded-artifacts.sh \
+              downloaded/supply-chain dependency-security "${{ github.sha }}"
+          test -s artifacts/artifact-verification/artifact-verification-report.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dependency-security-artifact-verification
+          path: artifacts/artifact-verification/
+          if-no-files-found: error

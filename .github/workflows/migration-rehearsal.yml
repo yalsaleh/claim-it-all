@@ -27,10 +27,11 @@ env:
   BETTER_AUTH_URL: http://localhost:3000
   MIGRATION_OUT_DIR: ${{ github.workspace }}/artifacts/migration
   REQUIRE_INTEGRATION_DB: 'true'
+  SLICE8_BASELINE_COMMIT: 0e6ff4e0c529b23ad7bde881b029079ef60e3ff4
 
 jobs:
   migration-rehearsal:
-    name: Slice 8→9 upgrade + drift + role separation
+    name: Slice 8→9 true checkout upgrade + drift + role separation
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -48,6 +49,8 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: Enable pnpm via Corepack
         run: corepack enable && corepack prepare pnpm@9.15.0 --activate
       - uses: actions/setup-node@v5
@@ -57,24 +60,18 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - run: pnpm install --frozen-lockfile
       - run: pnpm validate:prisma && pnpm db:generate
-      - name: Clean migrate from zero
-        env:
-          DATABASE_URL: ${{ env.DATABASE_MIGRATE_URL }}
-        run: |
-          mkdir -p artifacts/migration
-          chmod +x scripts/db/*.sh scripts/backup/lib.sh
-          pnpm db:migrate:deploy
-          bash scripts/db/migrate-verify.sh
-          (cd apps/web && pnpm exec prisma migrate status)
-      - name: Slice 8 → Slice 9 forward upgrade rehearsal
+      - name: True Slice 8 (0e6ff4e) → current upgrade rehearsal
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
-          # Reset DB then rehearse hold-aside Slice 9 path without claiming migrate reset IS the upgrade.
-          PSQL_URL="${DATABASE_MIGRATE_URL%%\?*}"
-          psql "$PSQL_URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+          mkdir -p artifacts/migration
+          chmod +x scripts/db/*.sh scripts/backup/lib.sh
+          # Verify baseline object exists in full history
+          git cat-file -t "${SLICE8_BASELINE_COMMIT}"
           bash scripts/db/slice8-upgrade-rehearsal.sh
           test -s artifacts/migration/slice8-to-slice9-report.json
+          test -s artifacts/migration/baseline-commit.txt
+          grep -q 0e6ff4e artifacts/migration/baseline-commit.txt
       - name: Drift detection
         run: |
           bash scripts/db/migration-drift-check.sh
@@ -85,11 +82,35 @@ jobs:
           test -s artifacts/migration/role-separation-report.json
           node scripts/ci/write-evidence-summary.mjs \
             "Migration rehearsal" PASS artifacts/migration \
-            "checksExecuted=clean-migrate,slice8-to-slice9-upgrade,drift-detection,role-separation" \
+            "checksExecuted=true-0e6ff4e-checkout-upgrade,drift-detection,role-separation" \
             "checksNotRun=" \
             "knownGaps="
       - uses: actions/upload-artifact@v6
         with:
           name: migration-rehearsal-artifacts
           path: artifacts/migration/
+          if-no-files-found: error
+
+  verify-artifacts:
+    name: Verify migration artifact contents
+    needs: migration-rehearsal
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v6
+        with:
+          name: migration-rehearsal-artifacts
+          path: downloaded/migration
+      - name: Validate archive contents
+        run: |
+          chmod +x scripts/ci/verify-uploaded-artifacts.sh
+          mkdir -p artifacts/artifact-verification
+          ARTIFACT_VERIFY_OUT_DIR="${{ github.workspace }}/artifacts/artifact-verification" \
+            bash scripts/ci/verify-uploaded-artifacts.sh \
+              downloaded/migration migration-rehearsal "${{ github.sha }}"
+          test -s artifacts/artifact-verification/artifact-verification-report.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: migration-artifact-verification
+          path: artifacts/artifact-verification/
           if-no-files-found: error

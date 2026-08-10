@@ -87,11 +87,70 @@ TENANT_COUNT_BEFORE="$(psql "${MIGRATE_URL}" -Atc 'SELECT count(*) FROM tenant')
 
 OBJ_A_KEY="tenants/11111111-1111-4111-8111-111111111111/projects/a1111111-1111-4111-8111-111111111111/originals/restore-a.txt"
 OBJ_B_KEY="tenants/22222222-2222-4222-8222-222222222222/projects/a2222222-2222-4222-8222-222222222222/originals/restore-b.txt"
+OBJ_ORIG_KEY="tenants/11111111-1111-4111-8111-111111111111/projects/a1111111-1111-4111-8111-111111111111/uploads/original-upload.bin"
+OBJ_PROMOTED_KEY="tenants/11111111-1111-4111-8111-111111111111/projects/a1111111-1111-4111-8111-111111111111/clean/promoted-clean.bin"
+OBJ_ARTIFACT_KEY="tenants/11111111-1111-4111-8111-111111111111/projects/a1111111-1111-4111-8111-111111111111/artifacts/extracted.txt"
+OBJ_EXPORT_KEY="tenants/11111111-1111-4111-8111-111111111111/notices/approved-export.pdf"
+OBJ_BUNDLE_KEY="tenants/11111111-1111-4111-8111-111111111111/notices/notice-bundle.bin"
+OBJ_DISPATCH_KEY="tenants/11111111-1111-4111-8111-111111111111/dispatch/evidence.bin"
+OBJ_CONNECTOR_KEY="tenants/11111111-1111-4111-8111-111111111111/projects/a1111111-1111-4111-8111-111111111111/connector/imported.bin"
+
 echo 'restore-object-a-bytes' > "${BACKUP_OUT_DIR}/object-a.txt"
 echo 'restore-object-b-bytes' > "${BACKUP_OUT_DIR}/object-b.txt"
+echo 'original-upload-bytes' > "${BACKUP_OUT_DIR}/object-orig.txt"
+echo 'promoted-clean-bytes' > "${BACKUP_OUT_DIR}/object-promoted.txt"
+echo 'extracted-artifact-bytes' > "${BACKUP_OUT_DIR}/object-artifact.txt"
+echo 'approved-notice-export' > "${BACKUP_OUT_DIR}/object-export.txt"
+echo 'notice-bundle-bytes' > "${BACKUP_OUT_DIR}/object-bundle.txt"
+echo 'dispatch-evidence-bytes' > "${BACKUP_OUT_DIR}/object-dispatch.txt"
+echo 'connector-imported-bytes' > "${BACKUP_OUT_DIR}/object-connector.txt"
+
 SHA_A="$(obj put "${OBJ_A_KEY}" "${BACKUP_OUT_DIR}/object-a.txt" | tail -n 1)"
 SHA_B="$(obj put "${OBJ_B_KEY}" "${BACKUP_OUT_DIR}/object-b.txt" | tail -n 1)"
+SHA_ORIG="$(obj put "${OBJ_ORIG_KEY}" "${BACKUP_OUT_DIR}/object-orig.txt" | tail -n 1)"
+SHA_PROMOTED="$(obj put "${OBJ_PROMOTED_KEY}" "${BACKUP_OUT_DIR}/object-promoted.txt" | tail -n 1)"
+SHA_ARTIFACT="$(obj put "${OBJ_ARTIFACT_KEY}" "${BACKUP_OUT_DIR}/object-artifact.txt" | tail -n 1)"
+SHA_EXPORT="$(obj put "${OBJ_EXPORT_KEY}" "${BACKUP_OUT_DIR}/object-export.txt" | tail -n 1)"
+SHA_BUNDLE="$(obj put "${OBJ_BUNDLE_KEY}" "${BACKUP_OUT_DIR}/object-bundle.txt" | tail -n 1)"
+SHA_DISPATCH="$(obj put "${OBJ_DISPATCH_KEY}" "${BACKUP_OUT_DIR}/object-dispatch.txt" | tail -n 1)"
+SHA_CONNECTOR="$(obj put "${OBJ_CONNECTOR_KEY}" "${BACKUP_OUT_DIR}/object-connector.txt" | tail -n 1)"
 note_pass "object_seed_written"
+
+echo "==> Seed DB rows that reference object keys"
+SEED_SQL="${BACKUP_OUT_DIR}/seed-db-object-refs.rendered.sql"
+sed \
+  -e "s|__SHA_ORIG__|${SHA_ORIG}|g" \
+  -e "s|__SHA_PROMOTED__|${SHA_PROMOTED}|g" \
+  -e "s|__SHA_ARTIFACT__|${SHA_ARTIFACT}|g" \
+  -e "s|__SHA_EXPORT__|${SHA_EXPORT}|g" \
+  -e "s|__SHA_BUNDLE__|${SHA_BUNDLE}|g" \
+  -e "s|__SHA_DISPATCH__|${SHA_DISPATCH}|g" \
+  -e "s|__SHA_CONNECTOR__|${SHA_CONNECTOR}|g" \
+  -e "s|__OBJ_ORIG_KEY__|${OBJ_ORIG_KEY}|g" \
+  -e "s|__OBJ_PROMOTED_KEY__|${OBJ_PROMOTED_KEY}|g" \
+  -e "s|__OBJ_ARTIFACT_KEY__|${OBJ_ARTIFACT_KEY}|g" \
+  -e "s|__OBJ_EXPORT_KEY__|${OBJ_EXPORT_KEY}|g" \
+  -e "s|__OBJ_BUNDLE_KEY__|${OBJ_BUNDLE_KEY}|g" \
+  -e "s|__OBJ_DISPATCH_KEY__|${OBJ_DISPATCH_KEY}|g" \
+  -e "s|__OBJ_CONNECTOR_KEY__|${OBJ_CONNECTOR_KEY}|g" \
+  "${ROOT_DIR}/scripts/backup/seed-db-object-refs.sql" > "${SEED_SQL}"
+psql "${MIGRATE_URL}" -v ON_ERROR_STOP=1 -f "${SEED_SQL}"
+python3 - <<PY2
+import json, pathlib
+pathlib.Path("${BACKUP_OUT_DIR}/db-object-refs-expected.json").write_text(json.dumps({
+  "refs": [
+    {"entityType":"upload_session","entityId":"u1111111-1111-4111-8111-111111111111","objectKey":"${OBJ_ORIG_KEY}","expectedChecksum":"${SHA_ORIG}"},
+    {"entityType":"document_version_promoted","entityId":"v1111111-1111-4111-8111-111111111111","objectKey":"${OBJ_PROMOTED_KEY}","expectedChecksum":"${SHA_PROMOTED}"},
+    {"entityType":"extracted_artifact","entityId":"e1111111-1111-4111-8111-111111111111","objectKey":"${OBJ_ARTIFACT_KEY}","expectedChecksum":"${SHA_ARTIFACT}"},
+    {"entityType":"notice_export_bundle","entityId":"ne111111-1111-4111-8111-111111111111","objectKey":"${OBJ_EXPORT_KEY}","expectedChecksum":"${SHA_EXPORT}"},
+    {"entityType":"notice_bundle","entityId":"ns111111-1111-4111-8111-111111111111","objectKey":"${OBJ_BUNDLE_KEY}","expectedChecksum":"${SHA_BUNDLE}"},
+    {"entityType":"dispatch_evidence","entityId":"de111111-1111-4111-8111-111111111111","objectKey":"${OBJ_DISPATCH_KEY}","expectedChecksum":"${SHA_DISPATCH}"},
+    {"entityType":"connector_imported_object","entityId":"v2222222-2222-4222-8222-222222222222","objectKey":"${OBJ_CONNECTOR_KEY}","expectedChecksum":"${SHA_CONNECTOR}"},
+  ]
+}, indent=2)+"\n")
+print("DB_OBJECT_REFS_EXPECTED")
+PY2
+note_pass "db_object_references_seeded"
 
 MANIFEST="$(BACKUP_OUT_DIR="${BACKUP_OUT_DIR}" bash scripts/backup/pg-backup.sh | tail -n 1)"
 test -s "${MANIFEST}" || fail "backup_manifest_missing"
@@ -109,15 +168,18 @@ python3 - <<PY
 import json, pathlib
 doc=json.loads(pathlib.Path("${OBJ_MANIFEST}").read_text())
 pathlib.Path("${BACKUP_OUT_DIR}/object-checksum-summary.json").write_text(json.dumps({"objects": doc.get("objects", [])}, indent=2)+"\n")
-assert doc.get("objectCount", 0) >= 2, doc
+assert doc.get("objectCount", 0) >= 9, doc
 PY
 test -s "${BACKUP_OUT_DIR}/database-checksum.txt" || fail "database_checksum_missing"
 test -s "${BACKUP_OUT_DIR}/database-backup-metadata.json" || fail "database_backup_metadata_missing"
 cp "${MANIFEST}" "${BACKUP_OUT_DIR}/backup-manifest.json"
 note_pass "object_manifest_created"
 
-obj del "${OBJ_A_KEY}" >/dev/null || true
-obj del "${OBJ_B_KEY}" >/dev/null || true
+for k in "${OBJ_A_KEY}" "${OBJ_B_KEY}" "${OBJ_ORIG_KEY}" "${OBJ_PROMOTED_KEY}" \
+         "${OBJ_ARTIFACT_KEY}" "${OBJ_EXPORT_KEY}" "${OBJ_BUNDLE_KEY}" \
+         "${OBJ_DISPATCH_KEY}" "${OBJ_CONNECTOR_KEY}"; do
+  obj del "${k}" >/dev/null || true
+done
 note_pass "objects_deleted_pre_restore"
 
 bash scripts/backup/pg-restore.sh "${DUMP_PATH}"
@@ -135,6 +197,100 @@ SHA_A2="$(obj get "${OBJ_A_KEY}" "${BACKUP_OUT_DIR}/object-a.restored.txt" | tai
 SHA_B2="$(obj get "${OBJ_B_KEY}" "${BACKUP_OUT_DIR}/object-b.restored.txt" | tail -n 1)"
 [[ "${SHA_A}" == "${SHA_A2}" && "${SHA_B}" == "${SHA_B2}" ]] || fail "object_checksum_mismatch ${SHA_A}/${SHA_A2} ${SHA_B}/${SHA_B2}"
 note_pass "object_byte_checksum_round_trip"
+
+echo "==> Verify restored DB object references resolve to object bytes"
+MIGRATE_URL="${MIGRATE_URL}" APP_URL="${APP_URL}" BACKUP_OUT_DIR="${BACKUP_OUT_DIR}" \
+ROOT_DIR="${ROOT_DIR}" python3 - <<'PY'
+import json, pathlib, subprocess, os, tempfile
+
+url = os.environ["MIGRATE_URL"]
+app_url = os.environ["APP_URL"]
+out = pathlib.Path(os.environ["BACKUP_OUT_DIR"])
+root = pathlib.Path(os.environ["ROOT_DIR"])
+
+def psql(u, q):
+    return subprocess.check_output(["psql", u, "-Atc", q], text=True).strip()
+
+def obj_get(key):
+    tmp = out / f"dbref-{key.replace('/', '_')}.bin"
+    r = subprocess.run(
+        ["pnpm", "--filter", "@contractradar/web", "exec", "node", "scripts/object-bytes.mjs", "get", key, str(tmp)],
+        cwd=str(root), capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        return None, f"missing:{r.stderr.strip()}"
+    sha = (r.stdout or "").strip().splitlines()[-1]
+    return sha, None
+
+queries = [
+    ("upload_session", "u1111111-1111-4111-8111-111111111111",
+     """SELECT "storageKey"||'|'||coalesce("expectedSha256",'') FROM upload_session WHERE id='u1111111-1111-4111-8111-111111111111'"""),
+    ("document_version_promoted", "v1111111-1111-4111-8111-111111111111",
+     """SELECT "storageKey"||'|'||sha256 FROM document_version WHERE id='v1111111-1111-4111-8111-111111111111'"""),
+    ("extracted_artifact", "e1111111-1111-4111-8111-111111111111",
+     """SELECT "storageKey"||'|'||sha256 FROM extracted_artifact WHERE id='e1111111-1111-4111-8111-111111111111'"""),
+    ("notice_export_bundle", "ne111111-1111-4111-8111-111111111111",
+     """SELECT "storageKey"||'|'||"artifactChecksum" FROM notice_export_bundle WHERE id='ne111111-1111-4111-8111-111111111111'"""),
+    ("notice_bundle", "ns111111-1111-4111-8111-111111111111",
+     """SELECT (\"attachmentSnapshot\"->0->>'storageKey')||'|'||\"bundleChecksum\" FROM notice_dispatch_package_snapshot WHERE id='ns111111-1111-4111-8111-111111111111'"""),
+    ("dispatch_evidence", "de111111-1111-4111-8111-111111111111",
+     """SELECT "storageKey"||'|'||"checksumSha256" FROM dispatch_evidence WHERE id='de111111-1111-4111-8111-111111111111'"""),
+    ("connector_imported_object", "v2222222-2222-4222-8222-222222222222",
+     """SELECT "storageKey"||'|'||sha256 FROM document_version WHERE id='v2222222-2222-4222-8222-222222222222'"""),
+]
+
+results = []
+missing = 0
+for entity_type, entity_id, q in queries:
+    row = psql(url, q)
+    if not row or "|" not in row:
+        results.append({"entityType": entity_type, "entityId": entity_id, "resolutionResult": "FAIL_DB_ROW_MISSING"})
+        missing += 1
+        continue
+    key, expected = row.split("|", 1)
+    restored, err = obj_get(key)
+    ok = restored is not None and restored == expected and key == key
+    if restored is None:
+        missing += 1
+    results.append({
+        "entityType": entity_type,
+        "entityId": entity_id,
+        "objectKey": key,
+        "expectedChecksum": expected,
+        "restoredChecksum": restored,
+        "resolutionResult": "PASS" if ok else ("FAIL_MISSING_OBJECT" if restored is None else "FAIL_CHECKSUM"),
+    })
+
+# Document/version readable
+doc_ok = psql(url, "SELECT count(*) FROM source_document WHERE id='d1111111-1111-4111-8111-111111111111'") == "1"
+ver_ok = psql(url, "SELECT count(*) FROM document_version WHERE id='v1111111-1111-4111-8111-111111111111'") == "1"
+
+# Cross-project access blocked for tenant B user against tenant A project objects
+iso = subprocess.check_output(["psql", app_url, "-v", "ON_ERROR_STOP=1"], text=True, input="""
+SELECT set_config('app.bypass_rls', 'off', false);
+SELECT set_config('app.current_user_id', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', false);
+SELECT set_config('app.current_tenant_id', '22222222-2222-4222-8222-222222222222', false);
+SELECT count(*) FROM document_version WHERE id = 'v1111111-1111-4111-8111-111111111111';
+""")
+import re
+nums = [int(x) for x in re.findall(r"^\s*(\d+)\s*$", iso, re.M)]
+cross_project_blocked = len(nums) >= 1 and nums[0] == 0
+
+ok = missing == 0 and all(r["resolutionResult"] == "PASS" for r in results) and doc_ok and ver_ok and cross_project_blocked
+doc = {
+  "status": "PASS" if ok else "FAIL",
+  "ok": ok,
+  "references": results,
+  "documentReadable": doc_ok,
+  "versionReadable": ver_ok,
+  "crossProjectAccessBlocked": cross_project_blocked,
+  "missingObjectCount": missing,
+}
+(out / "database-object-reference-report.json").write_text(json.dumps(doc, indent=2) + "\n")
+print(json.dumps(doc, indent=2))
+raise SystemExit(0 if ok else 1)
+PY
+note_pass "database_object_references_resolved"
 
 if ! obj missing "tenants/missing/object.bin"; then
   fail "missing_object_should_error"

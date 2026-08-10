@@ -96,9 +96,10 @@ jobs:
           test -s artifacts/backup/database-backup-metadata.json
           test -s artifacts/backup/application-readiness-report.json
           test -s artifacts/backup/object-restore-report.json
+          test -s artifacts/backup/database-object-reference-report.json
           node scripts/ci/write-evidence-summary.mjs \
             "Backup and restore test" PASS artifacts/backup \
-            "checksExecuted=pg-backup,object-byte-roundtrip,cross-tenant-isolation,tamper-rejection,readiness" \
+            "checksExecuted=pg-backup,object-byte-roundtrip,db-object-reference-resolution,cross-tenant-isolation,tamper-rejection,readiness" \
             "checksNotRun=production-cloud-restore" \
             "knownGaps=labelled-synthetic-ci-only"
       - uses: actions/upload-artifact@v6
@@ -106,6 +107,30 @@ jobs:
         with:
           name: backup-restore-artifacts
           path: artifacts/backup/
-          if-no-files-found: warn
+          if-no-files-found: error
       - if: always()
         run: bash scripts/ci/stop-live-sidecars.sh || true
+
+  verify-artifacts:
+    name: Verify backup artifact contents
+    needs: backup-restore
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v6
+        with:
+          name: backup-restore-artifacts
+          path: downloaded/backup
+      - name: Validate archive contents
+        run: |
+          chmod +x scripts/ci/verify-uploaded-artifacts.sh
+          mkdir -p artifacts/artifact-verification
+          ARTIFACT_VERIFY_OUT_DIR="${{ github.workspace }}/artifacts/artifact-verification" \
+            bash scripts/ci/verify-uploaded-artifacts.sh \
+              downloaded/backup backup-restore "${{ github.sha }}"
+          test -s artifacts/artifact-verification/artifact-verification-report.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: backup-artifact-verification
+          path: artifacts/artifact-verification/
+          if-no-files-found: error

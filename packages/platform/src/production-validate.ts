@@ -26,6 +26,8 @@ export type ProductionValidateInput = {
   documentIntelligenceToken?: string;
   malwareScanner?: string;
   allowDevDefaults?: boolean;
+  /** Explicit enable of test-only purge capability (must stay false outside LOCAL/TEST/CI). */
+  allowTestPurge?: boolean;
   connectorProvider?: string;
   noticeDeliveryProvider?: string;
   contractAiProvider?: string;
@@ -166,6 +168,15 @@ export function validateProductionConfig(input: ProductionValidateInput): Produc
     });
   }
 
+  if (input.allowTestPurge && !policy.allowTestPurgeGucs) {
+    findings.push({
+      code: 'CFG_TEST_PURGE_ENABLED',
+      severity: 'error',
+      message: 'ALLOW_TEST_PURGE / test purge capability is forbidden in ' + environment,
+      field: 'ALLOW_TEST_PURGE',
+    });
+  }
+
   if (policy.requireClamav && input.malwareScanner && input.malwareScanner !== 'clamav') {
     findings.push({
       code: 'CFG_SCANNER',
@@ -226,6 +237,7 @@ export function validateProductionConfig(input: ProductionValidateInput): Produc
     noticeDeliveryProvider: input.noticeDeliveryProvider,
     contractAiProvider: input.contractAiProvider,
     allowDevDefaults: input.allowDevDefaults,
+    allowTestPurge: input.allowTestPurge,
     backupConfigured: input.backupConfigured,
     cookieSecure: input.cookieSecure,
   }) as Record<string, unknown>;

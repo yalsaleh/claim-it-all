@@ -70,9 +70,9 @@ Slice 8 adds `@contractradar/connectors` and `@contractradar/operations` unit te
 
 | Workflow | Purpose |
 |----------|---------|
-| `production-readiness` | Config validation, fake-provider reject, integrity, pilot fixture, container hardening, DI health gates, downloadable evidence |
-| `backup-restore` | Synthetic CI Postgres + MinIO restore: cross-tenant isolation, object byte checksums, tamper rejection (**not** cloud DR) |
-| `migration-rehearsal` | Slice 8→9 forward upgrade (hold-aside), drift detection, runtime vs migration role separation |
+| `production-readiness` | Config validation, fake-provider reject, test-purge fail-closed, integrity, pilot fixture, **web+DI production image build/inspect**, full synthetic readiness (Postgres/Redis/MinIO/ClamAV/DI/ARQ/dispatcher), post-upload artifact verification |
+| `backup-restore` | Synthetic CI Postgres + MinIO restore: cross-tenant isolation, object byte checksums, DB object-reference resolution, tamper rejection (**not** cloud DR) |
+| `migration-rehearsal` | True Slice 8 (`0e6ff4e` worktree) → current forward upgrade (no upgrade-stage `migrate reset`), drift, role separation, post-upload artifact verification |
 | `dependency-security` | SBOM, `pnpm security:audit` policy gate, license inventory, secret scan, exception register snapshot |
 
 These workflows support Slice 9 / 9B Mode A evidence. They do **not** perform a real deployment, onboard real providers, or prove multi-region DR. Fake providers remain CI/test-only and are rejected for PILOT/PRODUCTION policy checks. Local Docker/Postgres absence is reported as **NOT RUN** via `pnpm env:doctor`, never as PASS.

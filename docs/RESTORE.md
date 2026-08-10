@@ -6,8 +6,10 @@ Prove backups restore isolation-preserving state (ADR-114).
 
 ## CI evidence
 
-Workflow `backup-restore` restores into ephemeral resources and runs `integrity:check`
-plus cross-tenant probes. **CI/MinIO only** for Slice 9.
+Workflow `backup-restore` restores into ephemeral resources and runs `integrity:check`,
+cross-tenant probes, object byte checksum round-trip, and **database object-reference
+resolution** (`database-object-reference-report.json`: DB keys → restored MinIO bytes).
+**Synthetic CI/MinIO only** — not a production-cloud restore.
 
 ## Manual outline
 

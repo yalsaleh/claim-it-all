@@ -17,7 +17,8 @@ yet.
 2. CI workflow `dependency-security` runs SBOM, license inventory, secret scan, and
    `pnpm security:audit` (advisory capture + owned expiring exception register)
 3. Critical/high findings must be fixed or have an explicit owned, expiring exception
-   keyed by advisory ID + package + dependency path (`security/vulnerability-exceptions.json`)
+   keyed by advisory ID + package + package version + dependency path
+   (`security/vulnerability-exceptions.json`), with expiry/staleness/unused gates
 4. Expired, malformed, or mismatched exceptions fail CI; audit reports remain downloadable
 5. Pin CI container images (tags today; digests as follow-up per [CI.md](../CI.md))
 6. Review new privileged dependencies affecting auth, crypto, parsers, or connectors

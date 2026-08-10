@@ -19,9 +19,14 @@ Uses `validateProductionConfig` from `@contractradar/platform`. Output is **reda
 - Weak / placeholder `BETTER_AUTH_SECRET`
 - Default MinIO or DI tokens when policy rejects defaults
 - `ALLOW_DEV_DEFAULTS` outside LOCAL/TEST/CI
+- `ALLOW_TEST_PURGE=true` outside LOCAL/TEST/CI (`CFG_TEST_PURGE_ENABLED`)
 - Non-ClamAV scanner when ClamAV required
 - Fake/local providers in STAGING/PILOT/PRODUCTION (local-capture also blocked in PILOT/PROD)
 - Insecure cookies in PILOT/PRODUCTION
+
+Production readiness also proves SQL `reject_test_purge_outside_test_check()` fail-closed
+in STAGING/PILOT/PRODUCTION, builds the **web production image** (non-root), and runs
+**internal synthetic** ClamAV/worker/dispatcher readiness (not a cloud deploy).
 
 ## Related
 

@@ -3,6 +3,9 @@ node_modules/
 .pnpm-store/
 .venv/
 .venv-ci/
+.venv-ci-local/
+.venv-s9b/
+.venv-ci-pr/
 .tools/
 venv/
 __pycache__/

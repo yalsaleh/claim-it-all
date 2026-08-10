@@ -6,8 +6,9 @@ Postgres + object storage manifests. Secrets are references only (not dump plain
 
 ## Evidence path
 
-Backups for Slice 9 are exercised in **CI against ephemeral Postgres + MinIO** — not a
-real customer cloud (ADR-113).
+Backups for Slice 9 are exercised in **synthetic CI against ephemeral Postgres + MinIO** —
+not a real customer cloud (ADR-113). Evidence includes manifests, checksums, and
+post-restore DB→object reference verification.
 
 ## Operator / CI
 

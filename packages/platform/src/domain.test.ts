@@ -77,10 +77,37 @@ describe('production validate', () => {
       noticeDeliveryProvider: 'smtp',
       contractAiProvider: 'approved_vendor',
       allowDevDefaults: false,
+      allowTestPurge: false,
       cookieSecure: true,
       backupConfigured: true,
     });
     expect(report.ok).toBe(true);
+  });
+
+  it('rejects ALLOW_TEST_PURGE in STAGING/PILOT/PRODUCTION', () => {
+    for (const environment of ['STAGING', 'PILOT', 'PRODUCTION'] as const) {
+      const report = validateProductionConfig({
+        environment,
+        databaseUrl: 'postgresql://contractradar_app:strong@db/app',
+        migrateDatabaseUrl: 'postgresql://migrator_role:strong@db/app',
+        redisUrl: 'redis://redis:6379',
+        s3Endpoint: 'https://s3.example',
+        s3AccessKeyId: 'AKIA_NOT_DEFAULT',
+        s3SecretAccessKey: 'not-default-secret-value',
+        betterAuthSecret: 'a'.repeat(48),
+        documentIntelligenceToken: 'a'.repeat(40),
+        malwareScanner: 'clamav',
+        clamavHost: 'clamav',
+        connectorProvider: 'microsoft',
+        noticeDeliveryProvider: 'smtp',
+        allowDevDefaults: false,
+        allowTestPurge: true,
+        cookieSecure: true,
+        backupConfigured: true,
+      });
+      expect(report.ok).toBe(false);
+      expect(report.findings.some((f) => f.code === 'CFG_TEST_PURGE_ENABLED')).toBe(true);
+    }
   });
 });
 
